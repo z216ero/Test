@@ -57,7 +57,7 @@ Infrastructure:
   - ensure TypeScript passes (often part of lint or a `typecheck` script)
 
 ## PR / commit rules
-- Branch name: `task-<id>` (example: `task-1000`).
+- Branch name: `task-<id>-<short description>` (example: `task-1000-add-login-btn`).
 - Keep PRs small and vertical: API + DB migration (if needed) + mobile wiring.
 - No broad refactors during feature work unless explicitly requested.
 - Never swallow errors silently. Return proper status codes and messages.
