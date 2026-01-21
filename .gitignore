@@ -1,0 +1,89 @@
+﻿# .NET / Visual Studio
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+[xX]64/
+[xX]86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+[Dd]ebugPublic/
+[Rr]eleases/
+[Oo]ut/
+[Ww]in32/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.vspscc
+*.vssscc
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.VC.opendb
+.vs/
+# .NET Aspire
+**/apphost/aspire-output/
+**/aspire-output/
+# NuGet
+*.nupkg
+*.snupkg
+.nupkg/
+# .NET artifacts
+project.lock.json
+project.fragment.lock.json
+artifacts/
+# Node.js / TypeScript
+node_modules/
+.npm/
+.pnpm-debug.log*
+.yarn/
+.yarnrc
+.yarnrc.yml
+.yarn-integrity
+.yarn-debug.log*
+.yarn-error.log*
+npm-debug.log*
+pnpm-debug.log*
+# React Native
+# metro
+.metro-cache/
+# iOS
+ios/Pods/
+ios/build/
+ios/*.xcworkspace
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+# Android local config
+android/local.properties
+# React Native misc
+*.keystore
+*.jks
+# Docker / docker-compose
+.env
+.env.*
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+$RECYCLE.BIN/
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+# Certificates
+**/*.pfx
+**/*.crt
+**/*.key
