@@ -3,6 +3,7 @@ using Api.Data;
 using Api.Features.Common;
 using Api.Features.Slots;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Api.Features.Bookings;
 
@@ -68,7 +69,7 @@ public sealed class BookingService(AppDbContext db)
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (Exception ex) when (IsBookingConflict(ex))
         {
             return ServiceResult<BookingDto>.Fail(
                 StatusCodes.Status409Conflict,
@@ -130,4 +131,24 @@ public sealed class BookingService(AppDbContext db)
             slot.DurationMinutes,
             slot.Status.ToString(),
             slot.CreatedAtUtc);
+
+    private static bool IsBookingConflict(Exception ex)
+    {
+        var pg = FindPostgresException(ex);
+        return pg is not null && (pg.SqlState == PostgresErrorCodes.UniqueViolation
+            || pg.SqlState == PostgresErrorCodes.SerializationFailure);
+    }
+
+    private static PostgresException? FindPostgresException(Exception ex)
+    {
+        for (var current = ex; current is not null; current = current.InnerException!)
+        {
+            if (current is PostgresException pg)
+            {
+                return pg;
+            }
+        }
+
+        return null;
+    }
 }

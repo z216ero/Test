@@ -11,6 +11,22 @@ public sealed class SlotService(AppDbContext db)
         CreateSlotRequest request,
         CancellationToken cancellationToken)
     {
+        if (request.StartsAtUtc == default)
+        {
+            return ServiceResult<SlotDto>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid start time",
+                "StartsAtUtc is required.");
+        }
+
+        if (request.StartsAtUtc.Kind != DateTimeKind.Utc)
+        {
+            return ServiceResult<SlotDto>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid start time",
+                "StartsAtUtc must be in UTC.");
+        }
+
         if (request.DurationMinutes <= 0)
         {
             return ServiceResult<SlotDto>.Fail(
@@ -19,13 +35,14 @@ public sealed class SlotService(AppDbContext db)
                 "DurationMinutes must be greater than 0.");
         }
 
-        var normalizedStart = NormalizeUtc(request.StartsAtUtc);
-        if (normalizedStart < DateTime.UtcNow)
+        var normalizedStart = request.StartsAtUtc;
+        var nowUtc = DateTime.UtcNow;
+        if (normalizedStart <= nowUtc)
         {
             return ServiceResult<SlotDto>.Fail(
                 StatusCodes.Status400BadRequest,
                 "Invalid start time",
-                "StartsAtUtc cannot be in the past.");
+                "StartsAtUtc must be in the future.");
         }
 
         var trainerExists = await db.TrainerProfiles
@@ -40,7 +57,8 @@ public sealed class SlotService(AppDbContext db)
 
         var newEnd = normalizedStart.AddMinutes(request.DurationMinutes);
         var existingSlots = await db.TrainingSlots
-            .Where(s => s.TrainerId == trainerId)
+            .Where(s => s.TrainerId == trainerId
+                && (s.Status == TrainingSlotStatus.Open || s.Status == TrainingSlotStatus.Booked))
             .ToListAsync(cancellationToken);
 
         if (existingSlots.Any(slot => Overlaps(normalizedStart, newEnd, slot)))
@@ -83,19 +101,35 @@ public sealed class SlotService(AppDbContext db)
                 "Trainer does not exist.");
         }
 
-        DateTime? normalizedFrom = fromUtc.HasValue ? NormalizeUtc(fromUtc.Value) : null;
-        DateTime? normalizedTo = toUtc.HasValue ? NormalizeUtc(toUtc.Value) : null;
+        if (fromUtc.HasValue && fromUtc.Value.Kind != DateTimeKind.Utc)
+        {
+            return ServiceResult<IReadOnlyList<SlotDto>>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid fromUtc",
+                "fromUtc must be in UTC.");
+        }
+
+        if (toUtc.HasValue && toUtc.Value.Kind != DateTimeKind.Utc)
+        {
+            return ServiceResult<IReadOnlyList<SlotDto>>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid toUtc",
+                "toUtc must be in UTC.");
+        }
+
+        var normalizedFrom = fromUtc ?? DateTime.UtcNow;
+        var normalizedTo = toUtc ?? normalizedFrom.AddDays(30);
+
+        if (normalizedFrom > normalizedTo)
+        {
+            return ServiceResult<IReadOnlyList<SlotDto>>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid range",
+                "fromUtc must be earlier than or equal to toUtc.");
+        }
 
         var query = db.TrainingSlots.Where(s => s.TrainerId == trainerId);
-        if (normalizedFrom.HasValue)
-        {
-            query = query.Where(s => s.StartsAtUtc >= normalizedFrom.Value);
-        }
-
-        if (normalizedTo.HasValue)
-        {
-            query = query.Where(s => s.StartsAtUtc <= normalizedTo.Value);
-        }
+        query = query.Where(s => s.StartsAtUtc >= normalizedFrom && s.StartsAtUtc <= normalizedTo);
 
         var slots = await query
             .OrderBy(s => s.StartsAtUtc)
@@ -106,7 +140,9 @@ public sealed class SlotService(AppDbContext db)
 
     private static bool Overlaps(DateTime newStart, DateTime newEnd, TrainingSlot existing)
     {
-        var existingStart = NormalizeUtc(existing.StartsAtUtc);
+        var existingStart = existing.StartsAtUtc.Kind == DateTimeKind.Utc
+            ? existing.StartsAtUtc
+            : NormalizeUtc(existing.StartsAtUtc);
         var existingEnd = existingStart.AddMinutes(existing.DurationMinutes);
         return newStart < existingEnd && existingStart < newEnd;
     }
