@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\api\Api.csproj" />
+    <ProjectReference Include="..\migrations\Migrations.csproj" />
   </ItemGroup>
 
   <ItemGroup>

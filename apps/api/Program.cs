@@ -1,35 +1,28 @@
 using Api.Data;
-using Microsoft.EntityFrameworkCore;
+using Api.Features.Bookings;
+using Api.Features.Health;
+using Api.Features.Slots;
+using Api.Features.Trainers;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-var connectionString = builder.Configuration.GetConnectionString("postgresdb")
-    ?? throw new InvalidOperationException("Connection string 'postgresdb' was not found.");
+builder.AddNpgsqlDbContext<AppDbContext>("postgresdb");
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-{
-    options.UseNpgsql(connectionString);
-    if (builder.Environment.IsDevelopment())
-    {
-        options.EnableDetailedErrors();
-        options.EnableSensitiveDataLogging();
-    }
-});
+builder.Services.AddScoped<TrainerService>();
+builder.Services.AddScoped<SlotService>();
+builder.Services.AddScoped<BookingService>();
 
 var app = builder.Build();
 
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.MapGet("/health", () => TypedResults.Ok(new { status = "ok" }));
-
-app.MapGet("/health/db", async (AppDbContext db, CancellationToken cancellationToken) =>
-{
-    var canConnect = await db.Database.CanConnectAsync(cancellationToken);
-    return canConnect ? Results.Ok() : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
-});
+app.MapHealthEndpoints();
+app.MapTrainerEndpoints();
+app.MapSlotEndpoints();
+app.MapBookingEndpoints();
 
 await app.RunAsync();
