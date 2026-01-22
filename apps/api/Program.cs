@@ -6,9 +6,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-var connectionString =
-    builder.Configuration.GetConnectionString("Default")
-    ?? throw new InvalidOperationException("Missing connection string 'ConnectionStrings:Default'.");
+var connectionString = builder.Configuration.GetConnectionString("postgresdb")
+    ?? throw new InvalidOperationException("Connection string 'postgresdb' was not found.");
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
