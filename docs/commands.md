@@ -22,6 +22,15 @@
 - `dotnet build`
 - `dotnet test`
 
+## OpenAPI snapshot и клиент
+- Обновить `docs/openapi.json` из запущенного API:
+  - `.\scripts\update-openapi.ps1 -BaseUrl https://localhost:<port>`
+  - или `setx API_BASE_URL https://localhost:<port>` и затем `.\scripts\update-openapi.ps1`
+- Сгенерировать TypeScript клиент (Orval):
+  - `cd apps/mobile`
+  - `npm run generate:api`
+- `apps/mobile/src/generated` генерируется автоматически, не редактировать вручную.
+
 ## Сброс базы данных (Aspire + DataVolume)
 - Остановить Aspire (`Ctrl+C`)
 - Удалить volume Postgres:
