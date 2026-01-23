@@ -26,3 +26,5 @@ app.MapSlotEndpoints();
 app.MapBookingEndpoints();
 
 await app.RunAsync();
+
+public partial class Program;

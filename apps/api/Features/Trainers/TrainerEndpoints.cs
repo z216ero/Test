@@ -1,3 +1,5 @@
+using Api.Features.Common;
+
 namespace Api.Features.Trainers;
 
 public static class TrainerEndpoints
@@ -13,10 +15,9 @@ public static class TrainerEndpoints
         {
             if (request is null)
             {
-                return Results.Problem(
-                    title: "Invalid request",
-                    detail: "Request body is required.",
-                    statusCode: StatusCodes.Status400BadRequest);
+                return Problems.BadRequest(
+                    "Invalid request",
+                    "Request body is required.");
             }
 
             var errors = new Dictionary<string, string[]>();
@@ -36,12 +37,16 @@ public static class TrainerEndpoints
 
             if (errors.Count > 0)
             {
-                return Results.ValidationProblem(errors);
+                return Problems.Validation(errors);
             }
 
             var trainer = await service.CreateTrainerAsync(request, cancellationToken);
             return Results.Created($"/trainers/{trainer.Id}", trainer);
-        });
+        })
+        .Produces<TrainerDto>(StatusCodes.Status201Created)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapGet("/", async (
             TrainerService service,
@@ -49,7 +54,11 @@ public static class TrainerEndpoints
         {
             var trainers = await service.GetAllTrainersAsync(cancellationToken);
             return Results.Ok(trainers);
-        });
+        })
+        .Produces<IReadOnlyList<TrainerDto>>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
 
         return app;
     }

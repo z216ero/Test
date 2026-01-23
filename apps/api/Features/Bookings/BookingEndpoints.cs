@@ -1,4 +1,5 @@
 using Api.Features.Common;
+using Api.Features.Slots;
 
 namespace Api.Features.Bookings;
 
@@ -16,10 +17,9 @@ public static class BookingEndpoints
         {
             if (request is null)
             {
-                return Results.Problem(
-                    title: "Invalid request",
-                    detail: "Request body is required.",
-                    statusCode: StatusCodes.Status400BadRequest);
+                return Problems.BadRequest(
+                    "Invalid request",
+                    "Request body is required.");
             }
 
             if (request.ClientId == Guid.Empty)
@@ -28,18 +28,22 @@ public static class BookingEndpoints
                 {
                     ["clientId"] = new[] { "ClientId is required." }
                 };
-                return Results.ValidationProblem(errors);
+                return Problems.Validation(errors);
             }
 
             var result = await service.BookSlotAsync(slotId, request, cancellationToken);
             if (!result.IsSuccess)
             {
-                return ToProblem(result.Error!);
+                return Problems.FromServiceError(result.Error!);
             }
 
             var booking = result.Value!;
             return Results.Created($"/slots/{slotId}/book", booking);
-        });
+        })
+        .Produces<BookingDto>(StatusCodes.Status201Created)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPost("/cancel", async (
             Guid slotId,
@@ -49,15 +53,16 @@ public static class BookingEndpoints
             var result = await service.CancelSlotAsync(slotId, cancellationToken);
             if (!result.IsSuccess)
             {
-                return ToProblem(result.Error!);
+                return Problems.FromServiceError(result.Error!);
             }
 
             return Results.Ok(result.Value);
-        });
+        })
+        .Produces<SlotDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
 
         return app;
     }
-
-    private static IResult ToProblem(ServiceError error)
-        => Results.Problem(title: error.Title, detail: error.Detail, statusCode: error.StatusCode);
 }

@@ -17,10 +17,9 @@ public static class SlotEndpoints
         {
             if (request is null)
             {
-                return Results.Problem(
-                    title: "Invalid request",
-                    detail: "Request body is required.",
-                    statusCode: StatusCodes.Status400BadRequest);
+                return Problems.BadRequest(
+                    "Invalid request",
+                    "Request body is required.");
             }
 
             var errors = new Dictionary<string, string[]>();
@@ -40,18 +39,22 @@ public static class SlotEndpoints
 
             if (errors.Count > 0)
             {
-                return Results.ValidationProblem(errors);
+                return Problems.Validation(errors);
             }
 
             var result = await service.CreateSlotAsync(trainerId, request, cancellationToken);
             if (!result.IsSuccess)
             {
-                return ToProblem(result.Error!);
+                return Problems.FromServiceError(result.Error!);
             }
 
             var slot = result.Value!;
             return Results.Created($"/trainers/{trainerId}/slots/{slot.Id}", slot);
-        });
+        })
+        .Produces<SlotDto>(StatusCodes.Status201Created)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapGet("/", async (
             Guid trainerId,
@@ -90,29 +93,30 @@ public static class SlotEndpoints
 
             if (errors.Count > 0)
             {
-                return Results.ValidationProblem(errors);
+                return Problems.Validation(errors);
             }
 
             if (parsedFrom.HasValue && parsedTo.HasValue && parsedFrom > parsedTo)
             {
                 errors["fromUtc"] = new[] { "fromUtc must be earlier than or equal to toUtc." };
-                return Results.ValidationProblem(errors);
+                return Problems.Validation(errors);
             }
 
             var result = await service.GetSlotsAsync(trainerId, parsedFrom, parsedTo, cancellationToken);
             if (!result.IsSuccess)
             {
-                return ToProblem(result.Error!);
+                return Problems.FromServiceError(result.Error!);
             }
 
             return Results.Ok(result.Value);
-        });
+        })
+        .Produces<IReadOnlyList<SlotDto>>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
 
         return app;
     }
-
-    private static IResult ToProblem(ServiceError error)
-        => Results.Problem(title: error.Title, detail: error.Detail, statusCode: error.StatusCode);
 
     private static bool TryParseUtc(string value, out DateTime utcValue, out string error)
     {
