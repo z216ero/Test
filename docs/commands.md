@@ -31,6 +31,14 @@
 - Запустить Android (нужен запущенный эмулятор):
   - `npx react-native run-android`
 
+## Mobile UI (Tamagui)
+- Tamagui подключен как основной UI toolkit (Provider в `App.tsx`, конфиг в `tamagui.config.ts`).
+- Команды запуска:
+  - `cd apps/mobile`
+  - `npm install`
+  - `npx react-native start`
+  - `npx react-native run-android`
+
 ## OpenAPI snapshot и клиент
 - Обновить `docs/openapi.json` из запущенного API:
   - `.\scripts\update-openapi.ps1 -BaseUrl https://localhost:<port>`
