@@ -22,6 +22,15 @@
 - `dotnet build`
 - `dotnet test`
 
+## Mobile Bootstrap
+- Установить зависимости:
+  - `cd apps/mobile`
+  - `npm install`
+- Запустить Metro:
+  - `npx react-native start`
+- Запустить Android (нужен запущенный эмулятор):
+  - `npx react-native run-android`
+
 ## OpenAPI snapshot и клиент
 - Обновить `docs/openapi.json` из запущенного API:
   - `.\scripts\update-openapi.ps1 -BaseUrl https://localhost:<port>`
