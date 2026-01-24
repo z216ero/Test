@@ -39,6 +39,14 @@
   - `npx react-native start`
   - `npx react-native run-android`
 
+## Mobile Navigation
+- Подключен React Navigation (native stack), 2 экрана: Home и Trainers.
+- Команды запуска:
+  - `cd apps/mobile`
+  - `npm install`
+  - `npx react-native start`
+  - `npx react-native run-android`
+
 ## OpenAPI snapshot и клиент
 - Обновить `docs/openapi.json` из запущенного API:
   - `.\scripts\update-openapi.ps1 -BaseUrl https://localhost:<port>`
