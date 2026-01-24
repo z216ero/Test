@@ -19,6 +19,7 @@ const tokens = {
     8: 40,
   },
   size: {
+    true: 16,
     1: 12,
     2: 14,
     3: 16,
@@ -56,6 +57,7 @@ export const config = {
     body: {
       family: 'System',
       size: {
+        true: 16,
         1: 12,
         2: 14,
         3: 16,
