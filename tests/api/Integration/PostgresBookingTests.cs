@@ -24,10 +24,23 @@ public sealed class PostgresBookingTests : IClassFixture<PostgresFixture>
             var trainerId = Guid.NewGuid();
             var slotId = Guid.NewGuid();
 
+            var userId = Guid.NewGuid();
+
+            setup.Users.Add(new AppUser
+            {
+                Id = userId,
+                Email = "trainer@example.com",
+                NormalizedEmail = "TRAINER@EXAMPLE.COM",
+                UserName = "trainer@example.com",
+                NormalizedUserName = "TRAINER@EXAMPLE.COM",
+                Name = "Trainer",
+                Role = UserRoles.Trainer
+            });
+
             setup.TrainerProfiles.Add(new TrainerProfile
             {
                 Id = trainerId,
-                DisplayName = "Trainer",
+                UserId = userId,
                 CreatedAtUtc = DateTime.UtcNow
             });
 

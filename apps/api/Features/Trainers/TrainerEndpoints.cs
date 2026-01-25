@@ -1,4 +1,6 @@
+using Api.Features.Auth;
 using Api.Features.Common;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Api.Features.Trainers;
 
@@ -10,6 +12,7 @@ public static class TrainerEndpoints
 
         group.MapPost("/", async (
             CreateTrainerRequest? request,
+            HttpContext httpContext,
             TrainerService service,
             CancellationToken cancellationToken) =>
         {
@@ -40,13 +43,26 @@ public static class TrainerEndpoints
                 return Problems.Validation(errors);
             }
 
-            var trainer = await service.CreateTrainerAsync(request, cancellationToken);
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var result = await service.CreateTrainerAsync(userId, request, cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            var trainer = result.Value!;
             return Results.Created($"/trainers/{trainer.Id}", trainer);
         })
         .Produces<TrainerDto>(StatusCodes.Status201Created)
         .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status404NotFound)
-        .ProducesProblem(StatusCodes.Status409Conflict);
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .RequireAuthorization();
 
         group.MapGet("/", async (
             TrainerService service,

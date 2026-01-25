@@ -14,16 +14,7 @@ public sealed class ServiceTests
     public async Task CreateSlotAsync_WhenStartsInPast_ReturnsBadRequest()
     {
         await using var db = CreateDbContext();
-        var trainerId = Guid.NewGuid();
-
-        db.TrainerProfiles.Add(new TrainerProfile
-        {
-            Id = trainerId,
-            DisplayName = "Trainer",
-            CreatedAtUtc = DateTime.UtcNow
-        });
-
-        await db.SaveChangesAsync();
+        var trainerId = await SeedTrainerAsync(db);
 
         var service = new SlotService(db);
         var request = new CreateSlotRequest(DateTime.UtcNow.AddMinutes(-5), 30);
@@ -38,16 +29,7 @@ public sealed class ServiceTests
     public async Task CreateSlotAsync_WhenDurationMinutesNonPositive_ReturnsBadRequest()
     {
         await using var db = CreateDbContext();
-        var trainerId = Guid.NewGuid();
-
-        db.TrainerProfiles.Add(new TrainerProfile
-        {
-            Id = trainerId,
-            DisplayName = "Trainer",
-            CreatedAtUtc = DateTime.UtcNow
-        });
-
-        await db.SaveChangesAsync();
+        var trainerId = await SeedTrainerAsync(db);
 
         var service = new SlotService(db);
         var request = new CreateSlotRequest(DateTime.UtcNow.AddHours(1), 0);
@@ -62,16 +44,7 @@ public sealed class ServiceTests
     public async Task GetSlotsAsync_WhenFromUtcGreaterThanToUtc_ReturnsBadRequest()
     {
         await using var db = CreateDbContext();
-        var trainerId = Guid.NewGuid();
-
-        db.TrainerProfiles.Add(new TrainerProfile
-        {
-            Id = trainerId,
-            DisplayName = "Trainer",
-            CreatedAtUtc = DateTime.UtcNow
-        });
-
-        await db.SaveChangesAsync();
+        var trainerId = await SeedTrainerAsync(db);
 
         var service = new SlotService(db);
         var fromUtc = DateTime.UtcNow.AddDays(2);
@@ -87,14 +60,7 @@ public sealed class ServiceTests
     public async Task CreateSlotAsync_WhenOverlapsOpenSlot_ReturnsConflict()
     {
         await using var db = CreateDbContext();
-        var trainerId = Guid.NewGuid();
-
-        db.TrainerProfiles.Add(new TrainerProfile
-        {
-            Id = trainerId,
-            DisplayName = "Trainer",
-            CreatedAtUtc = DateTime.UtcNow
-        });
+        var trainerId = await SeedTrainerAsync(db);
 
         db.TrainingSlots.Add(new TrainingSlot
         {
@@ -121,15 +87,8 @@ public sealed class ServiceTests
     public async Task BookSlotAsync_WhenAlreadyBooked_ReturnsConflict()
     {
         await using var db = CreateDbContext();
-        var trainerId = Guid.NewGuid();
+        var trainerId = await SeedTrainerAsync(db);
         var slotId = Guid.NewGuid();
-
-        db.TrainerProfiles.Add(new TrainerProfile
-        {
-            Id = trainerId,
-            DisplayName = "Trainer",
-            CreatedAtUtc = DateTime.UtcNow
-        });
 
         db.TrainingSlots.Add(new TrainingSlot
         {
@@ -156,15 +115,8 @@ public sealed class ServiceTests
     public async Task CancelSlotAsync_WhenSlotIsOpen_ReturnsConflict()
     {
         await using var db = CreateDbContext();
-        var trainerId = Guid.NewGuid();
+        var trainerId = await SeedTrainerAsync(db);
         var slotId = Guid.NewGuid();
-
-        db.TrainerProfiles.Add(new TrainerProfile
-        {
-            Id = trainerId,
-            DisplayName = "Trainer",
-            CreatedAtUtc = DateTime.UtcNow
-        });
 
         db.TrainingSlots.Add(new TrainingSlot
         {
@@ -189,16 +141,9 @@ public sealed class ServiceTests
     public async Task CancelSlotAsync_WhenBooked_DeletesBooking_AndSetsSlotOpen()
     {
         await using var db = CreateDbContext();
-        var trainerId = Guid.NewGuid();
+        var trainerId = await SeedTrainerAsync(db);
         var slotId = Guid.NewGuid();
         var bookingId = Guid.NewGuid();
-
-        db.TrainerProfiles.Add(new TrainerProfile
-        {
-            Id = trainerId,
-            DisplayName = "Trainer",
-            CreatedAtUtc = DateTime.UtcNow
-        });
 
         db.TrainingSlots.Add(new TrainingSlot
         {
@@ -241,5 +186,33 @@ public sealed class ServiceTests
             .Options;
 
         return new AppDbContext(options);
+    }
+
+    private static async Task<Guid> SeedTrainerAsync(AppDbContext db)
+    {
+        var userId = Guid.NewGuid();
+        var trainerId = Guid.NewGuid();
+
+        db.Users.Add(new AppUser
+        {
+            Id = userId,
+            Email = "trainer@example.com",
+            NormalizedEmail = "TRAINER@EXAMPLE.COM",
+            UserName = "trainer@example.com",
+            NormalizedUserName = "TRAINER@EXAMPLE.COM",
+            Name = "Trainer",
+            Role = UserRoles.Trainer
+        });
+
+        db.TrainerProfiles.Add(new TrainerProfile
+        {
+            Id = trainerId,
+            UserId = userId,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await db.SaveChangesAsync();
+
+        return trainerId;
     }
 }

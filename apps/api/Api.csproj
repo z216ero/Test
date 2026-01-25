@@ -9,7 +9,10 @@
 
 	<ItemGroup>
 		<PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.1.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0-preview.3.25172.1" />
+		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0-preview.3.25172.1" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.2" />
+		<PackageReference Include="Microsoft.OpenApi" Version="2.3.0" />
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.2" />

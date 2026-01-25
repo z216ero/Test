@@ -1,16 +1,32 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Data;
 
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
+    : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<AppMeta> AppMetas => Set<AppMeta>();
     public DbSet<TrainerProfile> TrainerProfiles => Set<TrainerProfile>();
+    public DbSet<ClientProfile> ClientProfiles => Set<ClientProfile>();
     public DbSet<TrainingSlot> TrainingSlots => Set<TrainingSlot>();
     public DbSet<Booking> Bookings => Set<Booking>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<AppUser>(entity =>
+        {
+            entity.Property(x => x.Name)
+                .HasMaxLength(100)
+                .IsRequired();
+            entity.Property(x => x.Role)
+                .HasMaxLength(20)
+                .IsRequired();
+        });
+
         modelBuilder.Entity<AppMeta>(entity =>
         {
             entity.ToTable("__app_meta");
@@ -23,13 +39,32 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("trainer_profiles");
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.DisplayName)
-                .IsRequired()
-                .HasMaxLength(100);
             entity.Property(x => x.GymName)
                 .HasMaxLength(120);
+            entity.Property(x => x.UserId)
+                .IsRequired();
             entity.Property(x => x.CreatedAtUtc)
                 .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.HasIndex(x => x.UserId)
+                .IsUnique();
+            entity.HasOne(x => x.User)
+                .WithOne()
+                .HasForeignKey<TrainerProfile>(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ClientProfile>(entity =>
+        {
+            entity.ToTable("client_profiles");
+            entity.HasKey(x => x.UserId);
+            entity.Property(x => x.UserId)
+                .IsRequired();
+            entity.Property(x => x.CreatedAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.HasOne(x => x.User)
+                .WithOne()
+                .HasForeignKey<ClientProfile>(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<TrainingSlot>(entity =>

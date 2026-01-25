@@ -17,7 +17,8 @@ if ($swaggerUrl -notmatch '\\/.+\\.json$') {
     $swaggerUrl = "$swaggerUrl/swagger/v1/swagger.json"
 }
 
-$outputPath = Join-Path $PSScriptRoot '..' 'docs' 'openapi.json'
+$docsRoot = Join-Path $PSScriptRoot '..'
+$outputPath = Join-Path $docsRoot 'docs\\openapi.json'
 
 Write-Host "Fetching OpenAPI from $swaggerUrl"
 

@@ -1,113 +1,110 @@
 {
-  "openapi": "3.0.1",
+  "openapi": "3.0.4",
   "info": {
-    "title": "Trainer App API",
-    "version": "1.0.0"
+    "title": "Api",
+    "version": "1.0"
   },
   "paths": {
-    "/trainers": {
-      "get": {
+    "/auth/register": {
+      "post": {
         "tags": [
-          "Trainers"
+          "Auth"
         ],
-        "operationId": "getTrainers",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TrainerDto"
-                  }
+                  "$ref": "#/components/schemas/AuthResponse"
                 }
               }
             }
           },
           "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Trainers"
-        ],
-        "operationId": "createTrainer",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateTrainerRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created",
+            "description": "Bad Request",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TrainerDto"
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
           },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
           "409": {
-            "$ref": "#/components/responses/Conflict"
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
     },
-    "/trainers/{trainerId}/slots": {
-      "get": {
+    "/auth/login": {
+      "post": {
         "tags": [
-          "Slots"
+          "Auth"
         ],
-        "operationId": "getTrainerSlots",
-        "parameters": [
-          {
-            "name": "trainerId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "fromUtc",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "format": "date-time"
-            }
-          },
-          {
-            "name": "toUtc",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "format": "date-time"
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
             }
           }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
         ],
         "responses": {
           "200": {
@@ -115,70 +112,32 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SlotDto"
-                  }
+                  "$ref": "#/components/schemas/AuthUserDto"
                 }
               }
             }
           },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
-      },
+      }
+    },
+    "/auth/logout": {
       "post": {
         "tags": [
-          "Slots"
+          "Auth"
         ],
-        "operationId": "createTrainerSlot",
-        "parameters": [
-          {
-            "name": "trainerId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateSlotRequest"
-              }
-            }
-          }
-        },
         "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SlotDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -188,7 +147,6 @@
         "tags": [
           "Bookings"
         ],
-        "operationId": "bookSlot",
         "parameters": [
           {
             "name": "slotId",
@@ -201,7 +159,6 @@
           }
         ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -222,13 +179,34 @@
             }
           },
           "400": {
-            "$ref": "#/components/responses/BadRequest"
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "404": {
-            "$ref": "#/components/responses/NotFound"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "409": {
-            "$ref": "#/components/responses/Conflict"
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -238,7 +216,6 @@
         "tags": [
           "Bookings"
         ],
-        "operationId": "cancelSlot",
         "parameters": [
           {
             "name": "slotId",
@@ -262,13 +239,73 @@
             }
           },
           "400": {
-            "$ref": "#/components/responses/BadRequest"
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "404": {
-            "$ref": "#/components/responses/NotFound"
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "409": {
-            "$ref": "#/components/responses/Conflict"
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/clients/me": {
+      "get": {
+        "tags": [
+          "Clients"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientProfileDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -278,14 +315,287 @@
         "tags": [
           "Health"
         ],
-        "operationId": "getHealth",
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthStatusDto"
+                  "$ref": "#/components/schemas/String<>f__AnonymousType1"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/db": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/trainers/{trainerId}/slots": {
+      "post": {
+        "tags": [
+          "Slots"
+        ],
+        "parameters": [
+          {
+            "name": "trainerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSlotRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Slots"
+        ],
+        "parameters": [
+          {
+            "name": "trainerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fromUtc",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toUtc",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SlotDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trainers": {
+      "post": {
+        "tags": [
+          "Trainers"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTrainerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainerDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Trainers"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrainerDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -296,52 +606,93 @@
   },
   "components": {
     "schemas": {
-      "CreateTrainerRequest": {
+      "AuthResponse": {
         "type": "object",
-        "required": [
-          "displayName"
-        ],
         "properties": {
-          "displayName": {
-            "type": "string"
-          },
-          "gymName": {
+          "accessToken": {
             "type": "string",
             "nullable": true
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUserDto"
           }
-        }
+        },
+        "additionalProperties": false
       },
-      "TrainerDto": {
+      "AuthUserDto": {
         "type": "object",
-        "required": [
-          "id",
-          "displayName",
-          "createdAtUtc"
-        ],
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid"
           },
-          "displayName": {
-            "type": "string"
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "specialization": {
+            "type": "string",
+            "nullable": true
           },
           "gymName": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookSlotRequest": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookingDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slotId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clientId": {
+            "type": "string",
+            "format": "uuid"
           },
           "createdAtUtc": {
             "type": "string",
             "format": "date-time"
           }
-        }
+        },
+        "additionalProperties": false
+      },
+      "ClientProfileDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
       },
       "CreateSlotRequest": {
         "type": "object",
-        "required": [
-          "startsAtUtc",
-          "durationMinutes"
-        ],
         "properties": {
           "startsAtUtc": {
             "type": "string",
@@ -351,18 +702,92 @@
             "type": "integer",
             "format": "int32"
           }
-        }
+        },
+        "additionalProperties": false
+      },
+      "CreateTrainerRequest": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "gymName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "password": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": { }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "password": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "specialization": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "SlotDto": {
         "type": "object",
-        "required": [
-          "id",
-          "trainerId",
-          "startsAtUtc",
-          "durationMinutes",
-          "status",
-          "createdAtUtc"
-        ],
         "properties": {
           "id": {
             "type": "string",
@@ -382,130 +807,75 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "Open",
-              "Booked",
-              "Cancelled"
-            ]
+            "nullable": true
           },
           "createdAtUtc": {
             "type": "string",
             "format": "date-time"
           }
-        }
+        },
+        "additionalProperties": false
       },
-      "BookSlotRequest": {
+      "String<>f__AnonymousType1": {
         "type": "object",
-        "required": [
-          "clientId"
-        ],
         "properties": {
-          "clientId": {
+          "status": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true
           }
-        }
+        },
+        "additionalProperties": false
       },
-      "BookingDto": {
+      "TrainerDto": {
         "type": "object",
-        "required": [
-          "id",
-          "slotId",
-          "clientId",
-          "createdAtUtc"
-        ],
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid"
           },
-          "slotId": {
+          "displayName": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true
           },
-          "clientId": {
+          "gymName": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true
           },
           "createdAtUtc": {
             "type": "string",
             "format": "date-time"
           }
-        }
-      },
-      "ProblemDetails": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "detail": {
-            "type": "string"
-          },
-          "instance": {
-            "type": "string"
-          },
-          "errors": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      },
-      "HealthStatusDto": {
-        "type": "object",
-        "required": [
-          "status"
-        ],
-        "properties": {
-          "status": {
-            "type": "string"
-          }
-        }
+        },
+        "additionalProperties": false
       }
     },
-    "responses": {
-      "BadRequest": {
-        "description": "Bad Request",
-        "content": {
-          "application/problem+json": {
-            "schema": {
-              "$ref": "#/components/schemas/ProblemDetails"
-            }
-          }
-        }
-      },
-      "NotFound": {
-        "description": "Not Found",
-        "content": {
-          "application/problem+json": {
-            "schema": {
-              "$ref": "#/components/schemas/ProblemDetails"
-            }
-          }
-        }
-      },
-      "Conflict": {
-        "description": "Conflict",
-        "content": {
-          "application/problem+json": {
-            "schema": {
-              "$ref": "#/components/schemas/ProblemDetails"
-            }
-          }
-        }
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "description": "Enter a valid JWT bearer token.",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Bookings"
+    },
+    {
+      "name": "Clients"
+    },
+    {
+      "name": "Health"
+    },
+    {
+      "name": "Slots"
+    },
+    {
+      "name": "Trainers"
+    }
+  ]
 }
