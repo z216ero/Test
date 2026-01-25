@@ -24,7 +24,9 @@ const parseBody = async (response: Response): Promise<unknown> => {
   }
 
   const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
+  const isJson =
+    contentType.includes('application/json') || contentType.includes('+json');
+  if (isJson) {
     return response.json();
   }
 
@@ -37,15 +39,6 @@ export const customFetch = async <T>(
 ): Promise<T> => {
   const response = await fetch(buildUrl(input), options);
   const data = await parseBody(response);
-
-  if (!response.ok) {
-    const message =
-      typeof data === 'string' && data.trim().length > 0
-        ? data
-        : `Request failed with status ${response.status}`;
-    throw new Error(message);
-  }
-
   return {
     status: response.status,
     data,
