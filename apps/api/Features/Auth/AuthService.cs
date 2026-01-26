@@ -21,71 +21,86 @@ public sealed class AuthService(
     {
         var normalizedRole = UserRoles.Normalize(request.Role);
 
-        var existingUser = await userManager.FindByEmailAsync(request.Email);
-        if (existingUser is not null)
-        {
-            return ServiceResult<AuthResponse>.Fail(
-                StatusCodes.Status409Conflict,
-                "Email already in use",
-                "Email is already registered.");
-        }
+        var strategy = db.Database.CreateExecutionStrategy();
+        ServiceResult<AuthResponse>? result = null;
 
-        var user = new AppUser
+        await strategy.ExecuteAsync(async () =>
         {
-            Id = Guid.NewGuid(),
-            Email = request.Email.Trim(),
-            UserName = request.Email.Trim(),
-            Name = request.Name.Trim(),
-            Role = normalizedRole
-        };
-
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-
-        var createResult = await userManager.CreateAsync(user, request.Password);
-        if (!createResult.Succeeded)
-        {
-            if (createResult.Errors.Any(error => string.Equals(error.Code, "DuplicateEmail", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(error.Code, "DuplicateUserName", StringComparison.OrdinalIgnoreCase)))
+            var existingUser = await userManager.FindByEmailAsync(request.Email);
+            if (existingUser is not null)
             {
-                return ServiceResult<AuthResponse>.Fail(
+                result = ServiceResult<AuthResponse>.Fail(
                     StatusCodes.Status409Conflict,
                     "Email already in use",
                     "Email is already registered.");
+                return;
             }
 
-            return ServiceResult<AuthResponse>.Fail(
-                StatusCodes.Status400BadRequest,
-                "Registration failed",
-                string.Join(" ", createResult.Errors.Select(e => e.Description)));
-        }
-
-        if (normalizedRole == UserRoles.Trainer)
-        {
-            db.TrainerProfiles.Add(new TrainerProfile
+            var user = new AppUser
             {
                 Id = Guid.NewGuid(),
-                UserId = user.Id,
-                GymName = null,
-                Specialization = string.IsNullOrWhiteSpace(request.Specialization)
-                    ? null
-                    : request.Specialization.Trim(),
-                CreatedAtUtc = DateTime.UtcNow
-            });
-        }
-        else
-        {
-            db.ClientProfiles.Add(new ClientProfile
+                Email = request.Email.Trim(),
+                UserName = request.Email.Trim(),
+                Name = request.Name.Trim(),
+                Role = normalizedRole
+            };
+
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+            var createResult = await userManager.CreateAsync(user, request.Password);
+            if (!createResult.Succeeded)
             {
-                UserId = user.Id,
-                CreatedAtUtc = DateTime.UtcNow
-            });
-        }
+                if (createResult.Errors.Any(error =>
+                        string.Equals(error.Code, "DuplicateEmail", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(error.Code, "DuplicateUserName", StringComparison.OrdinalIgnoreCase)))
+                {
+                    result = ServiceResult<AuthResponse>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Email already in use",
+                        "Email is already registered.");
+                    return;
+                }
 
-        await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+                result = ServiceResult<AuthResponse>.Fail(
+                    StatusCodes.Status400BadRequest,
+                    "Registration failed",
+                    string.Join(" ", createResult.Errors.Select(e => e.Description)));
+                return;
+            }
 
-        var response = await BuildAuthResponseAsync(user, cancellationToken);
-        return ServiceResult<AuthResponse>.Success(response);
+            if (normalizedRole == UserRoles.Trainer)
+            {
+                db.TrainerProfiles.Add(new TrainerProfile
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = user.Id,
+                    GymName = null,
+                    Specialization = string.IsNullOrWhiteSpace(request.Specialization)
+                        ? null
+                        : request.Specialization.Trim(),
+                    CreatedAtUtc = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                db.ClientProfiles.Add(new ClientProfile
+                {
+                    UserId = user.Id,
+                    CreatedAtUtc = DateTime.UtcNow
+                });
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            var response = await BuildAuthResponseAsync(user, cancellationToken);
+            result = ServiceResult<AuthResponse>.Success(response);
+        });
+
+        return result ?? ServiceResult<AuthResponse>.Fail(
+            StatusCodes.Status500InternalServerError,
+            "Registration failed",
+            "Unexpected registration failure.");
     }
 
     public async Task<ServiceResult<AuthResponse>> LoginAsync(

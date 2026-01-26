@@ -1,39 +1,66 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { HomeScreen } from '../screens/HomeScreen';
-import { TrainersScreen } from '../screens/TrainersScreen';
 import { AvailableSlotsScreen } from '../screens/AvailableSlotsScreen';
+import { BootstrapScreen } from '../screens/BootstrapScreen';
+import { CreateSlotScreen } from '../screens/CreateSlotScreen';
+import { HomeScreen } from '../screens/HomeScreen';
+import { LoginScreen } from '../screens/LoginScreen';
+import { RegisterScreen } from '../screens/RegisterScreen';
 import { SlotDetailsScreen } from '../screens/SlotDetailsScreen';
 import { TrainerSlotsScreen } from '../screens/TrainerSlotsScreen';
-import { CreateSlotScreen } from '../screens/CreateSlotScreen';
-import { RootStackParamList } from './types';
+import { TrainersScreen } from '../screens/TrainersScreen';
+import type {
+  AppStackParamList,
+  AuthStackParamList,
+  RootStackParamList,
+} from './types';
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
+const RootStack = createNativeStackNavigator<RootStackParamList>();
+const AuthStack = createNativeStackNavigator<AuthStackParamList>();
+const AppStack = createNativeStackNavigator<AppStackParamList>();
+
+const AuthStackNavigator = () => (
+  <AuthStack.Navigator>
+    <AuthStack.Screen name="Login" component={LoginScreen} options={{ title: 'Login' }} />
+    <AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: 'Register' }} />
+  </AuthStack.Navigator>
+);
+
+const AppStackNavigator = () => (
+  <AppStack.Navigator>
+    <AppStack.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
+    <AppStack.Screen name="Trainers" component={TrainersScreen} options={{ title: 'Trainers' }} />
+    <AppStack.Screen
+      name="AvailableSlots"
+      component={AvailableSlotsScreen}
+      options={{ title: 'Available Slots' }}
+    />
+    <AppStack.Screen
+      name="SlotDetails"
+      component={SlotDetailsScreen}
+      options={{ title: 'Confirm Booking' }}
+    />
+    <AppStack.Screen
+      name="TrainerSlots"
+      component={TrainerSlotsScreen}
+      options={{ title: 'Trainer Slots' }}
+    />
+    <AppStack.Screen
+      name="CreateSlot"
+      component={CreateSlotScreen}
+      options={{ title: 'Create Slot' }}
+    />
+  </AppStack.Navigator>
+);
 
 export function RootNavigator() {
   return (
-    <Stack.Navigator initialRouteName="Home">
-      <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
-      <Stack.Screen name="Trainers" component={TrainersScreen} options={{ title: 'Trainers' }} />
-      <Stack.Screen
-        name="AvailableSlots"
-        component={AvailableSlotsScreen}
-        options={{ title: 'Available Slots' }}
-      />
-      <Stack.Screen
-        name="SlotDetails"
-        component={SlotDetailsScreen}
-        options={{ title: 'Confirm Booking' }}
-      />
-      <Stack.Screen
-        name="TrainerSlots"
-        component={TrainerSlotsScreen}
-        options={{ title: 'Trainer Slots' }}
-      />
-      <Stack.Screen
-        name="CreateSlot"
-        component={CreateSlotScreen}
-        options={{ title: 'Create Slot' }}
-      />
-    </Stack.Navigator>
+    <RootStack.Navigator
+      initialRouteName="Bootstrap"
+      screenOptions={{ headerShown: false }}
+    >
+      <RootStack.Screen name="Bootstrap" component={BootstrapScreen} />
+      <RootStack.Screen name="Auth" component={AuthStackNavigator} />
+      <RootStack.Screen name="App" component={AppStackNavigator} />
+    </RootStack.Navigator>
   );
 }

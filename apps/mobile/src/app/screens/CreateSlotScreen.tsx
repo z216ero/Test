@@ -2,11 +2,16 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { Button, Input, Text, YStack } from 'tamagui';
 import { apiClient } from '../../api/client';
-import { getProblemDetailsMessage } from '../../api/problem-details';
+import { getUiErrorMessage, unwrap } from '../../api/core';
+import {
+  formInputProps,
+  primaryButtonProps,
+  secondaryButtonProps,
+} from '../../ui/formDefaults';
 import { parseLocalDateTime } from '../../utils/time';
-import type { RootStackParamList } from '../navigation/types';
+import type { AppStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'CreateSlot'>;
+type Props = NativeStackScreenProps<AppStackParamList, 'CreateSlot'>;
 
 export function CreateSlotScreen({ route, navigation }: Props) {
   const { trainerId, trainerName } = route.params;
@@ -44,35 +49,14 @@ export function CreateSlotScreen({ route, navigation }: Props) {
 
     setIsSubmitting(true);
     try {
-      const response = await apiClient.createTrainerSlot(trainerId, {
+      const response = await apiClient.postTrainersTrainerIdSlots(trainerId, {
         startsAtUtc: startDate.toISOString(),
         durationMinutes,
       });
-
-      if (response.status === 201) {
-        setSuccess('Slot created successfully.');
-        return;
-      }
-
-      if (response.status === 409) {
-        setError(
-          getProblemDetailsMessage(
-            response.data,
-            'Slot overlaps with another slot.'
-          )
-        );
-        return;
-      }
-
-      setError(
-        getProblemDetailsMessage(
-          response.data,
-          'Unable to create slot right now.'
-        )
-      );
+      unwrap(response, 'Unable to create slot right now.');
+      setSuccess('Slot created successfully.');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
+      setError(getUiErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -98,6 +82,7 @@ export function CreateSlotScreen({ route, navigation }: Props) {
           autoCapitalize="none"
           autoCorrect={false}
           placeholder="2026-01-25T10:00"
+          {...formInputProps}
         />
       </YStack>
       <YStack gap="$2">
@@ -110,6 +95,7 @@ export function CreateSlotScreen({ route, navigation }: Props) {
           autoCapitalize="none"
           autoCorrect={false}
           placeholder="2026-01-25T11:00"
+          {...formInputProps}
         />
       </YStack>
       {error ? (
@@ -128,10 +114,11 @@ export function CreateSlotScreen({ route, navigation }: Props) {
         color="$primaryText"
         onPress={handleCreate}
         disabled={isSubmitting || !!success}
+        {...primaryButtonProps}
       >
         {isSubmitting ? 'Creating...' : 'Create slot'}
       </Button>
-      <Button size="$3" onPress={() => navigation.goBack()}>
+      <Button size="$3" onPress={() => navigation.goBack()} {...secondaryButtonProps}>
         Back to slots
       </Button>
     </YStack>

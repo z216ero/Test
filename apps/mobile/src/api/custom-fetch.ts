@@ -1,3 +1,4 @@
+import { getAccessToken } from '../auth/tokenStorage';
 import { API_BASE_URL } from '../config/env';
 
 const trimTrailingSlash = (value: string): string =>
@@ -37,7 +38,16 @@ export const customFetch = async <T>(
   input: string,
   options: RequestInit = {}
 ): Promise<T> => {
-  const response = await fetch(buildUrl(input), options);
+  const token = await getAccessToken();
+  const headers = new Headers(options.headers ?? {});
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(buildUrl(input), {
+    ...options,
+    headers,
+  });
   const data = await parseBody(response);
   return {
     status: response.status,

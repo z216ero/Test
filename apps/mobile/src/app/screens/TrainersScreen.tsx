@@ -2,11 +2,12 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { JSX, useCallback, useEffect, useState } from 'react';
 import { Button, Text, YStack } from 'tamagui';
 import { apiClient } from '../../api/client';
-import { getProblemDetailsMessage } from '../../api/problem-details';
+import { getUiErrorMessage, unwrap } from '../../api/core';
+import { secondaryButtonProps } from '../../ui/formDefaults';
 import type { TrainerDto } from '../../generated/api';
-import type { RootStackParamList } from '../navigation/types';
+import type { AppStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Trainers'>;
+type Props = NativeStackScreenProps<AppStackParamList, 'Trainers'>;
 
 export function TrainersScreen({ route, navigation }: Props) {
   const { mode, clientId } = route.params;
@@ -20,20 +21,10 @@ export function TrainersScreen({ route, navigation }: Props) {
 
     try {
       const response = await apiClient.getTrainers();
-      if (response.status !== 200) {
-        setError(
-          getProblemDetailsMessage(
-            response.data,
-            'Unable to load trainers.'
-          )
-        );
-        setTrainers([]);
-        return;
-      }
-      setTrainers(response.data);
+      const data = unwrap(response, 'Unable to load trainers.');
+      setTrainers(data);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
+      setError(getUiErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -65,6 +56,7 @@ export function TrainersScreen({ route, navigation }: Props) {
           backgroundColor="$primary"
           color="$primaryText"
           onPress={loadTrainers}
+          {...secondaryButtonProps}
         >
           Retry
         </Button>
@@ -117,6 +109,7 @@ export function TrainersScreen({ route, navigation }: Props) {
                 }
               }}
               disabled={!canNavigate}
+              {...secondaryButtonProps}
             >
               {actionLabel}
             </Button>

@@ -1,10 +1,21 @@
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type {
+  NativeStackNavigationProp,
+  NativeStackScreenProps,
+} from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
 import { Button, Input, Text, XStack, YStack } from 'tamagui';
+import { clearAccessToken } from '../../auth/tokenStorage';
 import { apiClient } from '../../api/client';
-import { RootStackParamList } from '../navigation/types';
+import { logout } from '../../api/authApi';
+import { getUiErrorMessage, unwrap } from '../../api/core';
+import {
+  formInputProps,
+  primaryButtonProps,
+  secondaryButtonProps,
+} from '../../ui/formDefaults';
+import type { AppStackParamList, RootStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
+type Props = NativeStackScreenProps<AppStackParamList, 'Home'>;
 
 export function HomeScreen({ navigation }: Props) {
   const [clientId, setClientId] = useState(
@@ -13,6 +24,7 @@ export function HomeScreen({ navigation }: Props) {
   const [healthStatus, setHealthStatus] = useState<string | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
   const [isHealthLoading, setIsHealthLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -20,20 +32,16 @@ export function HomeScreen({ navigation }: Props) {
     const checkHealth = async () => {
       try {
         const response = await apiClient.getHealth();
+        const data = unwrap(response, 'Unable to reach API.');
         if (!isMounted) {
           return;
         }
-        if (response.status !== 200) {
-          throw new Error('Unexpected health response.');
-        }
-        setHealthStatus(response.data.status);
+        setHealthStatus(data.status);
       } catch (error) {
         if (!isMounted) {
           return;
         }
-        const message =
-          error instanceof Error ? error.message : 'Unknown error';
-        setHealthError(message);
+        setHealthError(getUiErrorMessage(error));
       } finally {
         if (isMounted) {
           setIsHealthLoading(false);
@@ -79,6 +87,7 @@ export function HomeScreen({ navigation }: Props) {
           autoCapitalize="none"
           autoCorrect={false}
           placeholder="00000000-0000-0000-0000-000000000001"
+          {...formInputProps}
         />
         <Text fontSize="$2" color="$muted">
           Use any GUID for now (no auth yet).
@@ -93,6 +102,7 @@ export function HomeScreen({ navigation }: Props) {
           onPress={() =>
             navigation.navigate('Trainers', { mode: 'client', clientId })
           }
+          {...primaryButtonProps}
         >
           Client flow
         </Button>
@@ -102,10 +112,38 @@ export function HomeScreen({ navigation }: Props) {
           backgroundColor="$primary"
           color="$primaryText"
           onPress={() => navigation.navigate('Trainers', { mode: 'trainer' })}
+          {...primaryButtonProps}
         >
           Trainer flow
         </Button>
       </XStack>
+      <Button
+        size="$3"
+        onPress={async () => {
+          try {
+            setAuthError(null);
+            await logout();
+          } catch (error) {
+            setAuthError(getUiErrorMessage(error));
+          } finally {
+            await clearAccessToken();
+            const rootNavigation =
+              navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
+            rootNavigation?.reset({
+              index: 0,
+              routes: [{ name: 'Auth' }],
+            });
+          }
+        }}
+        {...secondaryButtonProps}
+      >
+        Logout
+      </Button>
+      {authError ? (
+        <Text fontSize="$3" color="$primary" textAlign="center">
+          {authError}
+        </Text>
+      ) : null}
     </YStack>
   );
 }

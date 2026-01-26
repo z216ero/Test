@@ -2,11 +2,12 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { Button, Text, YStack } from 'tamagui';
 import { apiClient } from '../../api/client';
-import { getProblemDetailsMessage } from '../../api/problem-details';
+import { getUiErrorMessage, unwrap } from '../../api/core';
+import { primaryButtonProps, secondaryButtonProps } from '../../ui/formDefaults';
 import { formatUtcRange } from '../../utils/time';
-import type { RootStackParamList } from '../navigation/types';
+import type { AppStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'SlotDetails'>;
+type Props = NativeStackScreenProps<AppStackParamList, 'SlotDetails'>;
 
 export function SlotDetailsScreen({ route, navigation }: Props) {
   const { trainerName, slot, clientId } = route.params;
@@ -14,7 +15,10 @@ export function SlotDetailsScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const range = formatUtcRange(slot.startsAtUtc, slot.durationMinutes);
+  const range = formatUtcRange(
+    slot.startsAtUtc ?? '',
+    slot.durationMinutes ?? 0
+  );
 
   const handleBook = async () => {
     const trimmedClientId = clientId.trim();
@@ -27,31 +31,19 @@ export function SlotDetailsScreen({ route, navigation }: Props) {
     setError(null);
     setSuccess(null);
 
+    if (!slot.id) {
+      setError('Slot ID is missing.');
+      return;
+    }
+
     try {
-      const response = await apiClient.bookSlot(slot.id, {
+      const response = await apiClient.postSlotsSlotIdBook(slot.id, {
         clientId: trimmedClientId,
       });
-      if (response.status === 201) {
-        setSuccess('Slot booked successfully.');
-        return;
-      }
-
-      if (response.status === 409) {
-        setError(
-          getProblemDetailsMessage(response.data, 'Slot is already booked.')
-        );
-        return;
-      }
-
-      setError(
-        getProblemDetailsMessage(
-          response.data,
-          'Unable to book this slot right now.'
-        )
-      );
+      unwrap(response, 'Unable to book this slot right now.');
+      setSuccess('Slot booked successfully.');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
+      setError(getUiErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -78,10 +70,10 @@ export function SlotDetailsScreen({ route, navigation }: Props) {
           {range.start} - {range.end}
         </Text>
         <Text fontSize="$3" color="$muted">
-          Duration: {slot.durationMinutes} min
+          Duration: {slot.durationMinutes ?? 0} min
         </Text>
         <Text fontSize="$3" color="$muted">
-          Status: {slot.status}
+          Status: {slot.status ?? 'Unknown'}
         </Text>
       </YStack>
       {error ? (
@@ -100,10 +92,11 @@ export function SlotDetailsScreen({ route, navigation }: Props) {
         color="$primaryText"
         onPress={handleBook}
         disabled={isSubmitting || !!success}
+        {...primaryButtonProps}
       >
         {isSubmitting ? 'Booking...' : 'Book slot'}
       </Button>
-      <Button size="$3" onPress={() => navigation.goBack()}>
+      <Button size="$3" onPress={() => navigation.goBack()} {...secondaryButtonProps}>
         Back to list
       </Button>
     </YStack>
