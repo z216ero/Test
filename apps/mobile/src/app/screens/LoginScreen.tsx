@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   NativeStackNavigationProp,
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { setAccessToken } from '../../auth/tokenStorage';
 import { login } from '../../api/authApi';
 import { ApiError, getUiErrorMessage } from '../../api/core';
+import { t } from '../../i18n';
 import {
   AuthCard,
   AuthError,
@@ -27,7 +28,7 @@ export function LoginScreen({ navigation }: Props) {
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
-      setError('Email and password are required.');
+      setError(t('auth.login.validationRequired'));
       return;
     }
 
@@ -41,7 +42,7 @@ export function LoginScreen({ navigation }: Props) {
       });
 
       if (!response.accessToken) {
-        throw new ApiError('Missing access token.');
+        throw new ApiError(t('auth.errorMissingToken'));
       }
 
       await setAccessToken(response.accessToken);
@@ -57,34 +58,32 @@ export function LoginScreen({ navigation }: Props) {
 
   return (
     <AuthScreen>
-      <AuthHeader title="Welcome back" subtitle="Log in to manage your bookings." />
+      <AuthHeader title={t('auth.login.title')} subtitle={t('auth.login.subtitle')} />
       <AuthCard>
         <AuthField
-          label="Email"
+          label={t('auth.login.email')}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
-          placeholder="you@example.com"
+          placeholder={t('common.emailPlaceholder')}
         />
         <AuthField
-          label="Password"
+          label={t('auth.login.password')}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
-          placeholder="Your password"
+          placeholder={t('common.passwordPlaceholder')}
         />
-        {error ? (
-          <AuthError message={error} />
-        ) : null}
+        {error ? <AuthError message={error} /> : null}
         <AuthPrimaryButton onPress={handleLogin} disabled={isSubmitting}>
-          {isSubmitting ? 'Signing in...' : 'Log in'}
+          {isSubmitting ? t('auth.login.loading') : t('auth.login.cta')}
         </AuthPrimaryButton>
       </AuthCard>
       <AuthFooter
-        text="Don't have an account?"
-        actionText="Create account"
+        text={t('common.noAccount')}
+        actionText={t('auth.login.secondary')}
         onPress={() => navigation.navigate('Register')}
         variant="column"
       />

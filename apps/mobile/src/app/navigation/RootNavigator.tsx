@@ -12,6 +12,7 @@ import type {
 } from './types';
 import { Text } from 'tamagui';
 import { config } from '../../../tamagui.config';
+import { t } from '../../i18n';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -54,8 +55,12 @@ const AppTabsNavigator = () => {
         ),
       })}
     >
-      <AppTabs.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
-      <AppTabs.Screen name="Slots" component={SlotsScreen} options={{ title: 'Slots' }} />
+      <AppTabs.Screen name="Home" component={HomeScreen} options={{ title: t('tabs.home') }} />
+      <AppTabs.Screen
+        name="Slots"
+        component={SlotsScreen}
+        options={{ title: t('tabs.slots') }}
+      />
     </AppTabs.Navigator>
   );
 };

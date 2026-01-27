@@ -1,29 +1,38 @@
-import { Button, Text, XStack, YStack } from 'tamagui';
+﻿import { Button, Text, XStack, YStack } from 'tamagui';
+import { t } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
 
-const mockSlots = [
+const mockSlots: Array<{
+  id: string;
+  trainerKey: TranslationKey;
+  specializationKey: TranslationKey;
+  timeKey: TranslationKey;
+  priceKey: TranslationKey;
+  initials: string;
+}> = [
   {
     id: 'slot-1',
-    trainer: 'Sarah Kim',
-    specialization: 'Yoga',
-    time: '5:00 PM - 6:00 PM',
-    price: '2000 RUB',
-    initials: 'SK',
+    trainerKey: 'slots.mock.trainer1',
+    specializationKey: 'slots.mock.specialization1',
+    timeKey: 'slots.mock.time1',
+    priceKey: 'slots.mock.price1',
+    initials: 'СК',
   },
   {
     id: 'slot-2',
-    trainer: 'Rene Ivanov',
-    specialization: 'Functional',
-    time: '6:30 PM - 7:30 PM',
-    price: '1800 RUB',
-    initials: 'RI',
+    trainerKey: 'slots.mock.trainer2',
+    specializationKey: 'slots.mock.specialization2',
+    timeKey: 'slots.mock.time2',
+    priceKey: 'slots.mock.price2',
+    initials: 'РИ',
   },
   {
     id: 'slot-3',
-    trainer: 'Evan Turner',
-    specialization: 'Boxing',
-    time: '7:00 PM - 8:00 PM',
-    price: '2500 RUB',
-    initials: 'ET',
+    trainerKey: 'slots.mock.trainer3',
+    specializationKey: 'slots.mock.specialization3',
+    timeKey: 'slots.mock.time3',
+    priceKey: 'slots.mock.price3',
+    initials: 'ИТ',
   },
 ];
 
@@ -33,10 +42,10 @@ export function SlotsScreen() {
       <YStack flex={1} padding="$6" gap="$6">
         <YStack gap="$2">
           <Text fontSize="$8" fontWeight="700" color="$text">
-            Available Slots
+            {t('slots.title')}
           </Text>
           <Text fontSize="$4" color="$muted">
-            Choose a time that fits your schedule.
+            {t('slots.subtitle')}
           </Text>
         </YStack>
         <XStack gap="$2">
@@ -53,7 +62,7 @@ export function SlotsScreen() {
             <XStack alignItems="center" gap="$2">
               <Text fontSize="$4">D</Text>
               <Text fontSize="$3" color="$text">
-                Today, Apr 24
+                {t('slots.filters.date')}
               </Text>
             </XStack>
           </Button>
@@ -67,7 +76,7 @@ export function SlotsScreen() {
             onPress={() => {}}
           >
             <Text fontSize="$3" color="$text">
-              Filters
+              {t('slots.filters.button')}
             </Text>
           </Button>
         </XStack>
@@ -98,17 +107,17 @@ export function SlotsScreen() {
                 <YStack flex={1} gap="$1">
                   <XStack justifyContent="space-between" alignItems="center">
                     <Text fontSize="$4" fontWeight="700" color="$text">
-                      {slot.trainer}
+                      {t(slot.trainerKey)}
                     </Text>
                     <Text fontSize="$3" color="$text">
-                      {slot.price}
+                      {t(slot.priceKey)}
                     </Text>
                   </XStack>
                   <Text fontSize="$3" color="$muted">
-                    {slot.specialization}
+                    {t(slot.specializationKey)}
                   </Text>
                   <Text fontSize="$3" color="$muted">
-                    {slot.time}
+                    {t(slot.timeKey)}
                   </Text>
                 </YStack>
               </XStack>
@@ -122,7 +131,7 @@ export function SlotsScreen() {
                   paddingVertical="$2"
                   onPress={() => {}}
                 >
-                  Book Slot
+                  {t('slots.card.book')}
                 </Button>
               </XStack>
             </YStack>

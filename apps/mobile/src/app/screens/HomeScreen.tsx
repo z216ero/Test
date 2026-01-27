@@ -1,25 +1,39 @@
 ﻿import { Button, Text, XStack, YStack } from 'tamagui';
+import { t } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
 
-const upcomingSession = {
-  date: 'Ср, 24 апреля',
-  time: '11:00–12:00',
-  trainer: 'Марк Джонсон',
-  specialization: 'Кроссфит',
-  status: 'Записано',
+const upcomingSession: {
+  dateKey: TranslationKey;
+  timeKey: TranslationKey;
+  trainerKey: TranslationKey;
+  specializationKey: TranslationKey;
+  statusKey: TranslationKey;
+  initials: string;
+} = {
+  dateKey: 'home.upcoming.date',
+  timeKey: 'home.upcoming.time',
+  trainerKey: 'home.upcoming.trainer',
+  specializationKey: 'home.upcoming.specialization',
+  statusKey: 'home.upcoming.statusBooked',
   initials: 'МД',
 };
 
-const actionCards = [
+const actionCards: Array<{
+  id: string;
+  titleKey: TranslationKey;
+  subtitleKey: TranslationKey;
+  icon: string;
+}> = [
   {
     id: 'find-slots',
-    title: 'Найти слоты',
-    subtitle: 'Доступные окна',
+    titleKey: 'home.actions.findSlots',
+    subtitleKey: 'home.actions.findSlotsSubtitle',
     icon: '🔎',
   },
   {
     id: 'my-bookings',
-    title: 'Мои записи',
-    subtitle: 'Ближайшие тренировки',
+    titleKey: 'home.actions.myBookings',
+    subtitleKey: 'home.actions.myBookingsSubtitle',
     icon: '📅',
   },
 ];
@@ -31,10 +45,10 @@ export function HomeScreen() {
         <XStack alignItems="center" justifyContent="space-between">
           <YStack gap="$2">
             <Text fontSize="$3" color="$muted">
-              Client Home
+              {t('home.label')}
             </Text>
             <Text fontSize="$8" fontWeight="700" color="$text">
-              Доброе утро, Алекс!
+              {t('home.greeting', { name: 'Алекс' })}
             </Text>
           </YStack>
           <Button
@@ -60,7 +74,7 @@ export function HomeScreen() {
         >
           <XStack justifyContent="space-between" alignItems="center">
             <Text fontSize="$4" fontWeight="700" color="$text">
-              Ближайшая тренировка
+              {t('home.upcoming.title')}
             </Text>
             <XStack
               paddingHorizontal="$3"
@@ -69,12 +83,12 @@ export function HomeScreen() {
               borderRadius="$3"
             >
               <Text fontSize="$2" color="$accentText">
-                {upcomingSession.status}
+                {t(upcomingSession.statusKey)}
               </Text>
             </XStack>
           </XStack>
           <Text fontSize="$3" color="$muted">
-            {upcomingSession.date}
+            {t(upcomingSession.dateKey)}
           </Text>
           <XStack gap="$3" alignItems="center">
             <YStack
@@ -91,19 +105,19 @@ export function HomeScreen() {
             </YStack>
             <YStack gap="$1">
               <Text fontSize="$4" fontWeight="700" color="$text">
-                {upcomingSession.trainer}
+                {t(upcomingSession.trainerKey)}
               </Text>
               <Text fontSize="$3" color="$muted">
-                {upcomingSession.specialization}
+                {t(upcomingSession.specializationKey)}
               </Text>
               <Text fontSize="$3" color="$muted">
-                {upcomingSession.time}
+                {t(upcomingSession.timeKey)}
               </Text>
             </YStack>
           </XStack>
           <XStack justifyContent="flex-end">
             <Text fontSize="$3" fontWeight="700" color="$muted" onPress={() => {}}>
-              Детали →
+              {t('home.upcoming.details')}
             </Text>
           </XStack>
         </YStack>
@@ -134,10 +148,10 @@ export function HomeScreen() {
                 </YStack>
                 <YStack gap="$1" flex={1}>
                   <Text fontSize="$4" fontWeight="700" color="$text">
-                    {card.title}
+                    {t(card.titleKey)}
                   </Text>
                   <Text fontSize="$3" color="$muted">
-                    {card.subtitle}
+                    {t(card.subtitleKey)}
                   </Text>
                 </YStack>
                 <Text fontSize="$4" color="$muted">
