@@ -3,15 +3,18 @@ import type {
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { Button, Input, Text, YStack } from 'tamagui';
 import { setAccessToken } from '../../auth/tokenStorage';
 import { login } from '../../api/authApi';
 import { ApiError, getUiErrorMessage } from '../../api/core';
 import {
-  formInputProps,
-  primaryButtonProps,
-  secondaryButtonProps,
-} from '../../ui/formDefaults';
+  AuthCard,
+  AuthError,
+  AuthField,
+  AuthFooter,
+  AuthHeader,
+  AuthPrimaryButton,
+  AuthScreen,
+} from '../../ui/authUi';
 import type { AuthStackParamList, RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
@@ -53,58 +56,38 @@ export function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <YStack flex={1} padding="$6" gap="$4" backgroundColor="$background">
-      <Text fontSize="$7" fontWeight="700" color="$text">
-        Welcome back
-      </Text>
-      <YStack gap="$2">
-        <Text fontSize="$3" color="$text">
-          Email
-        </Text>
-        <Input
+    <AuthScreen>
+      <AuthHeader title="Welcome back" subtitle="Log in to manage your bookings." />
+      <AuthCard>
+        <AuthField
+          label="Email"
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
           placeholder="you@example.com"
-          {...formInputProps}
         />
-      </YStack>
-      <YStack gap="$2">
-        <Text fontSize="$3" color="$text">
-          Password
-        </Text>
-        <Input
+        <AuthField
+          label="Password"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
           placeholder="Your password"
-          {...formInputProps}
         />
-      </YStack>
-      {error ? (
-        <Text fontSize="$3" color="$primary">
-          {error}
-        </Text>
-      ) : null}
-      <Button
-        size="$4"
-        backgroundColor="$primary"
-        color="$primaryText"
-        onPress={handleLogin}
-        disabled={isSubmitting}
-        {...primaryButtonProps}
-      >
-        {isSubmitting ? 'Signing in...' : 'Login'}
-      </Button>
-      <Button
-        size="$3"
+        {error ? (
+          <AuthError message={error} />
+        ) : null}
+        <AuthPrimaryButton onPress={handleLogin} disabled={isSubmitting}>
+          {isSubmitting ? 'Signing in...' : 'Log in'}
+        </AuthPrimaryButton>
+      </AuthCard>
+      <AuthFooter
+        text="Don't have an account?"
+        actionText="Create account"
         onPress={() => navigation.navigate('Register')}
-        {...secondaryButtonProps}
-      >
-        Create account
-      </Button>
-    </YStack>
+        variant="column"
+      />
+    </AuthScreen>
   );
 }

@@ -1,6 +1,11 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { SlotDto } from '../../generated/api';
 
+export type AppTabsParamList = {
+  Home: undefined;
+  Slots: undefined;
+};
+
 export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
@@ -23,5 +28,5 @@ export type AppStackParamList = {
 export type RootStackParamList = {
   Bootstrap: undefined;
   Auth: NavigatorScreenParams<AuthStackParamList>;
-  App: NavigatorScreenParams<AppStackParamList>;
+  App: NavigatorScreenParams<AppTabsParamList>;
 };

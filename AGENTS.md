@@ -83,12 +83,22 @@ Infrastructure:
 - No custom design systems in MVP
 - Focus on usability, not visual experiments
 
-## UI stack
+## UI stack & style
+
 - Use Tamagui for all UI components and styling in the mobile app.
 - Do NOT use React Native StyleSheet directly unless absolutely required.
 - Prefer Tamagui primitives (Stack, XStack, YStack, Text, Button, Input).
 - Reuse Tamagui tokens (spacing, colors, font sizes) instead of hardcoded values.
 - No custom design system in MVP beyond Tamagui configuration.
+
+## UI style rules (mandatory)
+
+- UI style is defined in docs/ui-style.md and is the single source of truth for visual design.
+- All screens must follow the principles described in ui-style.md.
+- Do NOT invent new visual styles per screen.
+- Any UI change that deviates from ui-style.md must be explicitly discussed and agreed upon.
+- Reference images may be used as inspiration, but text rules in ui-style.md have priority.
+
 
 ## Documentation and references
 - Always use Context7 MCP when library or framework documentation is needed.

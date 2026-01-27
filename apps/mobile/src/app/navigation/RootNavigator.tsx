@@ -1,22 +1,21 @@
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { AvailableSlotsScreen } from '../screens/AvailableSlotsScreen';
 import { BootstrapScreen } from '../screens/BootstrapScreen';
-import { CreateSlotScreen } from '../screens/CreateSlotScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
-import { SlotDetailsScreen } from '../screens/SlotDetailsScreen';
-import { TrainerSlotsScreen } from '../screens/TrainerSlotsScreen';
-import { TrainersScreen } from '../screens/TrainersScreen';
+import { SlotsScreen } from '../screens/SlotsScreen';
 import type {
-  AppStackParamList,
   AuthStackParamList,
+  AppTabsParamList,
   RootStackParamList,
 } from './types';
+import { Text } from 'tamagui';
+import { config } from '../../../tamagui.config';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-const AppStack = createNativeStackNavigator<AppStackParamList>();
+const AppTabs = createBottomTabNavigator<AppTabsParamList>();
 
 const AuthStackNavigator = () => (
   <AuthStack.Navigator>
@@ -25,32 +24,41 @@ const AuthStackNavigator = () => (
   </AuthStack.Navigator>
 );
 
-const AppStackNavigator = () => (
-  <AppStack.Navigator>
-    <AppStack.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
-    <AppStack.Screen name="Trainers" component={TrainersScreen} options={{ title: 'Trainers' }} />
-    <AppStack.Screen
-      name="AvailableSlots"
-      component={AvailableSlotsScreen}
-      options={{ title: 'Available Slots' }}
-    />
-    <AppStack.Screen
-      name="SlotDetails"
-      component={SlotDetailsScreen}
-      options={{ title: 'Confirm Booking' }}
-    />
-    <AppStack.Screen
-      name="TrainerSlots"
-      component={TrainerSlotsScreen}
-      options={{ title: 'Trainer Slots' }}
-    />
-    <AppStack.Screen
-      name="CreateSlot"
-      component={CreateSlotScreen}
-      options={{ title: 'Create Slot' }}
-    />
-  </AppStack.Navigator>
-);
+const AppTabsNavigator = () => {
+  const tokens = config.tokens;
+
+  return (
+    <AppTabs.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: tokens.color.accent,
+        tabBarInactiveTintColor: tokens.color.muted,
+        tabBarStyle: {
+          backgroundColor: tokens.color.background,
+          borderTopColor: tokens.color.border,
+          borderTopWidth: 1,
+          paddingTop: tokens.space[2],
+          paddingBottom: tokens.space[3],
+          height: tokens.size[10] + tokens.space[3] + tokens.space[2],
+          elevation: 0,
+          shadowOpacity: 0,
+        },
+        tabBarLabelStyle: {
+          fontSize: tokens.size[2],
+          fontWeight: '600',
+        },
+        tabBarIcon: ({ color }) => (
+          <Text color={color} fontSize="$5">
+            {route.name === 'Home' ? 'H' : 'S'}
+          </Text>
+        ),
+      })}
+    >
+      <AppTabs.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
+      <AppTabs.Screen name="Slots" component={SlotsScreen} options={{ title: 'Slots' }} />
+    </AppTabs.Navigator>
+  );
+};
 
 export function RootNavigator() {
   return (
@@ -60,7 +68,7 @@ export function RootNavigator() {
     >
       <RootStack.Screen name="Bootstrap" component={BootstrapScreen} />
       <RootStack.Screen name="Auth" component={AuthStackNavigator} />
-      <RootStack.Screen name="App" component={AppStackNavigator} />
+      <RootStack.Screen name="App" component={AppTabsNavigator} />
     </RootStack.Navigator>
   );
 }

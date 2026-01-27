@@ -1,10 +1,14 @@
 const tokens = {
   color: {
     background: '#FFFFFF',
+    backgroundSoft: '#F4FAF7',
+    surfaceMuted: '#F1F5F4',
     text: '#0F172A',
     muted: '#64748B',
     primary: '#2563EB',
     primaryText: '#FFFFFF',
+    accent: '#78B792',
+    accentText: '#FFFFFF',
     border: '#E2E8F0',
   },
   space: {
@@ -28,6 +32,9 @@ const tokens = {
     6: 24,
     7: 28,
     8: 32,
+    9: 40,
+    10: 48,
+    11: 56
   },
   radius: {
     0: 0,
@@ -35,6 +42,8 @@ const tokens = {
     2: 8,
     3: 12,
     4: 16,
+    5: 20,
+    6: 24,
   },
 };
 
