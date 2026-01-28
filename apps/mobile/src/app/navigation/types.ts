@@ -4,6 +4,7 @@ import type { SlotDto } from '../../generated/api';
 export type AppTabsParamList = {
   Home: undefined;
   Slots: undefined;
+  Profile: undefined;
 };
 
 export type AuthStackParamList = {

@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { BootstrapScreen } from '../screens/BootstrapScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { LoginScreen } from '../screens/LoginScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
 import { SlotsScreen } from '../screens/SlotsScreen';
 import type {
@@ -50,17 +51,14 @@ const AppTabsNavigator = () => {
         },
         tabBarIcon: ({ color }) => (
           <Text color={color} fontSize="$5">
-            {route.name === 'Home' ? 'H' : 'S'}
+            {route.name === 'Home' ? 'H' : route.name === 'Slots' ? 'S' : 'P'}
           </Text>
         ),
       })}
     >
       <AppTabs.Screen name="Home" component={HomeScreen} options={{ title: t('tabs.home') }} />
-      <AppTabs.Screen
-        name="Slots"
-        component={SlotsScreen}
-        options={{ title: t('tabs.slots') }}
-      />
+      <AppTabs.Screen name="Slots" component={SlotsScreen} options={{ title: t('tabs.slots') }} />
+      <AppTabs.Screen name="Profile" component={ProfileScreen} options={{ title: t('tabs.profile') }} />
     </AppTabs.Navigator>
   );
 };

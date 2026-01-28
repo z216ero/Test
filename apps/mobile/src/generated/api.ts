@@ -110,6 +110,14 @@ export interface TrainerDto {
   createdAtUtc?: string;
 }
 
+export interface UpcomingSessionDto {
+  slot?: SlotDto;
+  /** @nullable */
+  trainerName?: string | null;
+  /** @nullable */
+  trainerSpecialization?: string | null;
+}
+
 export type GetTrainersTrainerIdSlotsParams = {
 fromUtc?: string;
 toUtc?: string;
@@ -427,6 +435,51 @@ export const getClientsMe = async ( options?: RequestInit): Promise<getClientsMe
 
 
 
+export type getClientsMeUpcomingResponse200 = {
+  data: UpcomingSessionDto
+  status: 200
+}
+
+export type getClientsMeUpcomingResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getClientsMeUpcomingResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type getClientsMeUpcomingResponseSuccess = (getClientsMeUpcomingResponse200) & {
+  headers: Headers;
+};
+export type getClientsMeUpcomingResponseError = (getClientsMeUpcomingResponse401 | getClientsMeUpcomingResponse404) & {
+  headers: Headers;
+};
+
+export type getClientsMeUpcomingResponse = (getClientsMeUpcomingResponseSuccess | getClientsMeUpcomingResponseError)
+
+export const getGetClientsMeUpcomingUrl = () => {
+
+
+  
+
+  return `/clients/me/upcoming`
+}
+
+export const getClientsMeUpcoming = async ( options?: RequestInit): Promise<getClientsMeUpcomingResponse> => {
+  
+  return customFetch<getClientsMeUpcomingResponse>(getGetClientsMeUpcomingUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
 export type getHealthResponse200 = {
   data: StringFAnonymousType1
   status: 200
@@ -594,6 +647,51 @@ export const getTrainersTrainerIdSlots = async (trainerId: string,
     params?: GetTrainersTrainerIdSlotsParams, options?: RequestInit): Promise<getTrainersTrainerIdSlotsResponse> => {
   
   return customFetch<getTrainersTrainerIdSlotsResponse>(getGetTrainersTrainerIdSlotsUrl(trainerId,params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getTrainersMeResponse200 = {
+  data: TrainerDto
+  status: 200
+}
+
+export type getTrainersMeResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getTrainersMeResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type getTrainersMeResponseSuccess = (getTrainersMeResponse200) & {
+  headers: Headers;
+};
+export type getTrainersMeResponseError = (getTrainersMeResponse401 | getTrainersMeResponse404) & {
+  headers: Headers;
+};
+
+export type getTrainersMeResponse = (getTrainersMeResponseSuccess | getTrainersMeResponseError)
+
+export const getGetTrainersMeUrl = () => {
+
+
+  
+
+  return `/trainers/me`
+}
+
+export const getTrainersMe = async ( options?: RequestInit): Promise<getTrainersMeResponse> => {
+  
+  return customFetch<getTrainersMeResponse>(getGetTrainersMeUrl(),
   {      
     ...options,
     method: 'GET'

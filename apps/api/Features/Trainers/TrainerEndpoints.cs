@@ -10,6 +10,29 @@ public static class TrainerEndpoints
     {
         var group = app.MapGroup("/trainers").WithTags("Trainers");
 
+        group.MapGet("/me", async (
+            HttpContext httpContext,
+            TrainerService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var result = await service.GetTrainerProfileAsync(userId, cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .RequireAuthorization()
+        .Produces<TrainerDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapPost("/", async (
             CreateTrainerRequest? request,
             HttpContext httpContext,

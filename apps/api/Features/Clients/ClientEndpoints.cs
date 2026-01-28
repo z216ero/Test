@@ -32,6 +32,29 @@ public static class ClientEndpoints
         .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/me/upcoming", async (
+            HttpContext httpContext,
+            ClientService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var result = await service.GetUpcomingSessionAsync(userId, cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .RequireAuthorization()
+        .Produces<UpcomingSessionDto?>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status404NotFound);
+
         return app;
     }
 }
