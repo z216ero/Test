@@ -50,6 +50,7 @@ A user can have ONLY ONE role in MVP.
 - id
 - role: Trainer | Client
 - name
+- avatar (optional): user profile photo
 - phone or email (auth identifier)
 
 ### TrainerProfile
@@ -60,6 +61,14 @@ A user can have ONLY ONE role in MVP.
 
 ### ClientProfile
 - userId
+
+### RefreshToken
+- id
+- userId
+- token
+- expiresAt (UTC)
+- createdAt (UTC)
+- revokedAt (UTC, optional)
 
 ### TrainingSlot
 - id

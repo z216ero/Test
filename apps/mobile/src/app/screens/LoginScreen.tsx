@@ -3,7 +3,6 @@
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { setAccessToken } from '../../auth/tokenStorage';
 import { login } from '../../api/authApi';
 import { ApiError, getUiErrorMessage } from '../../api/core';
 import { t } from '../../i18n';
@@ -45,7 +44,6 @@ export function LoginScreen({ navigation }: Props) {
         throw new ApiError(t('auth.errorMissingToken'));
       }
 
-      await setAccessToken(response.accessToken);
       const rootNavigation =
         navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
       rootNavigation?.reset({ index: 0, routes: [{ name: 'App' }] });

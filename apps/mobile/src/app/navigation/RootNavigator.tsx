@@ -3,12 +3,14 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { BootstrapScreen } from '../screens/BootstrapScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { LoginScreen } from '../screens/LoginScreen';
+import { PersonalInfoScreen } from '../screens/PersonalInfoScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
 import { SlotsScreen } from '../screens/SlotsScreen';
 import type {
   AuthStackParamList,
   AppTabsParamList,
+  ProfileStackParamList,
   RootStackParamList,
 } from './types';
 import { Text } from 'tamagui';
@@ -18,12 +20,20 @@ import { t } from '../../i18n';
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const AppTabs = createBottomTabNavigator<AppTabsParamList>();
+const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 
 const AuthStackNavigator = () => (
   <AuthStack.Navigator>
     <AuthStack.Screen name="Login" component={LoginScreen} options={{ title: 'Login' }} />
     <AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: 'Register' }} />
   </AuthStack.Navigator>
+);
+
+const ProfileStackNavigator = () => (
+  <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+    <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} />
+    <ProfileStack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
+  </ProfileStack.Navigator>
 );
 
 const AppTabsNavigator = () => {
@@ -58,7 +68,7 @@ const AppTabsNavigator = () => {
     >
       <AppTabs.Screen name="Home" component={HomeScreen} options={{ title: t('tabs.home') }} />
       <AppTabs.Screen name="Slots" component={SlotsScreen} options={{ title: t('tabs.slots') }} />
-      <AppTabs.Screen name="Profile" component={ProfileScreen} options={{ title: t('tabs.profile') }} />
+      <AppTabs.Screen name="Profile" component={ProfileStackNavigator} options={{ title: t('tabs.profile') }} />
     </AppTabs.Navigator>
   );
 };

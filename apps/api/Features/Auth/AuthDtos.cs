@@ -15,6 +15,12 @@ public sealed record AuthUserDto(
     string Role,
     string Name,
     string? Specialization,
-    string? GymName);
+    string? GymName,
+    bool HasAvatar,
+    string? AvatarUrl);
 
-public sealed record AuthResponse(string AccessToken, AuthUserDto User);
+public sealed record AuthResponse(string AccessToken, string RefreshToken, AuthUserDto User);
+
+public sealed record RefreshRequest(string RefreshToken);
+
+public sealed record LogoutRequest(string? RefreshToken);

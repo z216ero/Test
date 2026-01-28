@@ -121,4 +121,74 @@ public sealed class AuthFlowTests : IClassFixture<ApiPostgresFixture>
 
         Assert.Equal(HttpStatusCode.NotFound, profileResponse.StatusCode);
     }
+
+    [Fact]
+    public async Task Refresh_WhenTokenValid_ReturnsNewAccessToken()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var registerResponse = await client.PostAsJsonAsync("/auth/register", new RegisterRequest(
+            "refresh@example.com",
+            "Password123",
+            "Client",
+            "Refresh Client",
+            null));
+
+        Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
+        var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.NotNull(auth);
+        Assert.False(string.IsNullOrWhiteSpace(auth!.RefreshToken));
+
+        var refreshResponse = await client.PostAsJsonAsync(
+            "/auth/refresh",
+            new RefreshRequest(auth.RefreshToken!));
+
+        Assert.Equal(HttpStatusCode.OK, refreshResponse.StatusCode);
+        var refreshed = await refreshResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.NotNull(refreshed);
+        Assert.False(string.IsNullOrWhiteSpace(refreshed!.AccessToken));
+        Assert.False(string.IsNullOrWhiteSpace(refreshed.RefreshToken));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            refreshed.AccessToken);
+
+        var meResponse = await client.GetAsync("/auth/me");
+        Assert.Equal(HttpStatusCode.OK, meResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Logout_WhenRefreshTokenProvided_RevokesToken()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var registerResponse = await client.PostAsJsonAsync("/auth/register", new RegisterRequest(
+            "logout@example.com",
+            "Password123",
+            "Client",
+            "Logout Client",
+            null));
+
+        Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
+        var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.NotNull(auth);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            auth!.AccessToken);
+
+        var logoutResponse = await client.PostAsJsonAsync(
+            "/auth/logout",
+            new LogoutRequest(auth.RefreshToken));
+
+        Assert.Equal(HttpStatusCode.OK, logoutResponse.StatusCode);
+
+        var refreshResponse = await client.PostAsJsonAsync(
+            "/auth/refresh",
+            new RefreshRequest(auth.RefreshToken));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, refreshResponse.StatusCode);
+    }
 }

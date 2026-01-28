@@ -11,17 +11,36 @@ import {
   postAuthRegister,
 } from '../generated/api';
 import { unwrap } from './core';
+import {
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+} from '../auth/tokenStorage';
 
 export const register = async (
   payload: RegisterRequest
 ): Promise<AuthResponse> => {
   const response = await postAuthRegister(payload);
-  return unwrap(response, 'Unable to register. Please try again.');
+  const data = unwrap<AuthResponse>(response, 'Unable to register. Please try again.');
+  if (data.accessToken) {
+    await setAccessToken(data.accessToken);
+  }
+  if (data.refreshToken) {
+    await setRefreshToken(data.refreshToken);
+  }
+  return data;
 };
 
 export const login = async (payload: LoginRequest): Promise<AuthResponse> => {
   const response = await postAuthLogin(payload);
-  return unwrap(response, 'Unable to login. Please try again.');
+  const data = unwrap<AuthResponse>(response, 'Unable to login. Please try again.');
+  if (data.accessToken) {
+    await setAccessToken(data.accessToken);
+  }
+  if (data.refreshToken) {
+    await setRefreshToken(data.refreshToken);
+  }
+  return data;
 };
 
 export const me = async (): Promise<AuthUserDto> => {
@@ -30,6 +49,7 @@ export const me = async (): Promise<AuthUserDto> => {
 };
 
 export const logout = async (): Promise<void> => {
-  const response = await postAuthLogout();
+  const refreshToken = await getRefreshToken();
+  const response = await postAuthLogout({ refreshToken: refreshToken ?? null });
   unwrap(response, 'Unable to logout.');
 };

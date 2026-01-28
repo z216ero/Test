@@ -4,7 +4,6 @@
 } from '@react-navigation/native-stack';
 import { useMemo, useState } from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { setAccessToken } from '../../auth/tokenStorage';
 import { register } from '../../api/authApi';
 import { ApiError, getUiErrorMessage } from '../../api/core';
 import { t } from '../../i18n';
@@ -69,7 +68,6 @@ export function RegisterScreen({ navigation }: Props) {
         throw new ApiError(t('auth.errorMissingToken'));
       }
 
-      await setAccessToken(response.accessToken);
       const rootNavigation =
         navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
       rootNavigation?.reset({ index: 0, routes: [{ name: 'App' }] });

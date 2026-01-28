@@ -1,18 +1,22 @@
-import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useEffect, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { Image } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { logout } from '../../api/authApi';
 import { getUiErrorMessage } from '../../api/core';
 import { getMe } from '../../api/homeApi';
-import { clearAccessToken } from '../../auth/tokenStorage';
+import { clearSession } from '../../auth/tokenStorage';
+import { getAccessToken } from '../../auth/tokenStorage';
+import { API_BASE_URL } from '../../config/env';
 import { t } from '../../i18n';
 import type { AuthUserDto } from '../../generated/api';
-import type { AppTabsParamList, RootStackParamList } from '../navigation/types';
+import type { ProfileStackParamList, RootStackParamList } from '../navigation/types';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 
-type Props = BottomTabScreenProps<AppTabsParamList, 'Profile'>;
+type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
 
 const getInitials = (name?: string | null) => {
   const value = name?.trim();
@@ -26,36 +30,69 @@ const getInitials = (name?: string | null) => {
   return value.slice(0, 2).toUpperCase();
 };
 
+const buildAbsoluteUrl = (path: string): string => {
+  const trimmedBase = API_BASE_URL.endsWith('/')
+    ? API_BASE_URL.slice(0, -1)
+    : API_BASE_URL;
+  const trimmedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${trimmedBase}${trimmedPath}`;
+};
+
 export function ProfileScreen({ navigation }: Props) {
   const [me, setMe] = useState<AuthUserDto | null>(null);
+  const [avatarToken, setAvatarToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const meData = await getMe();
+      const token = await getAccessToken();
       setMe(meData);
+      setAvatarToken(token);
     } catch (err) {
       setError(getUiErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    load();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const role = me?.role === 'Trainer' ? 'Trainer' : 'Client';
   const roleLabel =
     role === 'Trainer' ? t('profile.roleTrainer') : t('profile.roleClient');
 
   const name = me?.name?.trim() || t('common.unknownUser');
+  const avatarUrl = useMemo(() => {
+    if (!me?.avatarUrl) {
+      return null;
+    }
+    return buildAbsoluteUrl(me.avatarUrl);
+  }, [me?.avatarUrl]);
+
+  const avatarSource = useMemo(() => {
+    if (avatarUrl && avatarToken) {
+      return {
+        uri: avatarUrl,
+        headers: { Authorization: `Bearer ${avatarToken}` },
+      };
+    }
+    return null;
+  }, [avatarUrl, avatarToken]);
 
   const settingsItems = [
-    { id: 'personal', label: t('profile.settings.personalInfo') },
+    {
+      id: 'personal',
+      label: t('profile.settings.personalInfo'),
+      onPress: () => navigation.navigate('PersonalInfo'),
+    },
     {
       id: 'schedule',
       label: role === 'Trainer'
@@ -74,15 +111,15 @@ export function ProfileScreen({ navigation }: Props) {
     } catch (err) {
       setError(getUiErrorMessage(err));
     } finally {
-      await clearAccessToken();
+      await clearSession();
+      const tabNavigation = navigation.getParent();
       const rootNavigation =
-        navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
+        tabNavigation?.getParent<NativeStackNavigationProp<RootStackParamList>>();
       rootNavigation?.reset({ index: 0, routes: [{ name: 'Auth' }] });
     }
   };
 
   const tabBarHeight = useBottomTabBarHeight();
-  console.log(tabBarHeight)
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
       <ScrollView
@@ -95,18 +132,27 @@ export function ProfileScreen({ navigation }: Props) {
           <YStack gap="$4">
             <XStack alignItems="center" gap="$4">
               <YStack
-                width="$12"
-                height="$12"
+                width="$11"
+                height="$11"
                 borderRadius="$6"
                 backgroundColor="$background"
                 borderWidth={1}
                 borderColor="$border"
                 alignItems="center"
                 justifyContent="center"
+                overflow="hidden"
               >
-                <Text fontSize="$5" color="$muted">
-                  {getInitials(me?.name)}
-                </Text>
+                {avatarSource ? (
+                  <Image
+                    source={avatarSource}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text fontSize="$5" color="$muted">
+                    {getInitials(me?.name)}
+                  </Text>
+                )}
               </YStack>
               <YStack gap="$1">
                 <Text fontSize="$6" fontWeight="700" color="$text">
@@ -146,7 +192,7 @@ export function ProfileScreen({ navigation }: Props) {
                 minHeight="$11"
                 paddingVertical="$3"
                 justifyContent="flex-start"
-                onPress={() => { }}
+                onPress={item.onPress}
                 disabled={item.disabled}
                 opacity={item.disabled ? 0.5 : 1}
               >

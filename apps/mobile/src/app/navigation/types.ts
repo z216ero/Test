@@ -1,10 +1,15 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { SlotDto } from '../../generated/api';
 
+export type ProfileStackParamList = {
+  ProfileHome: undefined;
+  PersonalInfo: undefined;
+};
+
 export type AppTabsParamList = {
   Home: undefined;
   Slots: undefined;
-  Profile: undefined;
+  Profile: NavigatorScreenParams<ProfileStackParamList>;
 };
 
 export type AuthStackParamList = {

@@ -8,6 +8,8 @@ import { customFetch } from '../api/custom-fetch';
 export interface AuthResponse {
   /** @nullable */
   accessToken?: string | null;
+  /** @nullable */
+  refreshToken?: string | null;
   user?: AuthUserDto;
 }
 
@@ -23,6 +25,9 @@ export interface AuthUserDto {
   specialization?: string | null;
   /** @nullable */
   gymName?: string | null;
+  hasAvatar?: boolean;
+  /** @nullable */
+  avatarUrl?: string | null;
 }
 
 export interface BookSlotRequest {
@@ -59,6 +64,11 @@ export interface LoginRequest {
   password?: string | null;
 }
 
+export interface LogoutRequest {
+  /** @nullable */
+  refreshToken?: string | null;
+}
+
 export interface ProblemDetails {
   /** @nullable */
   type?: string | null;
@@ -84,6 +94,23 @@ export interface RegisterRequest {
   name?: string | null;
   /** @nullable */
   specialization?: string | null;
+}
+
+export interface RefreshRequest {
+  /** @nullable */
+  refreshToken?: string | null;
+}
+
+export interface UpdateUserRequest {
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  specialization?: string | null;
+}
+
+export interface UploadAvatarRequest {
+  /** @nullable */
+  file?: Blob | null;
 }
 
 export interface SlotDto {
@@ -215,6 +242,52 @@ export const postAuthLogin = async (loginRequest: LoginRequest, options?: Reques
 
 
 
+export type postAuthRefreshResponse200 = {
+  data: AuthResponse
+  status: 200
+}
+
+export type postAuthRefreshResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postAuthRefreshResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+    
+export type postAuthRefreshResponseSuccess = (postAuthRefreshResponse200) & {
+  headers: Headers;
+};
+export type postAuthRefreshResponseError = (postAuthRefreshResponse400 | postAuthRefreshResponse401) & {
+  headers: Headers;
+};
+
+export type postAuthRefreshResponse = (postAuthRefreshResponseSuccess | postAuthRefreshResponseError)
+
+export const getPostAuthRefreshUrl = () => {
+
+
+  
+
+  return `/auth/refresh`
+}
+
+export const postAuthRefresh = async (refreshRequest: RefreshRequest, options?: RequestInit): Promise<postAuthRefreshResponse> => {
+  
+  return customFetch<postAuthRefreshResponse>(getPostAuthRefreshUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      refreshRequest,)
+  }
+);}
+
+
+
 export type getAuthMeResponse200 = {
   data: AuthUserDto
   status: 200
@@ -259,13 +332,20 @@ export type postAuthLogoutResponse200 = {
   data: void
   status: 200
 }
+
+export type postAuthLogoutResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
     
 export type postAuthLogoutResponseSuccess = (postAuthLogoutResponse200) & {
   headers: Headers;
 };
-;
+export type postAuthLogoutResponseError = (postAuthLogoutResponse401) & {
+  headers: Headers;
+};
 
-export type postAuthLogoutResponse = (postAuthLogoutResponseSuccess)
+export type postAuthLogoutResponse = (postAuthLogoutResponseSuccess | postAuthLogoutResponseError)
 
 export const getPostAuthLogoutUrl = () => {
 
@@ -275,12 +355,159 @@ export const getPostAuthLogoutUrl = () => {
   return `/auth/logout`
 }
 
-export const postAuthLogout = async ( options?: RequestInit): Promise<postAuthLogoutResponse> => {
+export const postAuthLogout = async (logoutRequest: LogoutRequest, options?: RequestInit): Promise<postAuthLogoutResponse> => {
   
   return customFetch<postAuthLogoutResponse>(getPostAuthLogoutUrl(),
   {      
     ...options,
-    method: 'POST'
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      logoutRequest,)
+  }
+);}
+
+
+
+export type patchUsersMeResponse200 = {
+  data: AuthUserDto
+  status: 200
+}
+
+export type patchUsersMeResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type patchUsersMeResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type patchUsersMeResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type patchUsersMeResponseSuccess = (patchUsersMeResponse200) & {
+  headers: Headers;
+};
+export type patchUsersMeResponseError = (patchUsersMeResponse400 | patchUsersMeResponse401 | patchUsersMeResponse404) & {
+  headers: Headers;
+};
+
+export type patchUsersMeResponse = (patchUsersMeResponseSuccess | patchUsersMeResponseError)
+
+export const getPatchUsersMeUrl = () => {
+
+
+  
+
+  return `/users/me`
+}
+
+export const patchUsersMe = async (updateUserRequest: UpdateUserRequest, options?: RequestInit): Promise<patchUsersMeResponse> => {
+  
+  return customFetch<patchUsersMeResponse>(getPatchUsersMeUrl(),
+  {      
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateUserRequest,)
+  }
+);}
+
+
+
+export type putUsersMeAvatarResponse204 = {
+  data: void
+  status: 204
+}
+
+export type putUsersMeAvatarResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type putUsersMeAvatarResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+    
+export type putUsersMeAvatarResponseSuccess = (putUsersMeAvatarResponse204) & {
+  headers: Headers;
+};
+export type putUsersMeAvatarResponseError = (putUsersMeAvatarResponse400 | putUsersMeAvatarResponse401) & {
+  headers: Headers;
+};
+
+export type putUsersMeAvatarResponse = (putUsersMeAvatarResponseSuccess | putUsersMeAvatarResponseError)
+
+export const getPutUsersMeAvatarUrl = () => {
+
+
+  
+
+  return `/users/me/avatar`
+}
+
+export const putUsersMeAvatar = async (uploadAvatarRequest: UploadAvatarRequest, options?: RequestInit): Promise<putUsersMeAvatarResponse> => {
+    const formData = new FormData();
+if(uploadAvatarRequest.file !== undefined && uploadAvatarRequest.file !== null) {
+ formData.append(`file`, uploadAvatarRequest.file)
+ }
+
+  return customFetch<putUsersMeAvatarResponse>(getPutUsersMeAvatarUrl(),
+  {      
+    ...options,
+    method: 'PUT'
+    ,
+    body: 
+      formData,
+  }
+);}
+
+
+
+export type getUsersMeAvatarResponse200 = {
+  data: Blob
+  status: 200
+}
+
+export type getUsersMeAvatarResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getUsersMeAvatarResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type getUsersMeAvatarResponseSuccess = (getUsersMeAvatarResponse200) & {
+  headers: Headers;
+};
+export type getUsersMeAvatarResponseError = (getUsersMeAvatarResponse401 | getUsersMeAvatarResponse404) & {
+  headers: Headers;
+};
+
+export type getUsersMeAvatarResponse = (getUsersMeAvatarResponseSuccess | getUsersMeAvatarResponseError)
+
+export const getGetUsersMeAvatarUrl = () => {
+
+
+  
+
+  return `/users/me/avatar`
+}
+
+export const getUsersMeAvatar = async ( options?: RequestInit): Promise<getUsersMeAvatarResponse> => {
+  
+  return customFetch<getUsersMeAvatarResponse>(getGetUsersMeAvatarUrl(),
+  {      
+    ...options,
+    method: 'GET'
     
     
   }

@@ -94,4 +94,19 @@ export const ru = {
   'profile.settings.notifications': 'Уведомления',
   'profile.settings.support': 'Помощь и поддержка',
   'profile.logout': 'Выйти',
+  'profile.personal.title': 'Личные данные',
+  'profile.personal.photo': 'Фото профиля',
+  'profile.personal.pickPhoto': 'Выбрать фото',
+  'profile.personal.main': 'Основное',
+  'profile.personal.name': 'Имя',
+  'profile.personal.specialization': 'Специализация',
+  'profile.personal.email': 'Почта',
+  'profile.personal.save': 'Сохранить',
+  'profile.personal.cancel': 'Отмена',
+  'errors.invalidImage': 'Неверный формат изображения.',
+  'errors.uploadFailed': 'Не удалось загрузить фото.',
+  'errors.saveFailed': 'Не удалось сохранить данные.',
 } as const;
+
+
+

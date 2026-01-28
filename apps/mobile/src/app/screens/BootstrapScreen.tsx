@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
 import { Button, Text, YStack } from 'tamagui';
-import { clearAccessToken, getAccessToken } from '../../auth/tokenStorage';
+import { clearSession, getAccessToken } from '../../auth/tokenStorage';
 import { me } from '../../api/authApi';
 import { getUiErrorMessage } from '../../api/core';
 import { secondaryButtonProps } from '../../ui/formDefaults';
@@ -33,7 +33,7 @@ export function BootstrapScreen({ navigation }: Props) {
     } catch (err) {
       console.error('Bootstrap failed', err);
       setError(getUiErrorMessage(err));
-      await clearAccessToken();
+      await clearSession();
       goToAuth();
     }
   };

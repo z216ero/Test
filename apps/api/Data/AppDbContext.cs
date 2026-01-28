@@ -12,6 +12,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<ClientProfile> ClientProfiles => Set<ClientProfile>();
     public DbSet<TrainingSlot> TrainingSlots => Set<TrainingSlot>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<UserAvatar> UserAvatars => Set<UserAvatar>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -101,6 +103,43 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasOne(x => x.Slot)
                 .WithOne(x => x.Booking)
                 .HasForeignKey<Booking>(x => x.SlotId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserAvatar>(entity =>
+        {
+            entity.ToTable("user_avatars");
+            entity.HasKey(x => x.UserId);
+            entity.Property(x => x.ContentType)
+                .HasMaxLength(100)
+                .IsRequired();
+            entity.Property(x => x.Bytes)
+                .IsRequired();
+            entity.Property(x => x.UpdatedAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.HasOne(x => x.User)
+                .WithOne(x => x.Avatar)
+                .HasForeignKey<UserAvatar>(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("refresh_tokens");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Token)
+                .HasMaxLength(200)
+                .IsRequired();
+            entity.Property(x => x.ExpiresAtUtc)
+                .IsRequired();
+            entity.Property(x => x.CreatedAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.HasIndex(x => x.Token)
+                .IsUnique();
+            entity.HasIndex(x => x.UserId);
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.RefreshTokens)
+                .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

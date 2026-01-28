@@ -5,6 +5,7 @@ using Api.Features.Clients;
 using Api.Features.Health;
 using Api.Features.Slots;
 using Api.Features.Trainers;
+using Api.Features.Users;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -100,6 +101,7 @@ builder.Services.AddScoped<SlotService>();
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ClientService>();
+builder.Services.AddScoped<UserService>();
 
 var app = builder.Build();
 
@@ -114,6 +116,7 @@ app.MapTrainerEndpoints();
 app.MapSlotEndpoints();
 app.MapBookingEndpoints();
 app.MapClientEndpoints();
+app.MapUserEndpoints();
 
 await app.RunAsync();
 

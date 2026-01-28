@@ -6,4 +6,6 @@ public sealed class AppUser : IdentityUser<Guid>
 {
     public string Name { get; set; } = string.Empty;
     public string Role { get; set; } = UserRoles.Client;
+    public UserAvatar? Avatar { get; set; }
+    public List<RefreshToken> RefreshTokens { get; set; } = new();
 }

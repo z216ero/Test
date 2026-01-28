@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Api.Data;
 using Api.Features.Common;
@@ -93,7 +94,7 @@ public sealed class AuthService(
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            var response = await BuildAuthResponseAsync(user, cancellationToken);
+            var response = await IssueAuthResponseAsync(user, cancellationToken);
             result = ServiceResult<AuthResponse>.Success(response);
         });
 
@@ -125,7 +126,7 @@ public sealed class AuthService(
                 "Email or password is incorrect.");
         }
 
-        var response = await BuildAuthResponseAsync(user, cancellationToken);
+        var response = await IssueAuthResponseAsync(user, cancellationToken);
         return ServiceResult<AuthResponse>.Success(response);
     }
 
@@ -146,17 +147,95 @@ public sealed class AuthService(
         return ServiceResult<AuthUserDto>.Success(authUser);
     }
 
-    private async Task<AuthResponse> BuildAuthResponseAsync(AppUser user, CancellationToken cancellationToken)
+    public async Task<ServiceResult<bool>> RevokeRefreshTokensAsync(
+        Guid userId,
+        string? refreshToken,
+        CancellationToken cancellationToken)
     {
-        var token = CreateToken(user);
+        var query = db.RefreshTokens.Where(x => x.UserId == userId);
+
+        if (!string.IsNullOrWhiteSpace(refreshToken))
+        {
+            query = query.Where(x => x.Token == refreshToken);
+        }
+
+        var tokens = await query
+            .Where(x => x.RevokedAtUtc == null)
+            .ToListAsync(cancellationToken);
+
+        if (tokens.Count == 0)
+        {
+            return ServiceResult<bool>.Success(true);
+        }
+
+        var now = DateTime.UtcNow;
+        foreach (var token in tokens)
+        {
+            token.RevokedAtUtc = now;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return ServiceResult<bool>.Success(true);
+    }
+
+    public async Task<ServiceResult<AuthResponse>> RefreshAsync(
+        RefreshRequest request,
+        CancellationToken cancellationToken)
+    {
+        var stored = await db.RefreshTokens
+            .Include(x => x.User)
+            .FirstOrDefaultAsync(x => x.Token == request.RefreshToken, cancellationToken);
+
+        if (stored is null
+            || stored.RevokedAtUtc.HasValue
+            || stored.ExpiresAtUtc <= DateTime.UtcNow)
+        {
+            return ServiceResult<AuthResponse>.Fail(
+                StatusCodes.Status401Unauthorized,
+                "Invalid refresh token",
+                "Refresh token is invalid or expired.");
+        }
+
+        if (stored.User is null)
+        {
+            return ServiceResult<AuthResponse>.Fail(
+                StatusCodes.Status401Unauthorized,
+                "Unauthorized",
+                "User is not available.");
+        }
+
+        stored.RevokedAtUtc = DateTime.UtcNow;
+
+        var newToken = CreateRefreshToken(stored.UserId);
+        db.RefreshTokens.Add(newToken);
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        var accessToken = CreateToken(stored.User);
+        var dto = await BuildUserDtoAsync(stored.User, cancellationToken);
+        return ServiceResult<AuthResponse>.Success(new AuthResponse(accessToken, newToken.Token, dto));
+    }
+
+    private async Task<AuthResponse> IssueAuthResponseAsync(AppUser user, CancellationToken cancellationToken)
+    {
+        var accessToken = CreateToken(user);
+        var refreshToken = CreateRefreshToken(user.Id);
+
+        db.RefreshTokens.Add(refreshToken);
+        await db.SaveChangesAsync(cancellationToken);
+
         var dto = await BuildUserDtoAsync(user, cancellationToken);
-        return new AuthResponse(token, dto);
+        return new AuthResponse(accessToken, refreshToken.Token, dto);
     }
 
     private async Task<AuthUserDto> BuildUserDtoAsync(AppUser user, CancellationToken cancellationToken)
     {
         string? specialization = null;
         string? gymName = null;
+        var hasAvatar = await db.UserAvatars
+            .AsNoTracking()
+            .AnyAsync(a => a.UserId == user.Id, cancellationToken);
+        var avatarUrl = hasAvatar ? "/users/me/avatar" : null;
 
         if (string.Equals(user.Role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
         {
@@ -173,8 +252,20 @@ public sealed class AuthService(
             user.Role,
             user.Name,
             specialization,
-            gymName);
+            gymName,
+            hasAvatar,
+            avatarUrl);
     }
+
+    private RefreshToken CreateRefreshToken(Guid userId)
+        => new()
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(jwtOptions.Value.RefreshTokenDays),
+            CreatedAtUtc = DateTime.UtcNow
+        };
 
     private string CreateToken(AppUser user)
     {
