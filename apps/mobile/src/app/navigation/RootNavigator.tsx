@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { TextStyle } from 'react-native';
 import { BootstrapScreen } from '../screens/BootstrapScreen';
+import { BookingConfirmScreen } from '../screens/BookingConfirmScreen';
 import { BookingsScreen } from '../screens/BookingsScreen';
 import { CreateSlotTabScreen } from '../screens/CreateSlotTabScreen';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -18,6 +19,7 @@ import type {
   AuthStackParamList,
   ProfileStackParamList,
   RootStackParamList,
+  SlotsStackParamList,
   TrainerTabsParamList,
 } from './types';
 import { Text, YStack } from 'tamagui';
@@ -29,6 +31,7 @@ const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const ClientTabs = createBottomTabNavigator<ClientTabsParamList>();
 const TrainerTabs = createBottomTabNavigator<TrainerTabsParamList>();
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
+const SlotsStack = createNativeStackNavigator<SlotsStackParamList>();
 
 const AuthStackNavigator = () => (
   <AuthStack.Navigator>
@@ -42,6 +45,13 @@ const ProfileStackNavigator = () => (
     <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} />
     <ProfileStack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
   </ProfileStack.Navigator>
+);
+
+const SlotsStackNavigator = () => (
+  <SlotsStack.Navigator screenOptions={{ headerShown: false }}>
+    <SlotsStack.Screen name="SlotsList" component={SlotsScreen} />
+    <SlotsStack.Screen name="BookingConfirm" component={BookingConfirmScreen} />
+  </SlotsStack.Navigator>
 );
 
 const tokens = config.tokens;
@@ -99,7 +109,7 @@ const ClientTabsNavigator = () => (
     />
     <ClientTabs.Screen
       name="Slots"
-      component={SlotsScreen}
+      component={SlotsStackNavigator}
       options={{ title: t('tabs.slots'), tabBarIcon: makeTabIcon('S') }}
     />
     <ClientTabs.Screen

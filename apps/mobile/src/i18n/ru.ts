@@ -53,6 +53,11 @@
 
   'slots.title': 'Доступные слоты',
   'slots.subtitle': 'Выберите удобное время.',
+  'slots.empty': 'Пока нет доступных слотов.',
+  'slots.retry': 'Обновить список',
+  'slots.bookCta': 'Записаться',
+  'slots.filterToday': 'Сегодня',
+  'slots.filterTomorrow': 'Завтра',
   'slots.filters.date': 'Сегодня, 24 апр',
   'slots.filters.button': 'Фильтры',
   'slots.card.book': 'Записаться',
@@ -89,12 +94,25 @@
   'tabs.createSlot': 'Создать слот',
   'tabs.profile': 'Профиль',
   'bookings.title': 'Записи',
-  'bookings.subtitle': 'Здесь появятся ваши предстоящие тренировки.',
-  'bookings.placeholder': 'Функция будет добавлена на следующем шаге.',
+  'bookings.subtitle': 'Ваши тренировки и история.',
+  'bookings.upcoming': 'Предстоящие',
+  'bookings.past': 'Прошедшие',
+  'bookings.cancel': 'Отменить',
+  'bookings.emptyUpcoming': 'Предстоящих тренировок нет.',
+  'bookings.emptyPast': 'Прошедших тренировок нет.',
+  'bookings.statusBooked': 'Записано',
+  'bookings.statusCancelled': 'Отменено',
+  'bookings.statusCompleted': 'Завершено',
+  'bookings.statusNoShow': 'Неявка',
+  'bookings.statusUnknown': 'Статус',
 
   'schedule.title': 'Расписание',
   'schedule.subtitle': 'Здесь будут ваши слоты и занятия.',
   'schedule.placeholder': 'Функция будет добавлена на следующем шаге.',
+
+  'bookingConfirm.title': 'Подтвердите запись',
+  'bookingConfirm.confirm': 'Подтвердить',
+  'bookingConfirm.back': 'Назад',
 
   'createSlot.title': 'Создать слот',
   'createSlot.subtitle': 'Здесь можно будет добавлять новые слоты.',
@@ -121,8 +139,12 @@
   'errors.invalidImage': 'Неверный формат изображения.',
   'errors.uploadFailed': 'Не удалось загрузить фото.',
   'errors.saveFailed': 'Не удалось сохранить данные.',
+  'errors.slotTaken': 'Слот уже занят.',
+  'errors.slotNotFound': 'Слот не найден.',
+  'errors.slotTakenHint': 'Вернитесь к списку и обновите слоты.',
+  'errors.slotNotFoundHint': 'Вернитесь к списку и выберите другой слот.',
+  'errors.generic': 'Что-то пошло не так. Попробуйте ещё раз.',
 } as const;
-
 
 
 

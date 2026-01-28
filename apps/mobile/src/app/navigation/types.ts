@@ -8,9 +8,18 @@ export type ProfileStackParamList = {
 
 export type UserRole = 'Client' | 'Trainer';
 
+export type SlotsStackParamList = {
+  SlotsList: undefined;
+  BookingConfirm: {
+    slot: SlotDto;
+    trainerName?: string | null;
+    trainerSpecialization?: string | null;
+  };
+};
+
 export type ClientTabsParamList = {
   Home: undefined;
-  Slots: undefined;
+  Slots: NavigatorScreenParams<SlotsStackParamList>;
   Bookings: undefined;
   Profile: NavigatorScreenParams<ProfileStackParamList>;
 };
