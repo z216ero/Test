@@ -6,11 +6,23 @@ export type ProfileStackParamList = {
   PersonalInfo: undefined;
 };
 
-export type AppTabsParamList = {
+export type UserRole = 'Client' | 'Trainer';
+
+export type ClientTabsParamList = {
   Home: undefined;
   Slots: undefined;
+  Bookings: undefined;
   Profile: NavigatorScreenParams<ProfileStackParamList>;
 };
+
+export type TrainerTabsParamList = {
+  Home: undefined;
+  Schedule: undefined;
+  CreateSlot: undefined;
+  Profile: NavigatorScreenParams<ProfileStackParamList>;
+};
+
+export type AppTabsParamList = ClientTabsParamList & TrainerTabsParamList;
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -34,5 +46,5 @@ export type AppStackParamList = {
 export type RootStackParamList = {
   Bootstrap: undefined;
   Auth: NavigatorScreenParams<AuthStackParamList>;
-  App: NavigatorScreenParams<AppTabsParamList>;
+  App: { role: UserRole } | undefined;
 };

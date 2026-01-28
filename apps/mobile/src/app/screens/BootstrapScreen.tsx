@@ -4,7 +4,9 @@ import { Button, Text, YStack } from 'tamagui';
 import { clearSession, getAccessToken } from '../../auth/tokenStorage';
 import { me } from '../../api/authApi';
 import { getUiErrorMessage } from '../../api/core';
+import { t } from '../../i18n';
 import { secondaryButtonProps } from '../../ui/formDefaults';
+import { getUserRole } from '../utils/userRole';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Bootstrap'>;
@@ -16,8 +18,8 @@ export function BootstrapScreen({ navigation }: Props) {
     navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });
   };
 
-  const goToApp = () => {
-    navigation.reset({ index: 0, routes: [{ name: 'App' }] });
+  const goToApp = (role: NonNullable<RootStackParamList['App']>['role']) => {
+    navigation.reset({ index: 0, routes: [{ name: 'App', params: { role } }] });
   };
 
   const bootstrap = async () => {
@@ -25,8 +27,13 @@ export function BootstrapScreen({ navigation }: Props) {
     try {
       const token = await getAccessToken();
       if (token) {
-        await me();
-        goToApp();
+        const meData = await me();
+        const role = getUserRole(meData.role);
+        if (role) {
+          goToApp(role);
+          return;
+        }
+        console.warn('Unknown role from /auth/me', meData.role);
         return;
       }
       goToAuth();
@@ -53,7 +60,7 @@ export function BootstrapScreen({ navigation }: Props) {
       backgroundColor="$background"
     >
       <Text fontSize="$6" fontWeight="700" color="$text">
-        Loading session...
+        {t('common.loading')}
       </Text>
       {error ? (
         <YStack gap="$3" alignItems="center">
@@ -67,7 +74,7 @@ export function BootstrapScreen({ navigation }: Props) {
             onPress={bootstrap}
             {...secondaryButtonProps}
           >
-            Retry
+            {t('common.retry')}
           </Button>
         </YStack>
       ) : null}

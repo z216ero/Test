@@ -132,6 +132,14 @@ export function HomeScreen({ navigation }: Props) {
         },
       ];
 
+  const goToPrimaryTab = () => {
+    if (role === 'Trainer') {
+      navigation.navigate('Schedule');
+      return;
+    }
+    navigation.navigate('Slots');
+  };
+
   const renderUpcomingCard = () => {
     if (state === 'loading') {
       return (
@@ -204,7 +212,7 @@ export function HomeScreen({ navigation }: Props) {
             borderRadius="$4"
             minHeight="$9"
             paddingHorizontal="$4"
-            onPress={() => navigation.navigate('Slots')}
+            onPress={goToPrimaryTab}
           >
             {t('home.upcoming.emptyAction')}
           </Button>
@@ -329,7 +337,15 @@ export function HomeScreen({ navigation }: Props) {
                 justifyContent="flex-start"
                 onPress={() => {
                   if (card.id === 'find-slots') {
-                    navigation.navigate('Slots');
+                    goToPrimaryTab();
+                    return;
+                  }
+                  if (card.id === 'my-bookings') {
+                    navigation.navigate('Bookings');
+                    return;
+                  }
+                  if (card.id === 'my-schedule') {
+                    navigation.navigate('Schedule');
                   }
                 }}
               >

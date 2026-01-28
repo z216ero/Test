@@ -1,3 +1,5 @@
+import { createTamagui } from '@tamagui/core';
+
 const tokens = {
   color: {
     background: '#FFFFFF',
@@ -47,7 +49,7 @@ const tokens = {
   },
 };
 
-export const config = {
+export const config = createTamagui({
   defaultFont: 'body',
   tokens,
   themes: {
@@ -82,10 +84,12 @@ export const config = {
       },
     },
   },
-};
+});
 
 export type AppConfig = typeof config;
 
 declare module 'tamagui' {
   interface TamaguiCustomConfig extends AppConfig {}
 }
+
+export default config;

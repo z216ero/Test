@@ -3,7 +3,7 @@
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { login } from '../../api/authApi';
+import { login, me } from '../../api/authApi';
 import { ApiError, getUiErrorMessage } from '../../api/core';
 import { t } from '../../i18n';
 import {
@@ -16,6 +16,7 @@ import {
   AuthScreen,
 } from '../../ui/authUi';
 import type { AuthStackParamList, RootStackParamList } from '../navigation/types';
+import { getUserRole } from '../utils/userRole';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -44,9 +45,15 @@ export function LoginScreen({ navigation }: Props) {
         throw new ApiError(t('auth.errorMissingToken'));
       }
 
+      const roleFromResponse = getUserRole(response.user?.role);
+      const role = roleFromResponse ?? getUserRole((await me()).role);
+      if (!role) {
+        throw new ApiError(t('auth.errorMissingRole'));
+      }
+
       const rootNavigation =
         navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
-      rootNavigation?.reset({ index: 0, routes: [{ name: 'App' }] });
+      rootNavigation?.reset({ index: 0, routes: [{ name: 'App', params: { role } }] });
     } catch (err) {
       setError(getUiErrorMessage(err));
     } finally {

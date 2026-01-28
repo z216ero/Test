@@ -1,31 +1,39 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import type { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import type { TextStyle } from 'react-native';
 import { BootstrapScreen } from '../screens/BootstrapScreen';
+import { BookingsScreen } from '../screens/BookingsScreen';
+import { CreateSlotTabScreen } from '../screens/CreateSlotTabScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { PersonalInfoScreen } from '../screens/PersonalInfoScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
+import { ScheduleScreen } from '../screens/ScheduleScreen';
 import { SlotsScreen } from '../screens/SlotsScreen';
 import type {
+  ClientTabsParamList,
   AuthStackParamList,
-  AppTabsParamList,
   ProfileStackParamList,
   RootStackParamList,
+  TrainerTabsParamList,
 } from './types';
-import { Text } from 'tamagui';
+import { Text, YStack } from 'tamagui';
 import { config } from '../../../tamagui.config';
 import { t } from '../../i18n';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-const AppTabs = createBottomTabNavigator<AppTabsParamList>();
+const ClientTabs = createBottomTabNavigator<ClientTabsParamList>();
+const TrainerTabs = createBottomTabNavigator<TrainerTabsParamList>();
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 
 const AuthStackNavigator = () => (
   <AuthStack.Navigator>
-    <AuthStack.Screen name="Login" component={LoginScreen} options={{ title: 'Login' }} />
-    <AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: 'Register' }} />
+    <AuthStack.Screen name="Login" component={LoginScreen} options={{ title: t('auth.login.title') }} />
+    <AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: t('auth.register.title') }} />
   </AuthStack.Navigator>
 );
 
@@ -36,41 +44,125 @@ const ProfileStackNavigator = () => (
   </ProfileStack.Navigator>
 );
 
-const AppTabsNavigator = () => {
-  const tokens = config.tokens;
+const tokens = config.tokens;
+type TokenValue<T> = { val: T } | T;
+const isTokenValue = <T,>(value: TokenValue<T>): value is { val: T } =>
+  typeof value === 'object' && value !== null && 'val' in value;
+const getTokenValue = <T,>(token: TokenValue<T> | undefined): T | undefined =>
+  token && isTokenValue(token) ? token.val : token;
 
-  return (
-    <AppTabs.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: tokens.color.accent,
-        tabBarInactiveTintColor: tokens.color.muted,
-        tabBarStyle: {
-          backgroundColor: tokens.color.background,
-          borderTopColor: tokens.color.border,
-          borderTopWidth: 1,
-          paddingTop: tokens.space[2],
-          paddingBottom: tokens.space[3],
-          height: tokens.size[10] + tokens.space[3] + tokens.space[2],
-          elevation: 0,
-          shadowOpacity: 0,
-        },
-        tabBarLabelStyle: {
-          fontSize: tokens.size[2],
-          fontWeight: '600',
-        },
-        tabBarIcon: ({ color }) => (
-          <Text color={color} fontSize="$5">
-            {route.name === 'Home' ? 'H' : route.name === 'Slots' ? 'S' : 'P'}
-          </Text>
-        ),
-      })}
-    >
-      <AppTabs.Screen name="Home" component={HomeScreen} options={{ title: t('tabs.home') }} />
-      <AppTabs.Screen name="Slots" component={SlotsScreen} options={{ title: t('tabs.slots') }} />
-      <AppTabs.Screen name="Profile" component={ProfileStackNavigator} options={{ title: t('tabs.profile') }} />
-    </AppTabs.Navigator>
-  );
+const tabActiveColor = getTokenValue(tokens.color.accent) as string;
+const tabInactiveColor = getTokenValue(tokens.color.muted) as string;
+const tabBackground = getTokenValue(tokens.color.background) as string;
+const tabBorder = getTokenValue(tokens.color.border) as string;
+const tabPaddingTop = getTokenValue(tokens.space[2]) as number;
+const tabPaddingBottom = getTokenValue(tokens.space[3]) as number;
+const tabHeight =
+  (getTokenValue(tokens.size[10]) as number) +
+  (getTokenValue(tokens.space[3]) as number) +
+  (getTokenValue(tokens.space[2]) as number);
+const tabLabelSize = getTokenValue(tokens.size[2]) as number;
+const tabLabelWeight = config.fonts.body.weight[7] as TextStyle['fontWeight'];
+
+const tabBarScreenOptions: BottomTabNavigationOptions = {
+  headerShown: false,
+  tabBarActiveTintColor: tabActiveColor,
+  tabBarInactiveTintColor: tabInactiveColor,
+  tabBarStyle: {
+    backgroundColor: tabBackground,
+    borderTopColor: tabBorder,
+    borderTopWidth: 1,
+    paddingTop: tabPaddingTop,
+    paddingBottom: tabPaddingBottom,
+    height: tabHeight,
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  tabBarLabelStyle: {
+    fontSize: tabLabelSize,
+    fontWeight: tabLabelWeight,
+  },
+};
+
+const makeTabIcon = (label: string) => ({ color }: { color: string }) => (
+  <Text color={color} fontSize="$5">
+    {label}
+  </Text>
+);
+
+const ClientTabsNavigator = () => (
+  <ClientTabs.Navigator screenOptions={tabBarScreenOptions}>
+    <ClientTabs.Screen
+      name="Home"
+      component={HomeScreen}
+      options={{ title: t('tabs.home'), tabBarIcon: makeTabIcon('H') }}
+    />
+    <ClientTabs.Screen
+      name="Slots"
+      component={SlotsScreen}
+      options={{ title: t('tabs.slots'), tabBarIcon: makeTabIcon('S') }}
+    />
+    <ClientTabs.Screen
+      name="Bookings"
+      component={BookingsScreen}
+      options={{ title: t('tabs.bookings'), tabBarIcon: makeTabIcon('B') }}
+    />
+    <ClientTabs.Screen
+      name="Profile"
+      component={ProfileStackNavigator}
+      options={{ title: t('tabs.profile'), tabBarIcon: makeTabIcon('P') }}
+    />
+  </ClientTabs.Navigator>
+);
+
+const TrainerTabsNavigator = () => (
+  <TrainerTabs.Navigator screenOptions={tabBarScreenOptions}>
+    <TrainerTabs.Screen
+      name="Home"
+      component={HomeScreen}
+      options={{ title: t('tabs.home'), tabBarIcon: makeTabIcon('H') }}
+    />
+    <TrainerTabs.Screen
+      name="Schedule"
+      component={ScheduleScreen}
+      options={{ title: t('tabs.schedule'), tabBarIcon: makeTabIcon('Sch') }}
+    />
+    <TrainerTabs.Screen
+      name="CreateSlot"
+      component={CreateSlotTabScreen}
+      options={{ title: t('tabs.createSlot'), tabBarIcon: makeTabIcon('C') }}
+    />
+    <TrainerTabs.Screen
+      name="Profile"
+      component={ProfileStackNavigator}
+      options={{ title: t('tabs.profile'), tabBarIcon: makeTabIcon('P') }}
+    />
+  </TrainerTabs.Navigator>
+);
+
+type RoleTabsProps = NativeStackScreenProps<RootStackParamList, 'App'>;
+
+const AppLoadingScreen = () => (
+  <YStack
+    flex={1}
+    alignItems="center"
+    justifyContent="center"
+    gap="$3"
+    padding="$6"
+    backgroundColor="$background"
+  >
+    <Text fontSize="$6" fontWeight="700" color="$text">
+      {t('common.loading')}
+    </Text>
+  </YStack>
+);
+
+const RoleTabsNavigator = ({ route }: RoleTabsProps) => {
+  const role = route.params?.role;
+  if (!role) {
+    return <AppLoadingScreen />;
+  }
+  return role === 'Trainer' ? <TrainerTabsNavigator /> : <ClientTabsNavigator />;
 };
 
 export function RootNavigator() {
@@ -81,7 +173,7 @@ export function RootNavigator() {
     >
       <RootStack.Screen name="Bootstrap" component={BootstrapScreen} />
       <RootStack.Screen name="Auth" component={AuthStackNavigator} />
-      <RootStack.Screen name="App" component={AppTabsNavigator} />
+      <RootStack.Screen name="App" component={RoleTabsNavigator} />
     </RootStack.Navigator>
   );
 }

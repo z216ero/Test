@@ -1,4 +1,4 @@
-export const ru = {
+﻿export const ru = {
   'auth.login.title': 'С возвращением',
   'auth.login.subtitle': 'Войдите, чтобы продолжить.',
   'auth.login.email': 'Почта',
@@ -28,6 +28,7 @@ export const ru = {
   'auth.register.validationRequired': 'Почта, пароль и имя обязательны.',
 
   'auth.errorMissingToken': 'Не удалось получить токен.',
+  'auth.errorMissingRole': 'Не удалось определить роль.',
 
   'home.labelClient': 'Экран клиента',
   'home.labelTrainer': 'Экран тренера',
@@ -83,7 +84,21 @@ export const ru = {
 
   'tabs.home': 'Главная',
   'tabs.slots': 'Слоты',
+  'tabs.bookings': 'Записи',
+  'tabs.schedule': 'Расписание',
+  'tabs.createSlot': 'Создать слот',
   'tabs.profile': 'Профиль',
+  'bookings.title': 'Записи',
+  'bookings.subtitle': 'Здесь появятся ваши предстоящие тренировки.',
+  'bookings.placeholder': 'Функция будет добавлена на следующем шаге.',
+
+  'schedule.title': 'Расписание',
+  'schedule.subtitle': 'Здесь будут ваши слоты и занятия.',
+  'schedule.placeholder': 'Функция будет добавлена на следующем шаге.',
+
+  'createSlot.title': 'Создать слот',
+  'createSlot.subtitle': 'Здесь можно будет добавлять новые слоты.',
+  'createSlot.placeholder': 'Функция будет добавлена на следующем шаге.',
 
   'profile.roleTrainer': 'Тренер',
   'profile.roleClient': 'Клиент',
@@ -107,6 +122,8 @@ export const ru = {
   'errors.uploadFailed': 'Не удалось загрузить фото.',
   'errors.saveFailed': 'Не удалось сохранить данные.',
 } as const;
+
+
 
 
 

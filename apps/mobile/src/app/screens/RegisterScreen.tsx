@@ -4,7 +4,7 @@
 } from '@react-navigation/native-stack';
 import { useMemo, useState } from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { register } from '../../api/authApi';
+import { me, register } from '../../api/authApi';
 import { ApiError, getUiErrorMessage } from '../../api/core';
 import { t } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
@@ -18,6 +18,7 @@ import {
   AuthScreen,
 } from '../../ui/authUi';
 import type { AuthStackParamList, RootStackParamList } from '../navigation/types';
+import { getUserRole } from '../utils/userRole';
 
 const SPECIALIZATIONS: Array<{ value: string; labelKey: TranslationKey }> = [
   { value: 'Strength', labelKey: 'auth.register.specializationStrength' },
@@ -68,9 +69,18 @@ export function RegisterScreen({ navigation }: Props) {
         throw new ApiError(t('auth.errorMissingToken'));
       }
 
+      const roleFromResponse = getUserRole(response.user?.role);
+      const resolvedRole = roleFromResponse ?? getUserRole((await me()).role);
+      if (!resolvedRole) {
+        throw new ApiError(t('auth.errorMissingRole'));
+      }
+
       const rootNavigation =
         navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
-      rootNavigation?.reset({ index: 0, routes: [{ name: 'App' }] });
+      rootNavigation?.reset({
+        index: 0,
+        routes: [{ name: 'App', params: { role: resolvedRole } }],
+      });
     } catch (err) {
       setError(getUiErrorMessage(err));
     } finally {
