@@ -8,4 +8,5 @@ public sealed record SlotDto(
     DateTime StartsAtUtc,
     int DurationMinutes,
     string Status,
+    string? BookingStatus,
     DateTime CreatedAtUtc);

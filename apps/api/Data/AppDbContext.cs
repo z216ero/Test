@@ -96,6 +96,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(x => x.Id);
             entity.Property(x => x.ClientId)
                 .IsRequired();
+            entity.Property(x => x.Status)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(BookingStatus.Booked)
+                .IsRequired();
             entity.Property(x => x.CreatedAtUtc)
                 .HasDefaultValueSql("now() at time zone 'utc'");
             entity.HasIndex(x => x.SlotId)

@@ -14,11 +14,13 @@ import { ProfileScreen } from '../screens/ProfileScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
 import { ScheduleScreen } from '../screens/ScheduleScreen';
 import { SlotsScreen } from '../screens/SlotsScreen';
+import { TrainerSlotDetailsScreen } from '../screens/TrainerSlotDetailsScreen';
 import type {
   ClientTabsParamList,
   AuthStackParamList,
   ProfileStackParamList,
   RootStackParamList,
+  ScheduleStackParamList,
   SlotsStackParamList,
   TrainerTabsParamList,
 } from './types';
@@ -32,6 +34,7 @@ const ClientTabs = createBottomTabNavigator<ClientTabsParamList>();
 const TrainerTabs = createBottomTabNavigator<TrainerTabsParamList>();
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 const SlotsStack = createNativeStackNavigator<SlotsStackParamList>();
+const ScheduleStack = createNativeStackNavigator<ScheduleStackParamList>();
 
 const AuthStackNavigator = () => (
   <AuthStack.Navigator>
@@ -52,6 +55,13 @@ const SlotsStackNavigator = () => (
     <SlotsStack.Screen name="SlotsList" component={SlotsScreen} />
     <SlotsStack.Screen name="BookingConfirm" component={BookingConfirmScreen} />
   </SlotsStack.Navigator>
+);
+
+const ScheduleStackNavigator = () => (
+  <ScheduleStack.Navigator screenOptions={{ headerShown: false }}>
+    <ScheduleStack.Screen name="ScheduleHome" component={ScheduleScreen} />
+    <ScheduleStack.Screen name="SlotDetails" component={TrainerSlotDetailsScreen} />
+  </ScheduleStack.Navigator>
 );
 
 const tokens = config.tokens;
@@ -134,7 +144,7 @@ const TrainerTabsNavigator = () => (
     />
     <TrainerTabs.Screen
       name="Schedule"
-      component={ScheduleScreen}
+      component={ScheduleStackNavigator}
       options={{ title: t('tabs.schedule'), tabBarIcon: makeTabIcon('Sch') }}
     />
     <TrainerTabs.Screen

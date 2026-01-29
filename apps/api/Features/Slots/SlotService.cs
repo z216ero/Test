@@ -128,7 +128,9 @@ public sealed class SlotService(AppDbContext db)
                 "fromUtc must be earlier than or equal to toUtc.");
         }
 
-        var query = db.TrainingSlots.Where(s => s.TrainerId == trainerId);
+        var query = db.TrainingSlots
+            .Include(s => s.Booking)
+            .Where(s => s.TrainerId == trainerId);
         query = query.Where(s => s.StartsAtUtc >= normalizedFrom && s.StartsAtUtc <= normalizedTo);
 
         var slots = await query
@@ -164,5 +166,6 @@ public sealed class SlotService(AppDbContext db)
             slot.StartsAtUtc,
             slot.DurationMinutes,
             slot.Status.ToString(),
+            slot.Booking?.Status.ToString(),
             slot.CreatedAtUtc);
 }

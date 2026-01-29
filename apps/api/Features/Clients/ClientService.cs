@@ -62,7 +62,7 @@ public sealed class ClientService(AppDbContext db)
         var trainerSpecialization = trainerProfile?.Specialization;
 
         var dto = new UpcomingSessionDto(
-            ToSlotDto(booking.Slot),
+            ToSlotDto(booking.Slot, booking.Status),
             trainerName,
             trainerSpecialization);
 
@@ -104,12 +104,13 @@ public sealed class ClientService(AppDbContext db)
         return ServiceResult<ClientProfileDto>.Success(new ClientProfileDto(profile.UserId));
     }
 
-    private static SlotDto ToSlotDto(TrainingSlot slot)
+    private static SlotDto ToSlotDto(TrainingSlot slot, BookingStatus? bookingStatus)
         => new(
             slot.Id,
             slot.TrainerId,
             slot.StartsAtUtc,
             slot.DurationMinutes,
             slot.Status.ToString(),
+            bookingStatus?.ToString(),
             slot.CreatedAtUtc);
 }

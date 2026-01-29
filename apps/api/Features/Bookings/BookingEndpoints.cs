@@ -1,3 +1,4 @@
+using Api.Data;
 using Api.Features.Common;
 using Api.Features.Slots;
 
@@ -59,6 +60,50 @@ public static class BookingEndpoints
             return Results.Ok(result.Value);
         })
         .Produces<SlotDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/complete", async (
+            Guid slotId,
+            BookingService service,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await service.MarkAttendanceAsync(
+                slotId,
+                BookingStatus.Completed,
+                cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .Produces<BookingDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/no-show", async (
+            Guid slotId,
+            BookingService service,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await service.MarkAttendanceAsync(
+                slotId,
+                BookingStatus.NoShow,
+                cancellationToken);
+
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .Produces<BookingDto>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict);

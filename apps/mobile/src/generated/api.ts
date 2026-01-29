@@ -38,6 +38,7 @@ export interface BookingDto {
   id?: string;
   slotId?: string;
   clientId?: string;
+  status?: string;
   createdAtUtc?: string;
 }
 
@@ -120,6 +121,8 @@ export interface SlotDto {
   durationMinutes?: number;
   /** @nullable */
   status?: string | null;
+  /** @nullable */
+  bookingStatus?: string | null;
   createdAtUtc?: string;
 }
 
@@ -607,6 +610,106 @@ export const getPostSlotsSlotIdCancelUrl = (slotId: string,) => {
 export const postSlotsSlotIdCancel = async (slotId: string, options?: RequestInit): Promise<postSlotsSlotIdCancelResponse> => {
   
   return customFetch<postSlotsSlotIdCancelResponse>(getPostSlotsSlotIdCancelUrl(slotId),
+  {      
+    ...options,
+    method: 'POST'
+    
+    
+  }
+);}
+
+
+
+export type postSlotsSlotIdCompleteResponse200 = {
+  data: BookingDto
+  status: 200
+}
+
+export type postSlotsSlotIdCompleteResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postSlotsSlotIdCompleteResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type postSlotsSlotIdCompleteResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postSlotsSlotIdCompleteResponseSuccess = (postSlotsSlotIdCompleteResponse200) & {
+  headers: Headers;
+};
+export type postSlotsSlotIdCompleteResponseError = (postSlotsSlotIdCompleteResponse400 | postSlotsSlotIdCompleteResponse404 | postSlotsSlotIdCompleteResponse409) & {
+  headers: Headers;
+};
+
+export type postSlotsSlotIdCompleteResponse = (postSlotsSlotIdCompleteResponseSuccess | postSlotsSlotIdCompleteResponseError)
+
+export const getPostSlotsSlotIdCompleteUrl = (slotId: string,) => {
+
+
+  
+
+  return `/slots/${slotId}/complete`
+}
+
+export const postSlotsSlotIdComplete = async (slotId: string, options?: RequestInit): Promise<postSlotsSlotIdCompleteResponse> => {
+  
+  return customFetch<postSlotsSlotIdCompleteResponse>(getPostSlotsSlotIdCompleteUrl(slotId),
+  {      
+    ...options,
+    method: 'POST'
+    
+    
+  }
+);}
+
+
+
+export type postSlotsSlotIdNoShowResponse200 = {
+  data: BookingDto
+  status: 200
+}
+
+export type postSlotsSlotIdNoShowResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postSlotsSlotIdNoShowResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type postSlotsSlotIdNoShowResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postSlotsSlotIdNoShowResponseSuccess = (postSlotsSlotIdNoShowResponse200) & {
+  headers: Headers;
+};
+export type postSlotsSlotIdNoShowResponseError = (postSlotsSlotIdNoShowResponse400 | postSlotsSlotIdNoShowResponse404 | postSlotsSlotIdNoShowResponse409) & {
+  headers: Headers;
+};
+
+export type postSlotsSlotIdNoShowResponse = (postSlotsSlotIdNoShowResponseSuccess | postSlotsSlotIdNoShowResponseError)
+
+export const getPostSlotsSlotIdNoShowUrl = (slotId: string,) => {
+
+
+  
+
+  return `/slots/${slotId}/no-show`
+}
+
+export const postSlotsSlotIdNoShow = async (slotId: string, options?: RequestInit): Promise<postSlotsSlotIdNoShowResponse> => {
+  
+  return customFetch<postSlotsSlotIdNoShowResponse>(getPostSlotsSlotIdNoShowUrl(slotId),
   {      
     ...options,
     method: 'POST'

@@ -6,5 +6,6 @@ public sealed class Booking
     public Guid SlotId { get; set; }
     public TrainingSlot? Slot { get; set; }
     public Guid ClientId { get; set; }
+    public BookingStatus Status { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 }

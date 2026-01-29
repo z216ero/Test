@@ -107,16 +107,40 @@
   'bookings.statusUnknown': 'Статус',
 
   'schedule.title': 'Расписание',
-  'schedule.subtitle': 'Здесь будут ваши слоты и занятия.',
-  'schedule.placeholder': 'Функция будет добавлена на следующем шаге.',
+  'schedule.subtitle': 'Ваши слоты и записи.',
+  'schedule.empty': 'Пока нет слотов.',
+  'schedule.createCta': 'Создать слот',
+  'schedule.sectionToday': 'Сегодня',
+  'schedule.sectionUpcoming': 'Ближайшие',
+
+  'slotDetails.title': 'Детали слота',
+  'slotDetails.markCompleted': 'Отметить проведено',
+  'slotDetails.markNoShow': 'Неявка',
 
   'bookingConfirm.title': 'Подтвердите запись',
   'bookingConfirm.confirm': 'Подтвердить',
   'bookingConfirm.back': 'Назад',
 
   'createSlot.title': 'Создать слот',
-  'createSlot.subtitle': 'Здесь можно будет добавлять новые слоты.',
-  'createSlot.placeholder': 'Функция будет добавлена на следующем шаге.',
+  'createSlot.subtitle': 'Добавьте слот для клиентов.',
+  'createSlot.date': 'Дата',
+  'createSlot.startTime': 'Время начала',
+  'createSlot.duration': 'Длительность',
+  'createSlot.save': 'Создать слот',
+  'createSlot.success': 'Слот создан.',
+  'createSlot.datePlaceholder': '28.01.2026',
+  'createSlot.timePlaceholder': '11:00',
+  'createSlot.durationOption': '{minutes} мин',
+  'createSlot.validationRequired': 'Укажите дату и время.',
+  'createSlot.validationFormat': 'Введите дату и время в правильном формате.',
+  'createSlot.validationDuration': 'Выберите длительность.',
+  'createSlot.validationFuture': 'Время должно быть в будущем.',
+
+  'status.open': 'Открыт',
+  'status.booked': 'Забронирован',
+  'status.cancelled': 'Отменён',
+  'status.completed': 'Проведено',
+  'status.noShow': 'Неявка',
 
   'profile.roleTrainer': 'Тренер',
   'profile.roleClient': 'Клиент',
@@ -143,9 +167,10 @@
   'errors.slotNotFound': 'Слот не найден.',
   'errors.slotTakenHint': 'Вернитесь к списку и обновите слоты.',
   'errors.slotNotFoundHint': 'Вернитесь к списку и выберите другой слот.',
+  'errors.overlap': 'Слот пересекается с существующим.',
+  'errors.notFound': 'Данные не найдены.',
+  'errors.conflict': 'Нельзя изменить статус. Обновите список.',
   'errors.generic': 'Что-то пошло не так. Попробуйте ещё раз.',
 } as const;
-
-
 
 

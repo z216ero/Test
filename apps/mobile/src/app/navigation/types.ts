@@ -1,6 +1,11 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { SlotDto } from '../../generated/api';
 
+export type ScheduleStackParamList = {
+  ScheduleHome: undefined;
+  SlotDetails: { slot: SlotDto };
+};
+
 export type ProfileStackParamList = {
   ProfileHome: undefined;
   PersonalInfo: undefined;
@@ -26,7 +31,7 @@ export type ClientTabsParamList = {
 
 export type TrainerTabsParamList = {
   Home: undefined;
-  Schedule: undefined;
+  Schedule: NavigatorScreenParams<ScheduleStackParamList>;
   CreateSlot: undefined;
   Profile: NavigatorScreenParams<ProfileStackParamList>;
 };

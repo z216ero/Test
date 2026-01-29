@@ -6,4 +6,5 @@ public sealed record BookingDto(
     Guid Id,
     Guid SlotId,
     Guid ClientId,
+    string Status,
     DateTime CreatedAtUtc);
