@@ -27,6 +27,7 @@ import type {
 import { Text, YStack } from 'tamagui';
 import { config } from '../../../tamagui.config';
 import { t } from '../../i18n';
+import { AppIcon } from '../../ui/AppIcon';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -104,10 +105,8 @@ const tabBarScreenOptions: BottomTabNavigationOptions = {
   },
 };
 
-const makeTabIcon = (label: string) => ({ color }: { color: string }) => (
-  <Text color={color} fontSize="$5">
-    {label}
-  </Text>
+const makeTabIcon = (name: Parameters<typeof AppIcon>[0]['name']) => ({ color }: { color: string }) => (
+  <AppIcon name={name} color={color} size={22} />
 );
 
 const ClientTabsNavigator = () => (
@@ -115,22 +114,22 @@ const ClientTabsNavigator = () => (
     <ClientTabs.Screen
       name="Home"
       component={HomeScreen}
-      options={{ title: t('tabs.home'), tabBarIcon: makeTabIcon('H') }}
+      options={{ title: t('tabs.home'), tabBarIcon: makeTabIcon('home') }}
     />
     <ClientTabs.Screen
       name="Slots"
       component={SlotsStackNavigator}
-      options={{ title: t('tabs.slots'), tabBarIcon: makeTabIcon('S') }}
+      options={{ title: t('tabs.slots'), tabBarIcon: makeTabIcon('calendar') }}
     />
     <ClientTabs.Screen
       name="Bookings"
       component={BookingsScreen}
-      options={{ title: t('tabs.bookings'), tabBarIcon: makeTabIcon('B') }}
+      options={{ title: t('tabs.bookings'), tabBarIcon: makeTabIcon('history') }}
     />
     <ClientTabs.Screen
       name="Profile"
       component={ProfileStackNavigator}
-      options={{ title: t('tabs.profile'), tabBarIcon: makeTabIcon('P') }}
+      options={{ title: t('tabs.profile'), tabBarIcon: makeTabIcon('user') }}
     />
   </ClientTabs.Navigator>
 );
@@ -140,22 +139,22 @@ const TrainerTabsNavigator = () => (
     <TrainerTabs.Screen
       name="Home"
       component={HomeScreen}
-      options={{ title: t('tabs.home'), tabBarIcon: makeTabIcon('H') }}
+      options={{ title: t('tabs.home'), tabBarIcon: makeTabIcon('home') }}
     />
     <TrainerTabs.Screen
       name="Schedule"
       component={ScheduleStackNavigator}
-      options={{ title: t('tabs.schedule'), tabBarIcon: makeTabIcon('Sch') }}
+      options={{ title: t('tabs.schedule'), tabBarIcon: makeTabIcon('calendar') }}
     />
     <TrainerTabs.Screen
       name="CreateSlot"
       component={CreateSlotTabScreen}
-      options={{ title: t('tabs.createSlot'), tabBarIcon: makeTabIcon('C') }}
+      options={{ title: t('tabs.createSlot'), tabBarIcon: makeTabIcon('plus') }}
     />
     <TrainerTabs.Screen
       name="Profile"
       component={ProfileStackNavigator}
-      options={{ title: t('tabs.profile'), tabBarIcon: makeTabIcon('P') }}
+      options={{ title: t('tabs.profile'), tabBarIcon: makeTabIcon('user') }}
     />
   </TrainerTabs.Navigator>
 );

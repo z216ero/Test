@@ -11,6 +11,8 @@ import { getAccessToken } from '../../auth/tokenStorage';
 import { API_BASE_URL } from '../../config/env';
 import { t } from '../../i18n';
 import type { AuthUserDto } from '../../generated/api';
+import { AppIcon } from '../../ui/AppIcon';
+import type { AppIconName } from '../../ui/icons';
 import type { ProfileStackParamList, RootStackParamList } from '../navigation/types';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -87,10 +89,17 @@ export function ProfileScreen({ navigation }: Props) {
     return null;
   }, [avatarUrl, avatarToken]);
 
-  const settingsItems = [
+  const settingsItems: {
+    id: string;
+    label: string;
+    icon: AppIconName;
+    onPress?: () => void;
+    disabled?: boolean;
+  }[] = [
     {
       id: 'personal',
       label: t('profile.settings.personalInfo'),
+      icon: 'user',
       onPress: () => navigation.navigate('PersonalInfo'),
     },
     {
@@ -98,10 +107,24 @@ export function ProfileScreen({ navigation }: Props) {
       label: role === 'Trainer'
         ? t('profile.settings.schedule')
         : t('profile.settings.bookings'),
+      icon: role === 'Trainer' ? 'calendar' : 'history',
     },
-    { id: 'payments', label: t('profile.settings.payments'), disabled: true },
-    { id: 'notifications', label: t('profile.settings.notifications') },
-    { id: 'support', label: t('profile.settings.support') }
+    {
+      id: 'payments',
+      label: t('profile.settings.payments'),
+      icon: 'creditCard',
+      disabled: true,
+    },
+    {
+      id: 'notifications',
+      label: t('profile.settings.notifications'),
+      icon: 'alertCircle',
+    },
+    {
+      id: 'support',
+      label: t('profile.settings.support'),
+      icon: 'info',
+    },
   ];
 
   const handleLogout = async () => {
@@ -197,6 +220,7 @@ export function ProfileScreen({ navigation }: Props) {
                 opacity={item.disabled ? 0.5 : 1}
               >
                 <XStack alignItems="center" gap="$3" flex={1}>
+                  <AppIcon name={item.icon} size={20} color="$muted" />
                   <Text fontSize="$3" color="$text" flex={1}>
                     {item.label}
                   </Text>

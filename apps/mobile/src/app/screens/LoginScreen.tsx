@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { login, me } from '../../api/authApi';
 import { ApiError, getUiErrorMessage } from '../../api/core';
 import { t } from '../../i18n';
+import { XStack } from 'tamagui';
 import {
   AuthCard,
   AuthError,
@@ -15,6 +16,7 @@ import {
   AuthPrimaryButton,
   AuthScreen,
 } from '../../ui/authUi';
+import { AppIcon } from '../../ui/AppIcon';
 import type { AuthStackParamList, RootStackParamList } from '../navigation/types';
 import { getUserRole } from '../utils/userRole';
 
@@ -63,6 +65,9 @@ export function LoginScreen({ navigation }: Props) {
 
   return (
     <AuthScreen>
+      <XStack justifyContent="center">
+        <AppIcon name="user" size={28} color="$muted" />
+      </XStack>
       <AuthHeader title={t('auth.login.title')} subtitle={t('auth.login.subtitle')} />
       <AuthCard>
         <AuthField

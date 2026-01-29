@@ -12,6 +12,7 @@ const tokens = {
     accent: '#78B792',
     accentText: '#FFFFFF',
     border: '#E2E8F0',
+    borderColorHover: '#E2E8F0',
   },
   space: {
     0: 0,
