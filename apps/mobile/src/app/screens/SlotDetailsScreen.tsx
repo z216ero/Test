@@ -2,23 +2,57 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { Button, Text, YStack } from 'tamagui';
 import { apiClient } from '../../api/client';
-import { getUiErrorMessage, unwrap } from '../../api/core';
+import { presentApiError } from '../../api/ApiErrorPresenter';
+import { unwrap } from '../../api/core';
+import { useAppMutation } from '../../query/hooks';
+import { keys } from '../../query/keys';
 import { primaryButtonProps, secondaryButtonProps } from '../../ui/formDefaults';
+import { useToast } from '../../ui/feedback/useToast';
 import { formatUtcRange } from '../../utils/time';
 import type { AppStackParamList } from '../navigation/types';
+import { useQueryClient } from '@tanstack/react-query';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'SlotDetails'>;
 
 export function SlotDetailsScreen({ route, navigation }: Props) {
   const { trainerName, slot, clientId } = route.params;
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
   const range = formatUtcRange(
     slot.startsAtUtc ?? '',
     slot.durationMinutes ?? 0
   );
+
+  const bookMutation = useAppMutation({
+    mutationFn: async (payload: { slotId: string; clientId: string }) => {
+      const response = await apiClient.postSlotsSlotIdBook(payload.slotId, {
+        clientId: payload.clientId,
+      });
+      return unwrap(response, 'Unable to book this slot right now.');
+    },
+    onSuccess: () => {
+      if (slot.trainerId) {
+        queryClient.invalidateQueries({
+          queryKey: keys.trainers.slots(slot.trainerId),
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
+      setSuccess('Slot booked successfully.');
+      showToast({ type: 'success', title: 'Slot booked successfully.' });
+    },
+    onError: (err) => {
+      const presented = presentApiError(err);
+      setError(presented.message);
+      showToast({
+        type: 'error',
+        title: presented.title,
+        message: presented.message,
+      });
+    },
+  });
 
   const handleBook = async () => {
     const trimmedClientId = clientId.trim();
@@ -27,7 +61,6 @@ export function SlotDetailsScreen({ route, navigation }: Props) {
       return;
     }
 
-    setIsSubmitting(true);
     setError(null);
     setSuccess(null);
 
@@ -37,15 +70,12 @@ export function SlotDetailsScreen({ route, navigation }: Props) {
     }
 
     try {
-      const response = await apiClient.postSlotsSlotIdBook(slot.id, {
+      await bookMutation.mutateAsync({
+        slotId: slot.id,
         clientId: trimmedClientId,
       });
-      unwrap(response, 'Unable to book this slot right now.');
-      setSuccess('Slot booked successfully.');
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-    } finally {
-      setIsSubmitting(false);
+    } catch {
+      // handled by mutation callbacks
     }
   };
 
@@ -91,10 +121,10 @@ export function SlotDetailsScreen({ route, navigation }: Props) {
         backgroundColor="$primary"
         color="$primaryText"
         onPress={handleBook}
-        disabled={isSubmitting || !!success}
+        disabled={bookMutation.isPending || !!success}
         {...primaryButtonProps}
       >
-        {isSubmitting ? 'Booking...' : 'Book slot'}
+        {bookMutation.isPending ? 'Booking...' : 'Book slot'}
       </Button>
       <Button size="$3" onPress={() => navigation.goBack()} {...secondaryButtonProps}>
         Back to list

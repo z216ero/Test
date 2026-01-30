@@ -6,11 +6,15 @@ import {
   markSlotCompleted,
   markSlotNoShow,
 } from '../../api/trainerSlotsApi';
-import { getUiErrorMessage } from '../../api/core';
+import { presentApiError } from '../../api/ApiErrorPresenter';
 import type { SlotDto } from '../../generated/api';
 import { t } from '../../i18n';
+import { useAppMutation } from '../../query/hooks';
+import { keys } from '../../query/keys';
+import { useToast } from '../../ui/feedback/useToast';
 import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
 import type { ScheduleStackParamList } from '../navigation/types';
+import { useQueryClient } from '@tanstack/react-query';
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, 'SlotDetails'>;
 
@@ -76,10 +80,9 @@ const getPriceLabel = (slot: SlotDto): string | null => {
 
 export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   const { slot } = route.params;
-  const [isSubmitting, setIsSubmitting] = useState<
-    'completed' | 'noShow' | null
-  >(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
   const times = getSlotTimes(slot);
   const dateLabel = times ? formatDateRu(times.start) : '';
@@ -94,47 +97,65 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   const canMark =
     attendanceActionsAvailable && slotStatus === 'Booked' && !!slot.id;
 
-  const handleMarkCompleted = async () => {
+  const completeMutation = useAppMutation({
+    mutationFn: (slotId: string) => markSlotCompleted(slotId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
+      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+      showToast({ type: 'success', title: t('status.completed') });
+      navigation.goBack();
+    },
+    onError: (err) => {
+      const presented = presentApiError(err);
+      setActionError(presented.message);
+      showToast({
+        type: 'error',
+        title: presented.title,
+        message: presented.message,
+      });
+    },
+  });
+
+  const noShowMutation = useAppMutation({
+    mutationFn: (slotId: string) => markSlotNoShow(slotId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
+      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+      showToast({ type: 'success', title: t('status.noShow') });
+      navigation.goBack();
+    },
+    onError: (err) => {
+      const presented = presentApiError(err);
+      setActionError(presented.message);
+      showToast({
+        type: 'error',
+        title: presented.title,
+        message: presented.message,
+      });
+    },
+  });
+
+  const handleMarkCompleted = () => {
     if (!slot.id) {
       setActionError(t('errors.generic'));
       return;
     }
-
-    setIsSubmitting('completed');
     setActionError(null);
-
-    try {
-      await markSlotCompleted(slot.id);
-      navigation.goBack();
-    } catch (err) {
-      setActionError(getUiErrorMessage(err));
-    } finally {
-      setIsSubmitting(null);
-    }
+    completeMutation.mutate(slot.id);
   };
 
-  const handleMarkNoShow = async () => {
+  const handleMarkNoShow = () => {
     if (!slot.id) {
       setActionError(t('errors.generic'));
       return;
     }
-
-    setIsSubmitting('noShow');
     setActionError(null);
-
-    try {
-      await markSlotNoShow(slot.id);
-      navigation.goBack();
-    } catch (err) {
-      setActionError(getUiErrorMessage(err));
-    } finally {
-      setIsSubmitting(null);
-    }
+    noShowMutation.mutate(slot.id);
   };
 
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
-      <YStack flex={1} padding="$6" gap="$4">
+      <YStack flex={1} padding="$6" gap="30">
         <Text fontSize="$8" fontWeight="700" color="$text">
           {t('slotDetails.title')}
         </Text>
@@ -184,9 +205,9 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
               minHeight="$9"
               paddingHorizontal="$4"
               onPress={handleMarkCompleted}
-              disabled={isSubmitting !== null}
+              disabled={completeMutation.isPending || noShowMutation.isPending}
             >
-              {isSubmitting === 'completed'
+              {completeMutation.isPending
                 ? t('common.loading')
                 : t('slotDetails.markCompleted')}
             </Button>
@@ -195,13 +216,13 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
               borderRadius="$4"
               borderWidth={1}
               borderColor="$border"
-              minHeight="$9"
+              height="$9"
               paddingHorizontal="$4"
               onPress={handleMarkNoShow}
-              disabled={isSubmitting !== null}
+              disabled={completeMutation.isPending || noShowMutation.isPending}
             >
               <Text color="$text">
-                {isSubmitting === 'noShow'
+                {noShowMutation.isPending
                   ? t('common.loading')
                   : t('slotDetails.markNoShow')}
               </Text>
@@ -219,7 +240,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
             borderRadius="$4"
             borderWidth={1}
             borderColor="$border"
-            minHeight="$9"
+            height="$9"
             paddingHorizontal="$4"
             onPress={() => navigation.goBack()}
           >

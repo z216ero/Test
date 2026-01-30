@@ -1,18 +1,23 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Input, Text, XStack, YStack } from 'tamagui';
 import { launchImageLibrary } from 'react-native-image-picker';
-import type { AuthUserDto, UpdateUserRequest } from '../../generated/api';
+import type { UpdateUserRequest } from '../../generated/api';
 import { patchUsersMe, putUsersMeAvatar } from '../../generated/api';
-import { getUiErrorMessage, unwrap } from '../../api/core';
+import { presentApiError } from '../../api/ApiErrorPresenter';
+import { unwrap } from '../../api/core';
 import { getMe } from '../../api/homeApi';
 import { getAccessToken } from '../../auth/tokenStorage';
 import { API_BASE_URL } from '../../config/env';
 import { t } from '../../i18n';
 import { formInputProps, primaryButtonProps, secondaryButtonProps } from '../../ui/formDefaults';
+import { useToast } from '../../ui/feedback/useToast';
 import type { ProfileStackParamList } from '../navigation/types';
+import { useAppMutation, useAppQuery } from '../../query/hooks';
+import { keys } from '../../query/keys';
+import { useQueryClient } from '@tanstack/react-query';
 
 const buildAbsoluteUrl = (path: string): string => {
   const trimmedBase = API_BASE_URL.endsWith('/')
@@ -43,7 +48,6 @@ type SelectedAvatar = {
 type Props = NativeStackScreenProps<ProfileStackParamList, 'PersonalInfo'>;
 
 export function PersonalInfoScreen({ navigation }: Props) {
-  const [me, setMe] = useState<AuthUserDto | null>(null);
   const [name, setName] = useState('');
   const [specialization, setSpecialization] = useState('');
   const [email, setEmail] = useState('');
@@ -51,32 +55,46 @@ export function PersonalInfoScreen({ navigation }: Props) {
   const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
   const [avatarToken, setAvatarToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+
+  const {
+    data: me,
+    isLoading,
+    error: meError,
+  } = useAppQuery({
+    queryKey: keys.auth.me(),
+    queryFn: ({ signal }) => getMe({ signal }),
+  });
 
   const isTrainer = me?.role === 'Trainer';
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const meData = await getMe();
-      const token = await getAccessToken();
-      setMe(meData);
-      setName(meData.name?.trim() ?? '');
-      setSpecialization(meData.specialization?.trim() ?? '');
-      setEmail(meData.email?.trim() ?? '');
-      setAvatarToken(token);
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (!me) {
+      return;
     }
+    setName(me.name?.trim() ?? '');
+    setSpecialization(me.specialization?.trim() ?? '');
+    setEmail(me.email?.trim() ?? '');
+  }, [me]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAccessToken().then((token) => {
+      if (!cancelled) {
+        setAvatarToken(token);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (meError) {
+      setError(presentApiError(meError).message);
+    }
+  }, [meError]);
 
   const avatarUrl = useMemo(() => {
     if (!me?.avatarUrl) {
@@ -138,11 +156,8 @@ export function PersonalInfoScreen({ navigation }: Props) {
     setAvatarPreviewUri(asset.uri);
   };
 
-  const handleSave = async () => {
-    setError(null);
-    setSaving(true);
-
-    try {
+  const saveMutation = useAppMutation({
+    mutationFn: async () => {
       const payload: UpdateUserRequest = {
         name: name.trim(),
         specialization: isTrainer
@@ -159,14 +174,29 @@ export function PersonalInfoScreen({ navigation }: Props) {
         });
         unwrap(uploadResponse, t('errors.uploadFailed'));
       }
-
-      const refreshed = await getMe();
-      setMe(refreshed);
+    },
+    onSuccess: async () => {
+      queryClient.invalidateQueries({ queryKey: keys.auth.me() });
+      showToast({ type: 'success', title: t('profile.personal.save') });
       navigation.goBack();
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-    } finally {
-      setSaving(false);
+    },
+    onError: (err) => {
+      const presented = presentApiError(err);
+      setError(presented.message);
+      showToast({
+        type: 'error',
+        title: presented.title,
+        message: presented.message,
+      });
+    },
+  });
+
+  const handleSave = async () => {
+    setError(null);
+    try {
+      await saveMutation.mutateAsync();
+    } catch {
+      // handled in mutation callbacks
     }
   };
 
@@ -183,7 +213,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
             <Text fontSize="$7" fontWeight="700" color="$text">
               {t('profile.personal.title')}
             </Text>
-            {loading ? (
+            {isLoading ? (
               <Text fontSize="$3" color="$muted">
                 {t('common.loading')}
               </Text>
@@ -234,7 +264,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                 borderWidth={1}
                 borderColor="$border"
                 onPress={handlePickPhoto}
-                disabled={saving}
+                disabled={saveMutation.isPending}
                 paddingHorizontal="$3"
                 {...secondaryButtonProps}
               >
@@ -304,11 +334,11 @@ export function PersonalInfoScreen({ navigation }: Props) {
               color="$accentText"
               borderRadius="$4"
               onPress={handleSave}
-              disabled={saving || loading}
+              disabled={saveMutation.isPending || isLoading}
               {...primaryButtonProps}
             >
               <Text fontSize="$3" color="$accentText">
-                {saving ? t('common.loading') : t('profile.personal.save')}
+                {saveMutation.isPending ? t('common.loading') : t('profile.personal.save')}
               </Text>
             </Button>
             <Button
@@ -317,7 +347,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
               borderWidth={1}
               borderColor="$border"
               onPress={() => navigation.goBack()}
-              disabled={saving}
+              disabled={saveMutation.isPending}
               {...secondaryButtonProps}
             >
               <Text fontSize="$3" color="$text">

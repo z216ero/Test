@@ -5,7 +5,8 @@
 import { useMemo, useState } from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { me, register } from '../../api/authApi';
-import { ApiError, getUiErrorMessage } from '../../api/core';
+import { presentApiError } from '../../api/ApiErrorPresenter';
+import { ApiError } from '../../api/core';
 import { t } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
 import {
@@ -19,6 +20,7 @@ import {
 } from '../../ui/authUi';
 import type { AuthStackParamList, RootStackParamList } from '../navigation/types';
 import { getUserRole } from '../utils/userRole';
+import { useAppMutation } from '../../query/hooks';
 
 const SPECIALIZATIONS: Array<{ value: string; labelKey: TranslationKey }> = [
   { value: 'Strength', labelKey: 'auth.register.specializationStrength' },
@@ -38,7 +40,6 @@ export function RegisterScreen({ navigation }: Props) {
   const [name, setName] = useState('');
   const [role, setRole] = useState<Role>('Client');
   const [specialization, setSpecialization] = useState(SPECIALIZATIONS[0].value);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isTrainer = role === 'Trainer';
@@ -47,22 +48,20 @@ export function RegisterScreen({ navigation }: Props) {
     [isTrainer, specialization]
   );
 
-  const handleRegister = async () => {
-    if (!email.trim() || !password || !name.trim()) {
-      setError(t('auth.register.validationRequired'));
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
+  const registerMutation = useAppMutation({
+    mutationFn: async (payload: {
+      email: string;
+      password: string;
+      name: string;
+      role: Role;
+      specialization?: string;
+    }) => {
       const response = await register({
-        email: email.trim(),
-        password,
-        name: name.trim(),
-        role,
-        specialization: specializationValue,
+        email: payload.email,
+        password: payload.password,
+        name: payload.name,
+        role: payload.role,
+        specialization: payload.specialization,
       });
 
       if (!response.accessToken) {
@@ -75,16 +74,39 @@ export function RegisterScreen({ navigation }: Props) {
         throw new ApiError(t('auth.errorMissingRole'));
       }
 
+      return resolvedRole;
+    },
+    onSuccess: (resolvedRole) => {
       const rootNavigation =
         navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
       rootNavigation?.reset({
         index: 0,
         routes: [{ name: 'App', params: { role: resolvedRole } }],
       });
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-    } finally {
-      setIsSubmitting(false);
+    },
+    onError: (err) => {
+      setError(presentApiError(err).message);
+    },
+  });
+
+  const handleRegister = async () => {
+    if (!email.trim() || !password || !name.trim()) {
+      setError(t('auth.register.validationRequired'));
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await registerMutation.mutateAsync({
+        email: email.trim(),
+        password,
+        name: name.trim(),
+        role,
+        specialization: specializationValue,
+      });
+    } catch {
+      // handled in mutation callbacks
     }
   };
 
@@ -171,8 +193,8 @@ export function RegisterScreen({ navigation }: Props) {
           </YStack>
         ) : null}
         {error ? <AuthError message={error} /> : null}
-        <AuthPrimaryButton onPress={handleRegister} disabled={isSubmitting}>
-          {isSubmitting ? t('auth.register.loading') : t('auth.register.cta')}
+        <AuthPrimaryButton onPress={handleRegister} disabled={registerMutation.isPending}>
+          {registerMutation.isPending ? t('auth.register.loading') : t('auth.register.cta')}
         </AuthPrimaryButton>
       </AuthCard>
       <AuthFooter

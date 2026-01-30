@@ -4,7 +4,8 @@
 } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { login, me } from '../../api/authApi';
-import { ApiError, getUiErrorMessage } from '../../api/core';
+import { presentApiError } from '../../api/ApiErrorPresenter';
+import { ApiError } from '../../api/core';
 import { t } from '../../i18n';
 import { XStack } from 'tamagui';
 import {
@@ -19,28 +20,20 @@ import {
 import { AppIcon } from '../../ui/AppIcon';
 import type { AuthStackParamList, RootStackParamList } from '../navigation/types';
 import { getUserRole } from '../utils/userRole';
+import { useAppMutation } from '../../query/hooks';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password) {
-      setError(t('auth.login.validationRequired'));
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
+  const loginMutation = useAppMutation({
+    mutationFn: async (payload: { email: string; password: string }) => {
       const response = await login({
-        email: email.trim(),
-        password,
+        email: payload.email,
+        password: payload.password,
       });
 
       if (!response.accessToken) {
@@ -53,13 +46,33 @@ export function LoginScreen({ navigation }: Props) {
         throw new ApiError(t('auth.errorMissingRole'));
       }
 
+      return role;
+    },
+    onSuccess: (role) => {
       const rootNavigation =
         navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
       rootNavigation?.reset({ index: 0, routes: [{ name: 'App', params: { role } }] });
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-    } finally {
-      setIsSubmitting(false);
+    },
+    onError: (err) => {
+      setError(presentApiError(err).message);
+    },
+  });
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password) {
+      setError(t('auth.login.validationRequired'));
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await loginMutation.mutateAsync({
+        email: email.trim(),
+        password,
+      });
+    } catch {
+      // handled in mutation callbacks
     }
   };
 
@@ -87,8 +100,8 @@ export function LoginScreen({ navigation }: Props) {
           placeholder={t('common.passwordPlaceholder')}
         />
         {error ? <AuthError message={error} /> : null}
-        <AuthPrimaryButton onPress={handleLogin} disabled={isSubmitting}>
-          {isSubmitting ? t('auth.login.loading') : t('auth.login.cta')}
+        <AuthPrimaryButton onPress={handleLogin} disabled={loginMutation.isPending}>
+          {loginMutation.isPending ? t('auth.login.loading') : t('auth.login.cta')}
         </AuthPrimaryButton>
       </AuthCard>
       <AuthFooter

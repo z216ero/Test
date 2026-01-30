@@ -5,12 +5,17 @@ import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { cancelBooking, getMyBookings } from '../../api/bookingsApi';
 import type { ClientBooking } from '../../api/bookingsApi';
-import { getUiErrorMessage } from '../../api/core';
+import { presentApiError } from '../../api/ApiErrorPresenter';
 import { t } from '../../i18n';
+import { useAppMutation, useAppQuery } from '../../query/hooks';
+import { keys } from '../../query/keys';
+import { useToast } from '../../ui/feedback/useToast';
+import { EmptyState } from '../../ui/states/EmptyState';
+import { ErrorState } from '../../ui/states/ErrorState';
+import { LoadingState } from '../../ui/states/LoadingState';
 import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
 import { onBookingCancelled } from '../../notifications/orchestrator';
-
-type ViewState = 'loading' | 'ready' | 'error';
+import { useQueryClient } from '@tanstack/react-query';
 
 type BookingSection = {
   title: string;
@@ -49,40 +54,31 @@ const getStatusLabel = (status?: string | null) => {
 };
 
 export function BookingsScreen() {
-  const [state, setState] = useState<ViewState>('loading');
-  const [bookings, setBookings] = useState<ClientBooking[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
-  const load = useCallback(async (isRefresh = false) => {
-    if (!isRefresh) {
-      setState('loading');
-    }
-    setError(null);
-
-    try {
-      const data = await getMyBookings();
-      setBookings(data);
-      setState('ready');
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-      setState('error');
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
+  const {
+    data: bookings = [],
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useAppQuery({
+    queryKey: keys.bookings.upcoming(),
+    queryFn: ({ signal }) => getMyBookings({ signal }),
+  });
 
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [load])
+      if (!isLoading) {
+        refetch();
+      }
+    }, [isLoading, refetch])
   );
 
   const onRefresh = () => {
-    setRefreshing(true);
-    load(true);
+    refetch();
   };
 
   const sections = useMemo(() => {
@@ -136,24 +132,35 @@ export function BookingsScreen() {
     ] satisfies BookingSection[];
   }, [bookings]);
 
-  const handleCancel = async (slotId: string) => {
-    setCancellingId(slotId);
-    setActionError(null);
-
-    try {
-      await cancelBooking(slotId);
+  const cancelMutation = useAppMutation({
+    mutationFn: (slotId: string) => cancelBooking(slotId),
+    onSuccess: async (_data, slotId) => {
       const booking = bookings.find((item) => item.slot.id === slotId);
-      await onBookingCancelled({
-        bookingId: slotId,
-        startAtUtcIso: booking?.slot.startsAtUtc ?? undefined,
+      try {
+        await onBookingCancelled({
+          bookingId: slotId,
+          startAtUtcIso: booking?.slot.startsAtUtc ?? undefined,
+        });
+      } catch (notificationError) {
+        if (__DEV__) {
+          console.warn('Failed to schedule cancel notification', notificationError);
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
+      setActionError(null);
+      showToast({ type: 'success', title: t('notifications.event.cancelled') });
+    },
+    onError: (err) => {
+      const presented = presentApiError(err);
+      setActionError(presented.message);
+      showToast({
+        type: 'error',
+        title: presented.title,
+        message: presented.message,
       });
-      await load(true);
-    } catch (err) {
-      setActionError(getUiErrorMessage(err));
-    } finally {
-      setCancellingId(null);
-    }
-  };
+    },
+  });
 
   const renderBookingCard = (booking: ClientBooking, index: number) => {
     const { slot, trainerName, trainerSpecialization } = booking;
@@ -164,7 +171,10 @@ export function BookingsScreen() {
       : '';
     const statusLabel = getStatusLabel(slot.status);
     const canCancel = slot.status === 'Booked' && !!slot.id;
-    const isCancelling = slot.id ? cancellingId === slot.id : false;
+    const isCancelling =
+      slot.id && cancelMutation.isPending
+        ? cancelMutation.variables === slot.id
+        : false;
 
     return (
       <YStack
@@ -215,7 +225,7 @@ export function BookingsScreen() {
               borderColor="$border"
               minHeight="$9"
               paddingHorizontal="$4"
-              onPress={() => handleCancel(slot.id as string)}
+              onPress={() => cancelMutation.mutate(slot.id as string)}
               disabled={isCancelling}
             >
               <Text color="$text">
@@ -254,40 +264,16 @@ export function BookingsScreen() {
   );
 
   const renderContent = () => {
-    if (state === 'loading') {
-      return (
-        <YStack gap="$3">
-          <YStack height="$12" backgroundColor="$surfaceMuted" borderRadius="$5" />
-          <YStack height="$12" backgroundColor="$surfaceMuted" borderRadius="$5" />
-        </YStack>
-      );
+    if (isLoading) {
+      return <LoadingState />;
     }
 
-    if (state === 'error') {
-      return (
-        <YStack
-          gap="$3"
-          padding="$5"
-          backgroundColor="$background"
-          borderRadius="$5"
-          borderWidth={1}
-          borderColor="$border"
-        >
-          <Text fontSize="$3" color="$muted">
-            {error ?? t('errors.generic')}
-          </Text>
-          <Button
-            backgroundColor="$accent"
-            color="$accentText"
-            borderRadius="$4"
-            minHeight="$9"
-            paddingHorizontal="$4"
-            onPress={() => load()}
-          >
-            {t('common.retry')}
-          </Button>
-        </YStack>
-      );
+    if (error) {
+      return <ErrorState error={error} onRetry={refetch} />;
+    }
+
+    if (bookings.length === 0) {
+      return <EmptyState title={t('bookings.emptyUpcoming')} />;
     }
 
     return (
@@ -305,7 +291,12 @@ export function BookingsScreen() {
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isFetching && !isLoading}
+            onRefresh={onRefresh}
+          />
+        }
       >
         <YStack flex={1} padding="$6" gap="$4">
           <YStack gap="$2">

@@ -1,10 +1,16 @@
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { JSX, useCallback, useEffect, useState } from 'react';
+import { JSX, useCallback } from 'react';
 import { Button, ScrollView, Text, YStack } from 'tamagui';
 import { apiClient } from '../../api/client';
-import { getUiErrorMessage, unwrap } from '../../api/core';
+import { unwrap } from '../../api/core';
 import type { SlotDto } from '../../generated/api';
-import { primaryButtonProps, secondaryButtonProps } from '../../ui/formDefaults';
+import { useAppQuery } from '../../query/hooks';
+import { keys } from '../../query/keys';
+import { primaryButtonProps } from '../../ui/formDefaults';
+import { EmptyState } from '../../ui/states/EmptyState';
+import { ErrorState } from '../../ui/states/ErrorState';
+import { LoadingState } from '../../ui/states/LoadingState';
 import { formatUtcRange } from '../../utils/time';
 import type { AppStackParamList } from '../navigation/types';
 
@@ -12,61 +18,38 @@ type Props = NativeStackScreenProps<AppStackParamList, 'TrainerSlots'>;
 
 export function TrainerSlotsScreen({ route, navigation }: Props) {
   const { trainerId, trainerName } = route.params;
-  const [slots, setSlots] = useState<SlotDto[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: slots = [],
+    isLoading,
+    error,
+    refetch,
+  } = useAppQuery({
+    queryKey: keys.trainers.slots(trainerId),
+    queryFn: async ({ signal }) => {
+      const response = await apiClient.getTrainersTrainerIdSlots(
+        trainerId,
+        undefined,
+        { signal }
+      );
+      return unwrap<SlotDto[]>(response, 'Unable to load trainer slots.');
+    },
+  });
 
-  const loadSlots = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await apiClient.getTrainersTrainerIdSlots(trainerId);
-      const data = unwrap(response, 'Unable to load trainer slots.');
-      setSlots(data);
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [trainerId]);
-
-  useEffect(() => {
-    loadSlots();
-    const unsubscribe = navigation.addListener('focus', loadSlots);
-    return unsubscribe;
-  }, [loadSlots, navigation]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!isLoading) {
+        refetch();
+      }
+    }, [isLoading, refetch])
+  );
 
   let content: JSX.Element;
   if (isLoading) {
-    content = (
-      <Text fontSize="$4" color="$muted">
-        Loading slots...
-      </Text>
-    );
+    content = <LoadingState />;
   } else if (error) {
-    content = (
-      <YStack gap="$3" alignItems="center">
-        <Text fontSize="$4" color="$text" textAlign="center">
-          {error}
-        </Text>
-        <Button
-          size="$3"
-          backgroundColor="$primary"
-          color="$primaryText"
-          onPress={loadSlots}
-          {...secondaryButtonProps}
-        >
-          Retry
-        </Button>
-      </YStack>
-    );
+    content = <ErrorState error={error} onRetry={refetch} />;
   } else if (slots.length === 0) {
-    content = (
-      <Text fontSize="$4" color="$muted">
-        No slots created yet.
-      </Text>
-    );
+    content = <EmptyState title="No slots created yet." />;
   } else {
     content = (
       <ScrollView flex={1} width="100%">

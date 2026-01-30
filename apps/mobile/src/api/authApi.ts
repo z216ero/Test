@@ -43,8 +43,8 @@ export const login = async (payload: LoginRequest): Promise<AuthResponse> => {
   return data;
 };
 
-export const me = async (): Promise<AuthUserDto> => {
-  const response = await getAuthMe();
+export const me = async (options?: RequestInit): Promise<AuthUserDto> => {
+  const response = await getAuthMe(options);
   return unwrap(response, 'Unable to load profile.');
 };
 

@@ -1,19 +1,21 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { RefreshControl } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { getUiErrorMessage } from '../../api/core';
 import { getMyTrainerSlots } from '../../api/trainerSlotsApi';
 import type { SlotDto } from '../../generated/api';
 import { t } from '../../i18n';
+import { useAppQuery } from '../../query/hooks';
+import { keys } from '../../query/keys';
+import { EmptyState } from '../../ui/states/EmptyState';
+import { ErrorState } from '../../ui/states/ErrorState';
+import { LoadingState } from '../../ui/states/LoadingState';
 import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
 import type { ScheduleStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, 'ScheduleHome'>;
-
-type ViewState = 'loading' | 'ready' | 'error';
 
 type SlotSection = {
   title: string;
@@ -80,40 +82,36 @@ const getSlotStatus = (slot: SlotDto): string | null => {
 };
 
 export function ScheduleScreen({ navigation }: Props) {
-  const [slots, setSlots] = useState<SlotDto[]>([]);
-  const [state, setState] = useState<ViewState>('loading');
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const startOfDay = (() => {
+    const value = new Date();
+    value.setHours(0, 0, 0, 0);
+    return value.toISOString();
+  })();
 
-  const loadSlots = useCallback(async (isRefresh = false) => {
-    if (!isRefresh) {
-      setState('loading');
-    }
-    setError(null);
-
-    try {
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      const data = await getMyTrainerSlots({ fromUtc: startOfDay.toISOString() });
-      setSlots(data.slice().sort(sortByStart));
-      setState('ready');
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-      setState('error');
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
+  const {
+    data: slots = [],
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useAppQuery({
+    queryKey: keys.trainerSlots.mine({ fromUtc: startOfDay }),
+    queryFn: async ({ signal }) => {
+      const data = await getMyTrainerSlots({ fromUtc: startOfDay }, { signal });
+      return data.slice().sort(sortByStart);
+    },
+  });
 
   useFocusEffect(
     useCallback(() => {
-      loadSlots();
-    }, [loadSlots])
+      if (!isLoading) {
+        refetch();
+      }
+    }, [isLoading, refetch])
   );
 
   const onRefresh = () => {
-    setRefreshing(true);
-    loadSlots(true);
+    refetch();
   };
 
   const sections = useMemo(() => {
@@ -209,66 +207,21 @@ export function ScheduleScreen({ navigation }: Props) {
   );
 
   const renderContent = () => {
-    if (state === 'loading') {
-      return (
-        <YStack gap="$3">
-          <YStack height="$12" backgroundColor="$surfaceMuted" borderRadius="$5" />
-          <YStack height="$12" backgroundColor="$surfaceMuted" borderRadius="$5" />
-        </YStack>
-      );
+    if (isLoading) {
+      return <LoadingState />;
     }
 
-    if (state === 'error') {
-      return (
-        <YStack
-          gap="$3"
-          padding="$5"
-          backgroundColor="$background"
-          borderRadius="$5"
-          borderWidth={1}
-          borderColor="$border"
-        >
-          <Text fontSize="$3" color="$muted">
-            {error ?? t('errors.generic')}
-          </Text>
-          <Button
-            backgroundColor="$accent"
-            color="$accentText"
-            borderRadius="$4"
-            minHeight="$9"
-            paddingHorizontal="$4"
-            onPress={() => loadSlots()}
-          >
-            {t('common.retry')}
-          </Button>
-        </YStack>
-      );
+    if (error) {
+      return <ErrorState error={error} onRetry={refetch} />;
     }
 
     if (slots.length === 0) {
       return (
-        <YStack
-          gap="$3"
-          padding="$5"
-          backgroundColor="$background"
-          borderRadius="$5"
-          borderWidth={1}
-          borderColor="$border"
-        >
-          <Text fontSize="$3" color="$muted">
-            {t('schedule.empty')}
-          </Text>
-          <Button
-            backgroundColor="$accent"
-            color="$accentText"
-            borderRadius="$4"
-            minHeight="$9"
-            paddingHorizontal="$4"
-            onPress={handleCreateSlot}
-          >
-            {t('schedule.createCta')}
-          </Button>
-        </YStack>
+        <EmptyState
+          title={t('schedule.empty')}
+          ctaLabel={t('schedule.createCta')}
+          onCtaPress={handleCreateSlot}
+        />
       );
     }
 
@@ -290,7 +243,12 @@ export function ScheduleScreen({ navigation }: Props) {
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isFetching && !isLoading}
+            onRefresh={onRefresh}
+          />
+        }
       >
         <YStack flex={1} padding="$6" gap="$4">
           <YStack gap="$2">

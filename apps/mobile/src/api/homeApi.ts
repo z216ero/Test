@@ -18,8 +18,8 @@ export type UpcomingSession = {
   specialization?: string | null;
 };
 
-export const getMe = async (): Promise<AuthUserDto> => {
-  const response = await getAuthMe();
+export const getMe = async (options?: RequestInit): Promise<AuthUserDto> => {
+  const response = await getAuthMe(options);
   return unwrap(response, 'Unable to load profile.');
 };
 
@@ -43,9 +43,10 @@ const sortByStart = (a: SlotDto, b: SlotDto) => {
 };
 
 export const getUpcomingForTrainer = async (
-  specialization?: string | null
+  specialization?: string | null,
+  options?: RequestInit
 ): Promise<UpcomingSession | null> => {
-  const trainerResponse = await getTrainersMe();
+  const trainerResponse = await getTrainersMe(options);
   const trainer = unwrap<TrainerDto>(
     trainerResponse,
     'Unable to load trainer profile.'
@@ -55,7 +56,11 @@ export const getUpcomingForTrainer = async (
     return null;
   }
 
-  const response = await getTrainersTrainerIdSlots(trainer.id);
+  const response = await getTrainersTrainerIdSlots(
+    trainer.id,
+    undefined,
+    options
+  );
   const slots = unwrap<SlotDto[]>(response, 'Unable to load trainer slots.');
   const now = Date.now();
   const upcoming = slots
@@ -73,8 +78,10 @@ export const getUpcomingForTrainer = async (
   };
 };
 
-export const getUpcomingForClient = async (): Promise<UpcomingSession | null> => {
-  const response = await getClientsMeUpcoming();
+export const getUpcomingForClient = async (
+  options?: RequestInit
+): Promise<UpcomingSession | null> => {
+  const response = await getClientsMeUpcoming(options);
   const data = unwrap<UpcomingSessionDto | null>(
     response,
     'Unable to load upcoming session.'

@@ -2,14 +2,18 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useState } from 'react';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Input, Text, XStack, YStack } from 'tamagui';
-import { getUiErrorMessage } from '../../api/core';
+import { presentApiError } from '../../api/ApiErrorPresenter';
 import {
   createSlot,
   TrainerSlotsOverlapError,
 } from '../../api/trainerSlotsApi';
 import { t } from '../../i18n';
+import { useAppMutation } from '../../query/hooks';
+import { keys } from '../../query/keys';
 import { formInputProps } from '../../ui/formDefaults';
+import { useToast } from '../../ui/feedback/useToast';
 import type { TrainerTabsParamList } from '../navigation/types';
+import { useQueryClient } from '@tanstack/react-query';
 
 type Props = BottomTabScreenProps<TrainerTabsParamList, 'CreateSlot'>;
 
@@ -82,7 +86,34 @@ export function CreateSlotTabScreen({ navigation }: Props) {
   const [duration, setDuration] = useState<number>(durations[2]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+
+  const createMutation = useAppMutation({
+    mutationFn: (payload: { startsAtUtc: string; durationMinutes: number }) =>
+      createSlot(payload),
+    onSuccess: () => {
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
+      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+      setSuccess(t('createSlot.success'));
+      showToast({ type: 'success', title: t('createSlot.success') });
+      navigation.navigate('Schedule', { screen: 'ScheduleHome' });
+    },
+    onError: (err) => {
+      if (err instanceof TrainerSlotsOverlapError) {
+        setError(err.message);
+        return;
+      }
+      const presented = presentApiError(err);
+      setError(presented.message);
+      showToast({
+        type: 'error',
+        title: presented.title,
+        message: presented.message,
+      });
+    },
+  });
 
   const handleSubmit = async () => {
     setError(null);
@@ -109,25 +140,18 @@ export function CreateSlotTabScreen({ navigation }: Props) {
       return;
     }
 
-    setIsSubmitting(true);
+    setError(null);
+    setSuccess(null);
     try {
-      await createSlot({
+      await createMutation.mutateAsync({
         startsAtUtc: startDate.toISOString(),
         durationMinutes: duration,
       });
       setDateInput('');
       setTimeInput('');
       setDuration(durations[2]);
-      setSuccess(t('createSlot.success'));
-      navigation.navigate('Schedule', { screen: 'ScheduleHome' });
-    } catch (err) {
-      if (err instanceof TrainerSlotsOverlapError) {
-        setError(err.message);
-      } else {
-        setError(getUiErrorMessage(err));
-      }
-    } finally {
-      setIsSubmitting(false);
+    } catch {
+      // handled in mutation callbacks
     }
   };
 
@@ -214,9 +238,9 @@ export function CreateSlotTabScreen({ navigation }: Props) {
             minHeight="$9"
             paddingHorizontal="$4"
             onPress={handleSubmit}
-            disabled={isSubmitting}
+            disabled={createMutation.isPending}
           >
-            {isSubmitting ? t('common.loading') : t('createSlot.save')}
+            {createMutation.isPending ? t('common.loading') : t('createSlot.save')}
           </Button>
         </YStack>
       </ScrollView>

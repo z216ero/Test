@@ -4,16 +4,18 @@ import { useCallback, useState } from 'react';
 import { RefreshControl } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { getUiErrorMessage } from '../../api/core';
 import { getAvailableSlotsWithTrainers } from '../../api/slotsApi';
 import type { SlotDto, TrainerDto } from '../../generated/api';
 import { t } from '../../i18n';
+import { useAppQuery } from '../../query/hooks';
+import { keys } from '../../query/keys';
+import { EmptyState } from '../../ui/states/EmptyState';
+import { ErrorState } from '../../ui/states/ErrorState';
+import { LoadingState } from '../../ui/states/LoadingState';
 import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
 import type { SlotsStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<SlotsStackParamList, 'SlotsList'>;
-
-type ViewState = 'loading' | 'ready' | 'error';
 
 type DayFilter = 'today' | 'tomorrow';
 
@@ -50,43 +52,32 @@ const getSlotEnd = (slot: SlotDto, start: Date): Date => {
 };
 
 export function SlotsScreen({ navigation }: Props) {
-  const [slots, setSlots] = useState<SlotDto[]>([]);
-  const [trainersById, setTrainersById] = useState<Record<string, TrainerDto>>(
-    {}
-  );
-  const [state, setState] = useState<ViewState>('loading');
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<DayFilter>('today');
 
-  const loadSlots = useCallback(async (isRefresh = false) => {
-    if (!isRefresh) {
-      setState('loading');
-    }
-    setError(null);
+  const {
+    data,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useAppQuery({
+    queryKey: keys.slots.available(),
+    queryFn: ({ signal }) => getAvailableSlotsWithTrainers(undefined, { signal }),
+  });
 
-    try {
-      const data = await getAvailableSlotsWithTrainers();
-      setSlots(data.slots);
-      setTrainersById(data.trainersById);
-      setState('ready');
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-      setState('error');
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
+  const slots = data?.slots ?? [];
+  const trainersById: Record<string, TrainerDto> = data?.trainersById ?? {};
 
   useFocusEffect(
     useCallback(() => {
-      loadSlots();
-    }, [loadSlots])
+      if (!isLoading) {
+        refetch();
+      }
+    }, [isLoading, refetch])
   );
 
   const onRefresh = () => {
-    setRefreshing(true);
-    loadSlots(true);
+    refetch();
   };
 
   const visibleSlots = slots;
@@ -164,56 +155,16 @@ export function SlotsScreen({ navigation }: Props) {
   };
 
   const renderContent = () => {
-    if (state === 'loading') {
-      return (
-        <YStack gap="$3">
-          <YStack height="$12" backgroundColor="$surfaceMuted" borderRadius="$5" />
-          <YStack height="$12" backgroundColor="$surfaceMuted" borderRadius="$5" />
-        </YStack>
-      );
+    if (isLoading) {
+      return <LoadingState />;
     }
 
-    if (state === 'error') {
-      return (
-        <YStack
-          gap="$3"
-          padding="$5"
-          backgroundColor="$background"
-          borderRadius="$5"
-          borderWidth={1}
-          borderColor="$border"
-        >
-          <Text fontSize="$3" color="$muted">
-            {error ?? t('errors.generic')}
-          </Text>
-          <Button
-            backgroundColor="$accent"
-            color="$accentText"
-            borderRadius="$4"
-            minHeight="$9"
-            paddingHorizontal="$4"
-            onPress={() => loadSlots()}
-          >
-            {t('slots.retry')}
-          </Button>
-        </YStack>
-      );
+    if (error) {
+      return <ErrorState error={error} onRetry={refetch} />;
     }
 
     if (visibleSlots.length === 0) {
-      return (
-        <YStack
-          padding="$5"
-          backgroundColor="$background"
-          borderRadius="$5"
-          borderWidth={1}
-          borderColor="$border"
-        >
-          <Text fontSize="$3" color="$muted">
-            {t('slots.empty')}
-          </Text>
-        </YStack>
-      );
+      return <EmptyState title={t('slots.empty')} />;
     }
 
     return <YStack gap="$4">{visibleSlots.map(renderSlotCard)}</YStack>;
@@ -222,7 +173,12 @@ export function SlotsScreen({ navigation }: Props) {
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isFetching && !isLoading}
+            onRefresh={onRefresh}
+          />
+        }
       >
         <YStack flex={1} padding="$6" gap="$6">
           <YStack gap="$2">

@@ -1,22 +1,23 @@
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { logout } from '../../api/authApi';
-import { getUiErrorMessage } from '../../api/core';
+import { presentApiError } from '../../api/ApiErrorPresenter';
 import { getMe } from '../../api/homeApi';
 import { clearSession } from '../../auth/tokenStorage';
 import { getAccessToken } from '../../auth/tokenStorage';
 import { API_BASE_URL } from '../../config/env';
 import { t } from '../../i18n';
-import type { AuthUserDto } from '../../generated/api';
 import { AppIcon } from '../../ui/AppIcon';
 import type { AppIconName } from '../../ui/icons';
 import type { ProfileStackParamList, RootStackParamList } from '../navigation/types';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
+import { useAppMutation, useAppQuery } from '../../query/hooks';
+import { keys } from '../../query/keys';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
 
@@ -41,30 +42,45 @@ const buildAbsoluteUrl = (path: string): string => {
 };
 
 export function ProfileScreen({ navigation }: Props) {
-  const [me, setMe] = useState<AuthUserDto | null>(null);
   const [avatarToken, setAvatarToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingToken, setLoadingToken] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const meData = await getMe();
-      const token = await getAccessToken();
-      setMe(meData);
-      setAvatarToken(token);
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
+  const {
+    data: me,
+    isLoading,
+    error: meError,
+    refetch,
+  } = useAppQuery({
+    queryKey: keys.auth.me(),
+    queryFn: ({ signal }) => getMe({ signal }),
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingToken(true);
+    getAccessToken()
+      .then((token) => {
+        if (!cancelled) {
+          setAvatarToken(token);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingToken(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [load])
+      if (!isLoading) {
+        refetch();
+      }
+    }, [isLoading, refetch])
   );
 
   const role = me?.role === 'Trainer' ? 'Trainer' : 'Client';
@@ -129,19 +145,28 @@ export function ProfileScreen({ navigation }: Props) {
   ];
 
   const handleLogout = async () => {
-    try {
-      setError(null);
-      await logout();
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-    } finally {
-      await clearSession();
-      const tabNavigation = navigation.getParent();
-      const rootNavigation =
-        tabNavigation?.getParent<NativeStackNavigationProp<RootStackParamList>>();
-      rootNavigation?.reset({ index: 0, routes: [{ name: 'Auth' }] });
-    }
+    await clearSession();
+    const tabNavigation = navigation.getParent();
+    const rootNavigation =
+      tabNavigation?.getParent<NativeStackNavigationProp<RootStackParamList>>();
+    rootNavigation?.reset({ index: 0, routes: [{ name: 'Auth' }] });
   };
+
+  const logoutMutation = useAppMutation({
+    mutationFn: () => logout(),
+    onError: (err) => {
+      setError(presentApiError(err).message);
+    },
+    onSettled: () => {
+      handleLogout();
+    },
+  });
+
+  useEffect(() => {
+    if (meError) {
+      setError(presentApiError(meError).message);
+    }
+  }, [meError]);
 
   const tabBarHeight = useBottomTabBarHeight();
   return (
@@ -192,7 +217,7 @@ export function ProfileScreen({ navigation }: Props) {
                 ) : null}
               </YStack>
             </XStack>
-            {loading ? (
+            {isLoading || loadingToken ? (
               <Text fontSize="$3" color="$muted">
                 {t('common.loading')}
               </Text>
@@ -241,7 +266,8 @@ export function ProfileScreen({ navigation }: Props) {
         padding="$4"
         minHeight="$11"
         paddingVertical="$3"
-        onPress={handleLogout}
+        onPress={() => logoutMutation.mutate()}
+        disabled={logoutMutation.isPending}
       >
         <Text fontSize="$3" color="$text">
           {t('profile.logout')}

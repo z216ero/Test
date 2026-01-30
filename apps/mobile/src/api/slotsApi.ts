@@ -38,16 +38,18 @@ export type SlotsWithTrainers = {
 };
 
 export const getAvailableSlots = async (
-  params?: GetTrainersTrainerIdSlotsParams
+  params?: GetTrainersTrainerIdSlotsParams,
+  options?: RequestInit
 ): Promise<SlotDto[]> => {
-  const data = await getAvailableSlotsWithTrainers(params);
+  const data = await getAvailableSlotsWithTrainers(params, options);
   return data.slots;
 };
 
 export const getAvailableSlotsWithTrainers = async (
-  params?: GetTrainersTrainerIdSlotsParams
+  params?: GetTrainersTrainerIdSlotsParams,
+  options?: RequestInit
 ): Promise<SlotsWithTrainers> => {
-  const trainersResponse = await getTrainers();
+  const trainersResponse = await getTrainers(options);
   const trainers = unwrap<TrainerDto[]>(
     trainersResponse,
     t('errors.generic')
@@ -69,7 +71,11 @@ export const getAvailableSlotsWithTrainers = async (
 
   const slotsPerTrainer = await Promise.all(
     trainerIds.map(async (trainerId) => {
-      const response = await getTrainersTrainerIdSlots(trainerId, params);
+      const response = await getTrainersTrainerIdSlots(
+        trainerId,
+        params,
+        options
+      );
       const slots = unwrap<SlotDto[]>(response, t('errors.generic'));
       return slots;
     })

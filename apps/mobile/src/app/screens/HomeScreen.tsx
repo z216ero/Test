@@ -1,14 +1,13 @@
 ﻿import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { RefreshControl } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { getUiErrorMessage } from '../../api/core';
 import { getMe, getUpcomingForClient, getUpcomingForTrainer } from '../../api/homeApi';
-import type { UpcomingSession } from '../../api/homeApi';
 import { t } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
-import type { AuthUserDto } from '../../generated/api';
+import { useAppQuery } from '../../query/hooks';
+import { keys } from '../../query/keys';
 import type { AppTabsParamList } from '../navigation/types';
 
 const formatDate = (utc: string | undefined) => {
@@ -52,52 +51,31 @@ const formatTimeRange = (utc: string | undefined, durationMinutes?: number) => {
 
 type Props = BottomTabScreenProps<AppTabsParamList, 'Home'>;
 
-type ViewState = 'loading' | 'ready' | 'error';
-
 export function HomeScreen({ navigation }: Props) {
-  const [me, setMe] = useState<AuthUserDto | null>(null);
-  const [upcoming, setUpcoming] = useState<UpcomingSession | null>(null);
-  const [state, setState] = useState<ViewState>('loading');
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const meQuery = useAppQuery({
+    queryKey: keys.auth.me(),
+    queryFn: ({ signal }) => getMe({ signal }),
+  });
 
-  const load = useCallback(async (isRefresh = false) => {
-    if (!isRefresh) {
-      setState('loading');
-    }
-    setError(null);
+  const me = meQuery.data ?? null;
+  const role = me?.role === 'Trainer' ? 'Trainer' : 'Client';
+  const specialization = me?.specialization ?? null;
 
-    try {
-      const meData = await getMe();
-      setMe(meData);
+  const upcomingQuery = useAppQuery({
+    queryKey: keys.home.upcoming(role),
+    enabled: Boolean(me),
+    queryFn: ({ signal }) =>
+      role === 'Trainer'
+        ? getUpcomingForTrainer(specialization, { signal })
+        : getUpcomingForClient({ signal }),
+  });
 
-      let upcomingData: UpcomingSession | null = null;
-      if (meData.role === 'Trainer') {
-        upcomingData = await getUpcomingForTrainer(meData.specialization);
-      } else {
-        upcomingData = await getUpcomingForClient();
-      }
-
-      setUpcoming(upcomingData);
-      setState('ready');
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-      setState('error');
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const upcoming = upcomingQuery.data ?? null;
 
   const onRefresh = () => {
-    setRefreshing(true);
-    load(true);
+    meQuery.refetch();
+    upcomingQuery.refetch();
   };
-
-  const role = me?.role === 'Trainer' ? 'Trainer' : 'Client';
   const labelKey: TranslationKey =
     role === 'Trainer' ? 'home.labelTrainer' : 'home.labelClient';
   const greetingName = me?.name?.trim() || t('common.unknownUser');
@@ -134,14 +112,14 @@ export function HomeScreen({ navigation }: Props) {
 
   const goToPrimaryTab = () => {
     if (role === 'Trainer') {
-      navigation.navigate('Schedule');
+      navigation.navigate('Schedule', { screen: 'ScheduleHome' });
       return;
     }
-    navigation.navigate('Slots');
+    navigation.navigate('Slots', { screen: 'SlotsList' });
   };
 
   const renderUpcomingCard = () => {
-    if (state === 'loading') {
+    if (meQuery.isLoading || upcomingQuery.isLoading) {
       return (
         <YStack
           gap="$3"
@@ -160,7 +138,7 @@ export function HomeScreen({ navigation }: Props) {
       );
     }
 
-    if (state === 'error') {
+    if (meQuery.error || upcomingQuery.error) {
       return (
         <YStack
           gap="$3"
@@ -174,7 +152,7 @@ export function HomeScreen({ navigation }: Props) {
             {t('home.upcoming.title')}
           </Text>
           <Text fontSize="$3" color="$muted">
-            {error ?? t('common.loading')}
+            {t('errors.generic')}
           </Text>
           <Button
             backgroundColor="$accent"
@@ -182,7 +160,7 @@ export function HomeScreen({ navigation }: Props) {
             borderRadius="$4"
             minHeight="$9"
             paddingHorizontal="$4"
-            onPress={() => load()}
+            onPress={onRefresh}
           >
             {t('common.retry')}
           </Button>
@@ -294,10 +272,20 @@ export function HomeScreen({ navigation }: Props) {
     );
   };
 
+  const isRefreshing = useMemo(
+    () => meQuery.isFetching || upcomingQuery.isFetching,
+    [meQuery.isFetching, upcomingQuery.isFetching]
+  );
+
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+          />
+        }
       >
         <YStack padding="$6" gap="$6">
           <XStack alignItems="center" justifyContent="space-between">
@@ -345,7 +333,7 @@ export function HomeScreen({ navigation }: Props) {
                     return;
                   }
                   if (card.id === 'my-schedule') {
-                    navigation.navigate('Schedule');
+                    navigation.navigate('Schedule', { screen: 'ScheduleHome' });
                   }
                 }}
               >

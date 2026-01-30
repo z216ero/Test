@@ -58,8 +58,8 @@ const mapBookingError = (error: unknown): Error => {
   return new ApiError(t('errors.generic'));
 };
 
-const getCurrentUserId = async (): Promise<string> => {
-  const response = await getAuthMe();
+const getCurrentUserId = async (options?: RequestInit): Promise<string> => {
+  const response = await getAuthMe(options);
   const me = unwrap<AuthUserDto>(response, t('errors.generic'));
   if (!me.id) {
     throw new ApiError(t('errors.generic'));
@@ -68,18 +68,23 @@ const getCurrentUserId = async (): Promise<string> => {
   return me.id;
 };
 
-export const createBooking = async (slotId: string): Promise<BookingDto> => {
+export const createBooking = async (
+  slotId: string,
+  options?: RequestInit
+): Promise<BookingDto> => {
   try {
-    const clientId = await getCurrentUserId();
-    const response = await postSlotsSlotIdBook(slotId, { clientId });
+    const clientId = await getCurrentUserId(options);
+    const response = await postSlotsSlotIdBook(slotId, { clientId }, options);
     return unwrap<BookingDto>(response, t('errors.generic'));
   } catch (error) {
     throw mapBookingError(error);
   }
 };
 
-export const getMyBookings = async (): Promise<ClientBooking[]> => {
-  const response = await getClientsMeUpcoming();
+export const getMyBookings = async (
+  options?: RequestInit
+): Promise<ClientBooking[]> => {
+  const response = await getClientsMeUpcoming(options);
   const data = unwrap<UpcomingSessionDto | null>(
     response,
     t('errors.generic')

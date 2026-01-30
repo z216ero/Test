@@ -1,38 +1,33 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { JSX, useCallback, useEffect, useState } from 'react';
+import { JSX } from 'react';
 import { Button, Text, YStack } from 'tamagui';
 import { apiClient } from '../../api/client';
-import { getUiErrorMessage, unwrap } from '../../api/core';
+import { unwrap } from '../../api/core';
 import { secondaryButtonProps } from '../../ui/formDefaults';
 import type { TrainerDto } from '../../generated/api';
+import { useAppQuery } from '../../query/hooks';
+import { keys } from '../../query/keys';
+import { EmptyState } from '../../ui/states/EmptyState';
+import { ErrorState } from '../../ui/states/ErrorState';
+import { LoadingState } from '../../ui/states/LoadingState';
 import type { AppStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Trainers'>;
 
 export function TrainersScreen({ route, navigation }: Props) {
   const { mode, clientId } = route.params;
-  const [trainers, setTrainers] = useState<TrainerDto[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadTrainers = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await apiClient.getTrainers();
-      const data = unwrap(response, 'Unable to load trainers.');
-      setTrainers(data);
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadTrainers();
-  }, [loadTrainers]);
+  const {
+    data: trainers = [],
+    isLoading,
+    error,
+    refetch,
+  } = useAppQuery({
+    queryKey: keys.trainers.list(),
+    queryFn: async ({ signal }) => {
+      const response = await apiClient.getTrainers({ signal });
+      return unwrap<TrainerDto[]>(response, 'Unable to load trainers.');
+    },
+  });
 
   const actionLabel = mode === 'trainer' ? 'Manage slots' : 'View slots';
   const canNavigate = mode === 'trainer' || !!clientId?.trim();
@@ -40,34 +35,11 @@ export function TrainersScreen({ route, navigation }: Props) {
   let content: JSX.Element;
 
   if (isLoading) {
-    content = (
-      <Text fontSize="$4" color="$muted">
-        Loading trainers...
-      </Text>
-    );
+    content = <LoadingState />;
   } else if (error) {
-    content = (
-      <YStack gap="$3" alignItems="center">
-        <Text fontSize="$4" color="$text" textAlign="center">
-          {error}
-        </Text>
-        <Button
-          size="$3"
-          backgroundColor="$primary"
-          color="$primaryText"
-          onPress={loadTrainers}
-          {...secondaryButtonProps}
-        >
-          Retry
-        </Button>
-      </YStack>
-    );
+    content = <ErrorState error={error} onRetry={refetch} />;
   } else if (trainers.length === 0) {
-    content = (
-      <Text fontSize="$4" color="$muted">
-        No trainers yet.
-      </Text>
-    );
+    content = <EmptyState title="No trainers yet." />;
   } else {
     content = (
       <YStack gap="$3" width="100%">

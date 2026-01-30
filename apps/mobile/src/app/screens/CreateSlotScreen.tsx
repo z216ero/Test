@@ -2,14 +2,19 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { Button, Input, Text, YStack } from 'tamagui';
 import { apiClient } from '../../api/client';
-import { getUiErrorMessage, unwrap } from '../../api/core';
+import { presentApiError } from '../../api/ApiErrorPresenter';
+import { unwrap } from '../../api/core';
+import { useAppMutation } from '../../query/hooks';
+import { keys } from '../../query/keys';
 import {
   formInputProps,
   primaryButtonProps,
   secondaryButtonProps,
 } from '../../ui/formDefaults';
+import { useToast } from '../../ui/feedback/useToast';
 import { parseLocalDateTime } from '../../utils/time';
 import type { AppStackParamList } from '../navigation/types';
+import { useQueryClient } from '@tanstack/react-query';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'CreateSlot'>;
 
@@ -19,7 +24,35 @@ export function CreateSlotScreen({ route, navigation }: Props) {
   const [endInput, setEndInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+
+  const createMutation = useAppMutation({
+    mutationFn: async (payload: { startsAtUtc: string; durationMinutes: number }) => {
+      const response = await apiClient.postTrainersTrainerIdSlots(
+        trainerId,
+        payload
+      );
+      return unwrap(response, 'Unable to create slot right now.');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: keys.trainers.slots(trainerId),
+      });
+      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+      setSuccess('Slot created successfully.');
+      showToast({ type: 'success', title: 'Slot created successfully.' });
+    },
+    onError: (err) => {
+      const presented = presentApiError(err);
+      setError(presented.message);
+      showToast({
+        type: 'error',
+        title: presented.title,
+        message: presented.message,
+      });
+    },
+  });
 
   const handleCreate = async () => {
     setError(null);
@@ -47,18 +80,15 @@ export function CreateSlotScreen({ route, navigation }: Props) {
       return;
     }
 
-    setIsSubmitting(true);
+    setError(null);
+    setSuccess(null);
     try {
-      const response = await apiClient.postTrainersTrainerIdSlots(trainerId, {
+      await createMutation.mutateAsync({
         startsAtUtc: startDate.toISOString(),
         durationMinutes,
       });
-      unwrap(response, 'Unable to create slot right now.');
-      setSuccess('Slot created successfully.');
-    } catch (err) {
-      setError(getUiErrorMessage(err));
-    } finally {
-      setIsSubmitting(false);
+    } catch {
+      // handled in mutation callbacks
     }
   };
 
@@ -113,10 +143,10 @@ export function CreateSlotScreen({ route, navigation }: Props) {
         backgroundColor="$primary"
         color="$primaryText"
         onPress={handleCreate}
-        disabled={isSubmitting || !!success}
+        disabled={createMutation.isPending || !!success}
         {...primaryButtonProps}
       >
-        {isSubmitting ? 'Creating...' : 'Create slot'}
+        {createMutation.isPending ? 'Creating...' : 'Create slot'}
       </Button>
       <Button size="$3" onPress={() => navigation.goBack()} {...secondaryButtonProps}>
         Back to slots

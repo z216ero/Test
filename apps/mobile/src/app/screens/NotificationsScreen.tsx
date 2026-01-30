@@ -8,6 +8,8 @@ import { t } from '../../i18n';
 import type { ProfileStackParamList } from '../navigation/types';
 import { useFocusEffect } from '@react-navigation/native';
 import { getMe } from '../../api/homeApi';
+import { useAppQuery } from '../../query/hooks';
+import { keys } from '../../query/keys';
 import {
   getNotificationSettings,
   NotificationSettings,
@@ -35,23 +37,21 @@ const formatEventTime = (iso: string): string => {
 export function NotificationsScreen({ navigation }: Props) {
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [events, setEvents] = useState<InAppEvent[]>([]);
-  const [role, setRole] = useState<'Client' | 'Trainer'>('Client');
   const [loading, setLoading] = useState(true);
+
+  const meQuery = useAppQuery({
+    queryKey: keys.auth.me(),
+    queryFn: ({ signal }) => getMe({ signal }),
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [nextSettings, nextEvents, me] = await Promise.all([
+    const [nextSettings, nextEvents] = await Promise.all([
       getNotificationSettings(),
       listEvents(),
-      getMe().catch(() => null),
     ]);
     setSettings(nextSettings);
     setEvents(nextEvents);
-    if (me?.role === 'Trainer') {
-      setRole('Trainer');
-    } else {
-      setRole('Client');
-    }
     setLoading(false);
   }, []);
 
@@ -97,6 +97,7 @@ export function NotificationsScreen({ navigation }: Props) {
     inAppBookingEventsEnabled: true,
   };
 
+  const role = meQuery.data?.role === 'Trainer' ? 'Trainer' : 'Client';
   const showReminderSection = role !== 'Trainer';
 
   return (
