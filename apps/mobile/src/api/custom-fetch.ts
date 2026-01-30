@@ -6,6 +6,7 @@ import {
   setRefreshToken,
 } from '../auth/tokenStorage';
 import { API_BASE_URL } from '../config/env';
+import { fetchWithTimeout, readResponseTextSafe } from './fetcher';
 
 const trimTrailingSlash = (value: string): string =>
   value.endsWith('/') ? value.slice(0, -1) : value;
@@ -34,10 +35,18 @@ const parseBody = async (response: Response): Promise<unknown> => {
   const isJson =
     contentType.includes('application/json') || contentType.includes('+json');
   if (isJson) {
-    return response.json();
+    const text = await readResponseTextSafe(response);
+    if (!text) {
+      return undefined;
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
   }
 
-  return response.text();
+  return readResponseTextSafe(response);
 };
 
 export const customFetch = async <T>(
@@ -51,7 +60,7 @@ export const customFetch = async <T>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  let response = await fetch(buildUrl(input), {
+  let response = await fetchWithTimeout(buildUrl(input), {
     ...options,
     headers,
   });
@@ -61,7 +70,7 @@ export const customFetch = async <T>(
     if (refreshed) {
       const retryHeaders = new Headers(options.headers ?? {});
       retryHeaders.set('Authorization', `Bearer ${refreshed}`);
-      response = await fetch(buildUrl(input), {
+      response = await fetchWithTimeout(buildUrl(input), {
         ...options,
         headers: retryHeaders,
       });
@@ -82,7 +91,7 @@ const tryRefreshToken = async (): Promise<string | null> => {
     return null;
   }
 
-  const response = await fetch(buildUrl('/auth/refresh'), {
+  const response = await fetchWithTimeout(buildUrl('/auth/refresh'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken }),

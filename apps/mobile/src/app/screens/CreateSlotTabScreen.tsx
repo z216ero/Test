@@ -119,7 +119,7 @@ export function CreateSlotTabScreen({ navigation }: Props) {
       setTimeInput('');
       setDuration(durations[2]);
       setSuccess(t('createSlot.success'));
-      navigation.getParent()?.navigate('Schedule');
+      navigation.navigate('Schedule', { screen: 'ScheduleHome' });
     } catch (err) {
       if (err instanceof TrainerSlotsOverlapError) {
         setError(err.message);

@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
@@ -6,8 +7,11 @@ import {
   BookingNotFoundError,
   createBooking,
 } from '../../api/bookingsApi';
-import { getUiErrorMessage } from '../../api/core';
+import { presentApiError } from '../../api/ApiErrorPresenter';
 import { t } from '../../i18n';
+import { useAppMutation } from '../../query/hooks';
+import { keys } from '../../query/keys';
+import { useToast } from '../../ui/feedback/useToast';
 import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
 import { onBookingCreated } from '../../notifications/orchestrator';
 import type { SlotsStackParamList } from '../navigation/types';
@@ -33,9 +37,10 @@ const getSlotTimes = (startsAtUtc?: string, durationMinutes?: number) => {
 
 export function BookingConfirmScreen({ navigation, route }: Props) {
   const { slot, trainerName, trainerSpecialization } = route.params;
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorKind, setErrorKind] = useState<ErrorKind>(null);
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
   const times = getSlotTimes(slot.startsAtUtc, slot.durationMinutes);
   const dateLabel = times ? formatDateRu(times.start) : '';
@@ -43,31 +48,45 @@ export function BookingConfirmScreen({ navigation, route }: Props) {
     ? formatTimeRangeRu(times.start, times.end)
     : '';
 
-  const handleConfirm = async () => {
-    if (!slot.id) {
-      setError(t('errors.generic'));
-      setErrorKind('generic');
-      return;
-    }
+  const bookingMutation = useAppMutation({
+    mutationFn: (slotId: string) => createBooking(slotId),
+    onSuccess: async (_data, slotId) => {
+      const trainerId = slot.trainerId;
+      if (trainerId) {
+        queryClient.invalidateQueries({
+          queryKey: keys.trainers.slots(trainerId),
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
 
-    setIsSubmitting(true);
-    setError(null);
-    setErrorKind(null);
+      try {
+        await onBookingCreated({
+          bookingId: slotId,
+          startAtUtcIso: slot.startsAtUtc ?? '',
+          title: trainerName
+            ? t('notifications.reminder.notificationTitleWithTrainer', {
+                name: trainerName,
+              })
+            : t('notifications.reminder.notificationTitle'),
+        });
+      } catch (notificationError) {
+        if (__DEV__) {
+          console.warn('Failed to schedule booking notification', notificationError);
+        }
+      }
 
-    try {
-      await createBooking(slot.id);
-      await onBookingCreated({
-        bookingId: slot.id,
-        startAtUtcIso: slot.startsAtUtc ?? '',
-        title: trainerName
-          ? t('notifications.reminder.notificationTitleWithTrainer', {
-              name: trainerName,
-            })
-          : t('notifications.reminder.notificationTitle'),
-      });
+      showToast({ type: 'success', title: t('notifications.event.booked') });
       navigation.popToTop();
       navigation.getParent()?.navigate('Bookings');
-    } catch (err) {
+    },
+    onError: (err) => {
+      const presented = presentApiError(err);
+      showToast({
+        type: 'error',
+        title: presented.title,
+        message: presented.message,
+      });
+
       if (err instanceof BookingConflictError) {
         setError(err.message);
         setErrorKind('conflict');
@@ -75,12 +94,22 @@ export function BookingConfirmScreen({ navigation, route }: Props) {
         setError(err.message);
         setErrorKind('notFound');
       } else {
-        setError(getUiErrorMessage(err));
+        setError(presented.message);
         setErrorKind('generic');
       }
-    } finally {
-      setIsSubmitting(false);
+    },
+  });
+
+  const handleConfirm = () => {
+    if (!slot.id) {
+      setError(t('errors.generic'));
+      setErrorKind('generic');
+      return;
     }
+
+    setError(null);
+    setErrorKind(null);
+    bookingMutation.mutate(slot.id);
   };
 
   return (
@@ -140,9 +169,11 @@ export function BookingConfirmScreen({ navigation, route }: Props) {
           minHeight="$9"
           paddingHorizontal="$4"
           onPress={handleConfirm}
-          disabled={isSubmitting}
+          disabled={bookingMutation.isPending}
         >
-          {isSubmitting ? t('common.loading') : t('bookingConfirm.confirm')}
+          {bookingMutation.isPending
+            ? t('common.loading')
+            : t('bookingConfirm.confirm')}
         </Button>
         <XStack justifyContent="center">
           <Button

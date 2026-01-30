@@ -158,7 +158,7 @@ export function ScheduleScreen({ navigation }: Props) {
         borderWidth={1}
         borderColor="$border"
         padding="$4"
-        minHeight="$10"
+        height="100"
         justifyContent="flex-start"
         alignItems="stretch"
         onPress={() => {

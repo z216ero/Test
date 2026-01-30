@@ -7,6 +7,7 @@ import {
 } from '../generated/api';
 import { t } from '../i18n';
 import { ApiError, unwrap } from './core';
+import { ApiTimeoutError } from './fetcher';
 
 export type ClientBooking = {
   slot: SlotDto;
@@ -17,7 +18,15 @@ export type ClientBooking = {
 export class BookingConflictError extends ApiError {}
 export class BookingNotFoundError extends ApiError {}
 
-const mapBookingError = (error: unknown): ApiError => {
+const mapBookingError = (error: unknown): Error => {
+  if (error instanceof ApiTimeoutError) {
+    return error;
+  }
+
+  if (error instanceof TypeError) {
+    return error;
+  }
+
   if (error instanceof ApiError) {
     if (error.status === 409) {
       return new BookingConflictError(
