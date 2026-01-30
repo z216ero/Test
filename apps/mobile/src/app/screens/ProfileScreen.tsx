@@ -119,6 +119,7 @@ export function ProfileScreen({ navigation }: Props) {
       id: 'notifications',
       label: t('profile.settings.notifications'),
       icon: 'alertCircle',
+      onPress: () => navigation.navigate('Notifications'),
     },
     {
       id: 'support',

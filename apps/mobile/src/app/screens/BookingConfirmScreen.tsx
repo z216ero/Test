@@ -9,6 +9,7 @@ import {
 import { getUiErrorMessage } from '../../api/core';
 import { t } from '../../i18n';
 import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
+import { onBookingCreated } from '../../notifications/orchestrator';
 import type { SlotsStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<SlotsStackParamList, 'BookingConfirm'>;
@@ -55,6 +56,15 @@ export function BookingConfirmScreen({ navigation, route }: Props) {
 
     try {
       await createBooking(slot.id);
+      await onBookingCreated({
+        bookingId: slot.id,
+        startAtUtcIso: slot.startsAtUtc ?? '',
+        title: trainerName
+          ? t('notifications.reminder.notificationTitleWithTrainer', {
+              name: trainerName,
+            })
+          : t('notifications.reminder.notificationTitle'),
+      });
       navigation.popToTop();
       navigation.getParent()?.navigate('Bookings');
     } catch (err) {

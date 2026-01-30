@@ -9,6 +9,7 @@ export type ScheduleStackParamList = {
 export type ProfileStackParamList = {
   ProfileHome: undefined;
   PersonalInfo: undefined;
+  Notifications: undefined;
 };
 
 export type UserRole = 'Client' | 'Trainer';

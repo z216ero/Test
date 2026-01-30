@@ -9,6 +9,7 @@ import { BookingsScreen } from '../screens/BookingsScreen';
 import { CreateSlotTabScreen } from '../screens/CreateSlotTabScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { LoginScreen } from '../screens/LoginScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { PersonalInfoScreen } from '../screens/PersonalInfoScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
@@ -48,6 +49,7 @@ const ProfileStackNavigator = () => (
   <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
     <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} />
     <ProfileStack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
+    <ProfileStack.Screen name="Notifications" component={NotificationsScreen} />
   </ProfileStack.Navigator>
 );
 

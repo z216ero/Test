@@ -53,7 +53,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+
   const isTrainer = me?.role === 'Trainer';
 
   const load = useCallback(async () => {
@@ -235,6 +235,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                 borderColor="$border"
                 onPress={handlePickPhoto}
                 disabled={saving}
+                paddingHorizontal="$3"
                 {...secondaryButtonProps}
               >
                 <Text fontSize="$3" color="$text">
@@ -261,6 +262,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
               </Text>
               <Input
                 value={name}
+                borderRadius="$4"
                 onChangeText={setName}
                 placeholder={t('profile.personal.name')}
                 {...formInputProps}
@@ -286,6 +288,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                 </Text>
                 <Input
                   value={email}
+                  borderRadius="$4"
                   editable={false}
                   backgroundColor="$surfaceMuted"
                   color="$muted"

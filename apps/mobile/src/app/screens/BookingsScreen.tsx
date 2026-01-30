@@ -8,6 +8,7 @@ import type { ClientBooking } from '../../api/bookingsApi';
 import { getUiErrorMessage } from '../../api/core';
 import { t } from '../../i18n';
 import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
+import { onBookingCancelled } from '../../notifications/orchestrator';
 
 type ViewState = 'loading' | 'ready' | 'error';
 
@@ -141,6 +142,11 @@ export function BookingsScreen() {
 
     try {
       await cancelBooking(slotId);
+      const booking = bookings.find((item) => item.slot.id === slotId);
+      await onBookingCancelled({
+        bookingId: slotId,
+        startAtUtcIso: booking?.slot.startsAtUtc ?? undefined,
+      });
       await load(true);
     } catch (err) {
       setActionError(getUiErrorMessage(err));

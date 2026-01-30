@@ -171,6 +171,26 @@
   'errors.notFound': 'Данные не найдены.',
   'errors.conflict': 'Нельзя изменить статус. Обновите список.',
   'errors.generic': 'Что-то пошло не так. Попробуйте ещё раз.',
+
+  'notifications.title': 'Уведомления',
+  'notifications.reminder.title': 'Напоминание о тренировке',
+  'notifications.reminder.toggle': 'Напоминать о тренировке',
+  'notifications.reminder.offset2h': 'За 2 часа',
+  'notifications.reminder.offset24h': 'За 24 часа',
+  'notifications.reminder.caption': 'Локальное уведомление на этом устройстве',
+  'notifications.reminder.notificationTitle': 'Напоминание о тренировке',
+  'notifications.reminder.notificationTitleWithTrainer': 'Тренировка с {name}',
+  'notifications.reminder.notificationBody': 'Скоро начнётся ваша тренировка.',
+  'notifications.reminder.notificationBodyWithTime': 'Начало: {time}',
+  'notifications.inApp.title': 'События в приложении',
+  'notifications.inApp.toggle': 'Изменения со стороны тренера',
+  'notifications.inApp.toggleTrainer': 'Записи клиентов и отмены',
+  'notifications.system.title': 'Системные настройки',
+  'notifications.system.permissions': 'Разрешения уведомлений',
+  'notifications.system.openSettings': 'Открыть настройки',
+  'notifications.journal.title': 'Журнал',
+  'notifications.journal.clear': 'Очистить',
+  'notifications.journal.empty': 'Событий пока нет',
+  'notifications.event.booked': 'Запись подтверждена',
+  'notifications.event.cancelled': 'Запись отменена',
 } as const;
-
-
