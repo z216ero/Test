@@ -10,7 +10,7 @@ import type { AppStackParamList } from '../navigation/types';
 type Props = NativeStackScreenProps<AppStackParamList, 'CreateSlot'>;
 
 export function CreateSlotScreen({ route, navigation }: Props) {
-  const { trainerId } = route.params;
+  const { trainerId, initialDateIsoLocal } = route.params;
   const queryClient = useQueryClient();
 
   const handleSuccess = () => {
@@ -43,6 +43,7 @@ export function CreateSlotScreen({ route, navigation }: Props) {
         );
         return unwrap(response, t('errors.generic'));
       }}
+      initialDateIsoLocal={initialDateIsoLocal}
     />
   );
 }

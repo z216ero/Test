@@ -43,9 +43,13 @@ export function TrainersScreen({ route, navigation }: Props) {
   } else {
     content = (
       <YStack gap="$3" width="100%">
-        {trainers.map((trainer) => (
+        {trainers.map((trainer, index) => {
+          const trainerId = trainer.id;
+          const trainerName = trainer.displayName;
+          const canOpen = !!trainerId && !!trainerName && canNavigate;
+          return (
           <YStack
-            key={trainer.id}
+            key={trainer.id ?? `trainer-${index}`}
             padding="$4"
             borderWidth={1}
             borderColor="$border"
@@ -54,7 +58,7 @@ export function TrainersScreen({ route, navigation }: Props) {
           >
             <YStack gap="$1">
               <Text fontSize="$5" fontWeight="600" color="$text">
-                {trainer.displayName}
+                {trainerName ?? '—'}
               </Text>
               {trainer.gymName ? (
                 <Text fontSize="$3" color="$muted">
@@ -67,26 +71,30 @@ export function TrainersScreen({ route, navigation }: Props) {
               backgroundColor="$primary"
               color="$primaryText"
               onPress={() => {
+                if (!canOpen || !trainerId || !trainerName) {
+                  return;
+                }
                 if (mode === 'trainer') {
                   navigation.navigate('TrainerSlots', {
-                    trainerId: trainer.id,
-                    trainerName: trainer.displayName,
+                    trainerId,
+                    trainerName,
                   });
                 } else {
                   navigation.navigate('AvailableSlots', {
-                    trainerId: trainer.id,
-                    trainerName: trainer.displayName,
+                    trainerId,
+                    trainerName,
                     clientId: clientId?.trim() ?? '',
                   });
                 }
               }}
-              disabled={!canNavigate}
+              disabled={!canOpen}
               {...secondaryButtonProps}
             >
               {actionLabel}
             </Button>
           </YStack>
-        ))}
+          );
+        })}
       </YStack>
     );
   }

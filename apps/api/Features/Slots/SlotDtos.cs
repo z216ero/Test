@@ -9,4 +9,6 @@ public sealed record SlotDto(
     int DurationMinutes,
     string Status,
     string? BookingStatus,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    string? ClientName,
+    string? ClientAvatarUrl);

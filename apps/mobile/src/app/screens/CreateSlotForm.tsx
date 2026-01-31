@@ -27,6 +27,7 @@ type CreateSlotFormProps = {
     options?: RequestInit
   ) => Promise<SlotDto[]>;
   createSlot: (payload: CreateSlotRequest, options?: RequestInit) => Promise<SlotDto>;
+  initialDateIsoLocal?: string;
 };
 
 export function CreateSlotForm({
@@ -36,6 +37,7 @@ export function CreateSlotForm({
   buildQueryKey,
   loadSlots,
   createSlot,
+  initialDateIsoLocal,
 }: CreateSlotFormProps) {
   const {
     datePreset,
@@ -70,6 +72,7 @@ export function CreateSlotForm({
     loadSlots,
     createSlot,
     onAfterSuccess,
+    initialDateIsoLocal,
   });
 
   return (

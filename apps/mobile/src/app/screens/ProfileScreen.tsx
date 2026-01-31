@@ -8,7 +8,7 @@ import { presentApiError } from '../../api/ApiErrorPresenter';
 import { getMe } from '../../api/homeApi';
 import { clearSession } from '../../auth/tokenStorage';
 import { getAccessToken } from '../../auth/tokenStorage';
-import { API_BASE_URL } from '../../config/env';
+import { buildAbsoluteUrl } from '../../utils/url';
 import { t } from '../../i18n';
 import { AppIcon } from '../../ui/AppIcon';
 import type { AppIconName } from '../../ui/icons';
@@ -31,14 +31,6 @@ const getInitials = (name?: string | null) => {
     return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
   }
   return value.slice(0, 2).toUpperCase();
-};
-
-const buildAbsoluteUrl = (path: string): string => {
-  const trimmedBase = API_BASE_URL.endsWith('/')
-    ? API_BASE_URL.slice(0, -1)
-    : API_BASE_URL;
-  const trimmedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${trimmedBase}${trimmedPath}`;
 };
 
 export function ProfileScreen({ navigation }: Props) {

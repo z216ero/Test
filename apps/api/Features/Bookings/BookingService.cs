@@ -206,7 +206,9 @@ public sealed class BookingService(AppDbContext db)
             slot.DurationMinutes,
             slot.Status.ToString(),
             slot.Booking?.Status.ToString(),
-            slot.CreatedAtUtc);
+            slot.CreatedAtUtc,
+            null,
+            null);
 
     private static bool IsBookingConflict(Exception ex)
     {

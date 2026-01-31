@@ -33,7 +33,7 @@ export type ClientTabsParamList = {
 export type TrainerTabsParamList = {
   Home: undefined;
   Schedule: NavigatorScreenParams<ScheduleStackParamList>;
-  CreateSlot: undefined;
+  CreateSlot: { initialDateIsoLocal?: string } | undefined;
   Profile: NavigatorScreenParams<ProfileStackParamList>;
 };
 
@@ -55,7 +55,11 @@ export type AppStackParamList = {
     clientId: string;
   };
   TrainerSlots: { trainerId: string; trainerName: string };
-  CreateSlot: { trainerId: string; trainerName: string };
+  CreateSlot: {
+    trainerId: string;
+    trainerName: string;
+    initialDateIsoLocal?: string;
+  };
 };
 
 export type RootStackParamList = {

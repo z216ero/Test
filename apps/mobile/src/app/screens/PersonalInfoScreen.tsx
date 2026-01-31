@@ -10,7 +10,7 @@ import { presentApiError } from '../../api/ApiErrorPresenter';
 import { unwrap } from '../../api/core';
 import { getMe } from '../../api/homeApi';
 import { getAccessToken } from '../../auth/tokenStorage';
-import { API_BASE_URL } from '../../config/env';
+import { buildAbsoluteUrl } from '../../utils/url';
 import { t } from '../../i18n';
 import { formInputProps, primaryButtonProps, secondaryButtonProps } from '../../ui/formDefaults';
 import { useToast } from '../../ui/feedback/useToast';
@@ -18,14 +18,6 @@ import type { ProfileStackParamList } from '../navigation/types';
 import { useAppMutation, useAppQuery } from '../../query/hooks';
 import { keys } from '../../query/keys';
 import { useQueryClient } from '@tanstack/react-query';
-
-const buildAbsoluteUrl = (path: string): string => {
-  const trimmedBase = API_BASE_URL.endsWith('/')
-    ? API_BASE_URL.slice(0, -1)
-    : API_BASE_URL;
-  const trimmedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${trimmedBase}${trimmedPath}`;
-};
 
 const getInitials = (name?: string | null) => {
   const value = name?.trim();

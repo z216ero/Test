@@ -3,7 +3,7 @@ import {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import type {
   CreateSlotRequest,
@@ -39,6 +39,7 @@ export type UseCreateSlotFormStateArgs = {
   ) => Promise<SlotDto[]>;
   createSlot: (payload: CreateSlotRequest, options?: RequestInit) => Promise<SlotDto>;
   onAfterSuccess: (count: number) => void;
+  initialDateIsoLocal?: string;
 };
 
 export const MULTI_COUNTS = [2, 3, 4] as const;
@@ -50,6 +51,31 @@ const isSameLocalDay = (left: Date, right: Date) =>
   left.getFullYear() === right.getFullYear()
   && left.getMonth() === right.getMonth()
   && left.getDate() === right.getDate();
+
+const parseLocalDate = (value?: string | null): Date | null => {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return startOfLocalDay(parsed);
+};
+
+const resolveDatePreset = (
+  value: Date,
+  today: Date,
+  tomorrow: Date
+): 'today' | 'tomorrow' | 'custom' => {
+  if (isSameLocalDay(value, today)) {
+    return 'today';
+  }
+  if (isSameLocalDay(value, tomorrow)) {
+    return 'tomorrow';
+  }
+  return 'custom';
+};
 
 export const formatTimeLabel = (value: Date): string =>
   new Intl.DateTimeFormat('ru-RU', {
@@ -118,19 +144,26 @@ export const useCreateSlotFormState = ({
   loadSlots,
   createSlot,
   onAfterSuccess,
+  initialDateIsoLocal,
 }: UseCreateSlotFormStateArgs) => {
   const { showToast } = useToast();
-  const [selectedDate, setSelectedDate] = useState(() =>
-    startOfLocalDay(new Date())
-  );
-  const [datePreset, setDatePreset] = useState<'today' | 'tomorrow' | 'custom'>(
-    'today'
-  );
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const initial = parseLocalDate(initialDateIsoLocal);
+    return initial ?? startOfLocalDay(new Date());
+  });
+  const [datePreset, setDatePreset] = useState<'today' | 'tomorrow' | 'custom'>(() => {
+    const today = startOfLocalDay(new Date());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const initial = parseLocalDate(initialDateIsoLocal) ?? today;
+    return resolveDatePreset(initial, today, tomorrow);
+  });
   const [selectedStart, setSelectedStart] = useState<Date | null>(null);
   const [multiEnabled, setMultiEnabled] = useState(false);
   const [multiCount, setMultiCount] = useState<number>(MULTI_COUNTS[0]);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const lastInitialRef = useRef<string | null>(null);
 
   const [todayDate, setTodayDate] = useState(() => startOfLocalDay(new Date()));
   const [tomorrowDate, setTomorrowDate] = useState(() => {
@@ -159,6 +192,22 @@ export const useCreateSlotFormState = ({
       recomputeToday();
     }, [recomputeToday])
   );
+
+  useEffect(() => {
+    if (!initialDateIsoLocal || initialDateIsoLocal === lastInitialRef.current) {
+      return;
+    }
+    const parsed = parseLocalDate(initialDateIsoLocal);
+    if (!parsed) {
+      return;
+    }
+    const today = startOfLocalDay(new Date());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    setSelectedDate(parsed);
+    setDatePreset(resolveDatePreset(parsed, today, tomorrow));
+    lastInitialRef.current = initialDateIsoLocal;
+  }, [initialDateIsoLocal]);
 
   const dateRange = useMemo(() => {
     const startLocal = startOfLocalDay(selectedDate);

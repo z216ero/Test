@@ -82,7 +82,7 @@ public sealed class SlotService(AppDbContext db)
         db.TrainingSlots.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult<SlotDto>.Success(ToDto(entity));
+        return ServiceResult<SlotDto>.Success(ToDto(entity, null, null));
     }
 
     public async Task<ServiceResult<IReadOnlyList<SlotDto>>> GetSlotsAsync(
@@ -137,7 +137,54 @@ public sealed class SlotService(AppDbContext db)
             .OrderBy(s => s.StartsAtUtc)
             .ToListAsync(cancellationToken);
 
-        return ServiceResult<IReadOnlyList<SlotDto>>.Success(slots.Select(ToDto).ToList());
+        if (slots.Count == 0)
+        {
+            return ServiceResult<IReadOnlyList<SlotDto>>.Success([]);
+        }
+
+        var clientIds = slots
+            .Where(slot => slot.Booking is not null)
+            .Select(slot => slot.Booking!.ClientId)
+            .Distinct()
+            .ToList();
+
+        Dictionary<Guid, string> clientNames = [];
+        HashSet<Guid> clientAvatarIds = [];
+
+        if (clientIds.Count > 0)
+        {
+            clientNames = await db.Users
+                .AsNoTracking()
+                .Where(user => clientIds.Contains(user.Id))
+                .Select(user => new { user.Id, user.Name })
+                .ToDictionaryAsync(entry => entry.Id, entry => entry.Name, cancellationToken);
+
+            clientAvatarIds = await db.UserAvatars
+                .AsNoTracking()
+                .Where(avatar => clientIds.Contains(avatar.UserId))
+                .Select(avatar => avatar.UserId)
+                .ToHashSetAsync(cancellationToken);
+        }
+
+        var dtos = slots.Select(slot =>
+        {
+            string? clientName = null;
+            string? clientAvatarUrl = null;
+
+            var clientId = slot.Booking?.ClientId;
+            if (clientId.HasValue && clientNames.TryGetValue(clientId.Value, out var name))
+            {
+                clientName = name;
+                if (clientAvatarIds.Contains(clientId.Value))
+                {
+                    clientAvatarUrl = $"/users/{clientId.Value}/avatar";
+                }
+            }
+
+            return ToDto(slot, clientName, clientAvatarUrl);
+        }).ToList();
+
+        return ServiceResult<IReadOnlyList<SlotDto>>.Success(dtos);
     }
 
     private static bool Overlaps(DateTime newStart, DateTime newEnd, TrainingSlot existing)
@@ -159,7 +206,7 @@ public sealed class SlotService(AppDbContext db)
         };
     }
 
-    private static SlotDto ToDto(TrainingSlot slot)
+    private static SlotDto ToDto(TrainingSlot slot, string? clientName, string? clientAvatarUrl)
         => new(
             slot.Id,
             slot.TrainerId,
@@ -167,5 +214,7 @@ public sealed class SlotService(AppDbContext db)
             slot.DurationMinutes,
             slot.Status.ToString(),
             slot.Booking?.Status.ToString(),
-            slot.CreatedAtUtc);
+            slot.CreatedAtUtc,
+            clientName,
+            clientAvatarUrl);
 }

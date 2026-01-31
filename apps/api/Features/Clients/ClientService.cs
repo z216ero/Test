@@ -112,5 +112,7 @@ public sealed class ClientService(AppDbContext db)
             slot.DurationMinutes,
             slot.Status.ToString(),
             bookingStatus?.ToString(),
-            slot.CreatedAtUtc);
+            slot.CreatedAtUtc,
+            null,
+            null);
 }

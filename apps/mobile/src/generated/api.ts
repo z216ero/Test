@@ -40,6 +40,10 @@ export interface BookingDto {
   clientId?: string;
   status?: string;
   createdAtUtc?: string;
+  /** @nullable */
+  clientName?: string | null;
+  /** @nullable */
+  clientAvatarUrl?: string | null;
 }
 
 export interface ClientProfileDto {
@@ -124,6 +128,10 @@ export interface SlotDto {
   /** @nullable */
   bookingStatus?: string | null;
   createdAtUtc?: string;
+  /** @nullable */
+  clientName?: string | null;
+  /** @nullable */
+  clientAvatarUrl?: string | null;
 }
 
 export interface StringFAnonymousType1 {
@@ -508,6 +516,51 @@ export const getGetUsersMeAvatarUrl = () => {
 export const getUsersMeAvatar = async ( options?: RequestInit): Promise<getUsersMeAvatarResponse> => {
   
   return customFetch<getUsersMeAvatarResponse>(getGetUsersMeAvatarUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getUsersUserIdAvatarResponse200 = {
+  data: Blob
+  status: 200
+}
+
+export type getUsersUserIdAvatarResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getUsersUserIdAvatarResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type getUsersUserIdAvatarResponseSuccess = (getUsersUserIdAvatarResponse200) & {
+  headers: Headers;
+};
+export type getUsersUserIdAvatarResponseError = (getUsersUserIdAvatarResponse401 | getUsersUserIdAvatarResponse404) & {
+  headers: Headers;
+};
+
+export type getUsersUserIdAvatarResponse = (getUsersUserIdAvatarResponseSuccess | getUsersUserIdAvatarResponseError)
+
+export const getGetUsersUserIdAvatarUrl = (userId: string,) => {
+
+
+  
+
+  return `/users/${userId}/avatar`
+}
+
+export const getUsersUserIdAvatar = async (userId: string, options?: RequestInit): Promise<getUsersUserIdAvatarResponse> => {
+  
+  return customFetch<getUsersUserIdAvatarResponse>(getGetUsersUserIdAvatarUrl(userId),
   {      
     ...options,
     method: 'GET'

@@ -8,6 +8,7 @@ import type {
 import {
   getTrainersMe,
   getTrainersTrainerIdSlots,
+  postSlotsSlotIdCancel,
   postSlotsSlotIdComplete,
   postSlotsSlotIdNoShow,
   postTrainersTrainerIdSlots,
@@ -197,6 +198,18 @@ export const markSlotNoShow = async (
   try {
     const response = await postSlotsSlotIdNoShow(slotId, options);
     return unwrap<BookingDto>(response, t('errors.generic'));
+  } catch (error) {
+    throw mapAttendanceError(error);
+  }
+};
+
+export const cancelTrainerSlot = async (
+  slotId: string,
+  options?: RequestInit
+): Promise<SlotDto> => {
+  try {
+    const response = await postSlotsSlotIdCancel(slotId, options);
+    return unwrap<SlotDto>(response, t('errors.generic'));
   } catch (error) {
     throw mapAttendanceError(error);
   }

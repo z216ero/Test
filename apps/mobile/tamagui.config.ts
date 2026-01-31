@@ -1,3 +1,4 @@
+import { createAnimations } from '@tamagui/animations-react-native';
 import { createTamagui } from '@tamagui/core';
 
 const tokens = {
@@ -48,12 +49,29 @@ const tokens = {
     4: 16,
     5: 20,
     6: 24,
+    7: 28
   },
 };
 
 export const config = createTamagui({
   defaultFont: 'body',
   tokens,
+  animations: createAnimations({
+    fast: {
+      damping: 20,
+      mass: 1.2,
+      stiffness: 250,
+    },
+    medium: {
+      damping: 10,
+      mass: 0.9,
+      stiffness: 100,
+    },
+    slow: {
+      damping: 20,
+      stiffness: 60,
+    },
+  }),
   themes: {
     light: {
       background: tokens.color.background,
@@ -91,7 +109,7 @@ export const config = createTamagui({
 export type AppConfig = typeof config;
 
 declare module 'tamagui' {
-  interface TamaguiCustomConfig extends AppConfig {}
+  interface TamaguiCustomConfig extends AppConfig { }
 }
 
 export default config;

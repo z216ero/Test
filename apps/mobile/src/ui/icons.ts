@@ -4,12 +4,15 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  Check,
   CreditCard,
   Home,
   History,
   Info,
   Plus,
   Settings,
+  Slash,
+  Trash2,
   User,
   X,
 } from 'lucide-react-native';
@@ -17,6 +20,7 @@ import {
 export const iconsMap = {
   alertCircle: AlertCircle,
   calendar: Calendar,
+  check: Check,
   chevronLeft: ChevronLeft,
   chevronRight: ChevronRight,
   close: X,
@@ -26,6 +30,8 @@ export const iconsMap = {
   info: Info,
   plus: Plus,
   settings: Settings,
+  slash: Slash,
+  trash: Trash2,
   user: User,
 } as const satisfies Record<string, LucideIcon>;
 
