@@ -47,9 +47,10 @@ const getInitials = (name?: string | null) => {
 type SlotCardProps = {
   slot: SlotDto;
   onPress?: () => void;
+  variant?: 'default' | 'muted';
 };
 
-export function SlotCard({ slot, onPress }: SlotCardProps) {
+export function SlotCard({ slot, onPress, variant = 'default' }: SlotCardProps) {
   const [avatarToken, setAvatarToken] = useState<string | null>(null);
   const statusType = getSlotStatusType(slot);
   const status = statusMeta[statusType];
@@ -80,12 +81,18 @@ export function SlotCard({ slot, onPress }: SlotCardProps) {
     };
   }, []);
 
+  const isMuted = variant === 'muted';
+  const titleColor = isMuted ? '$muted' : status.textColor;
+  const statusColor = isMuted ? '$muted' : status.color;
+  const labelColor = isMuted ? '$muted' : '$muted';
+  const cardBackground = isMuted ? '$surfaceMuted' : '$background';
+
   return (
     <Button
       onPress={onPress}
       disabled={!onPress}
       unstyled
-      backgroundColor="$background"
+      backgroundColor={cardBackground}
       borderRadius="$5"
       borderWidth={1}
       borderColor="$border"
@@ -97,7 +104,7 @@ export function SlotCard({ slot, onPress }: SlotCardProps) {
     >
       <YStack gap="$3">
         <XStack alignItems="center" justifyContent="space-between" width="100%">
-          <Text fontSize="$4" fontWeight="700" color={status.textColor}>
+          <Text fontSize="$4" fontWeight="700" color={titleColor}>
             {timeLabel || t('common.empty')}
           </Text>
           <XStack alignItems="center" gap="$2">
@@ -105,9 +112,9 @@ export function SlotCard({ slot, onPress }: SlotCardProps) {
               width="$1"
               height="$1"
               borderRadius="$6"
-              backgroundColor={status.color}
+              backgroundColor={statusColor}
             />
-            <Text fontSize="$2" color="$muted">
+            <Text fontSize="$2" color={labelColor}>
               {status.label}
             </Text>
           </XStack>
@@ -138,7 +145,7 @@ export function SlotCard({ slot, onPress }: SlotCardProps) {
               )}
             </YStack>
             <YStack gap="$1" flex={1}>
-              <Text fontSize="$4" fontWeight="700" color="$text">
+              <Text fontSize="$4" fontWeight="700" color={isMuted ? '$muted' : '$text'}>
                 {clientName}
               </Text>
               <Text fontSize="$3" color="$muted">

@@ -123,6 +123,10 @@ No integrations with banks.
 - Slot duration is fixed per slot.
 - Overlapping slots are rejected.
 
+### Trainer cancels slot
+- Trainer can cancel an Available slot.
+- Cancelling an Available slot sets slot status to Cancelled.
+
 ### Client booking
 - Client can book ONLY Available slots.
 - Booking must be atomic (no double booking).

@@ -9,7 +9,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, RefreshControl } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
-import { Button, Text, YStack } from 'tamagui';
+import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   attendanceActionsAvailable,
   cancelTrainerSlot,
@@ -31,10 +31,19 @@ import type { ScheduleStackParamList } from '../navigation/types';
 import { DateStrip } from '../components/schedule/DateStrip';
 import { SlotActionsSheet } from '../components/schedule/SlotActionsSheet';
 import { SlotCard } from '../components/schedule/SlotCard';
-import { getSlotStatusType } from '../components/schedule/slotHelpers';
+import {
+  canMarkNoShow,
+  canMarkCompleted,
+  isActiveSlotForMainList,
+  isAttendanceFinalStatus,
+  isFreeSlotPast,
+  CANCEL_FORBIDDEN_WITHIN_MS,
+  getSlotStatusType,
+} from '../components/schedule/slotHelpers';
 import { useQueryClient } from '@tanstack/react-query';
 
 const DATE_RANGE_DAYS = 14;
+const NOW_REFRESH_INTERVAL_MS = 30 * 1000;
 
 const startOfLocalDay = (value: Date) =>
   new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
@@ -76,6 +85,8 @@ export function ScheduleScreen({ navigation }: Props) {
   const [slotMarkers, setSlotMarkers] = useState<Record<string, boolean>>({});
   const [activeSlot, setActiveSlot] = useState<SlotDto | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  const [completedExpanded, setCompletedExpanded] = useState(false);
   const todayRef = useRef(todayDate);
 
   useEffect(() => {
@@ -128,6 +139,16 @@ export function ScheduleScreen({ navigation }: Props) {
     }, [isLoading, refetch])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      setNowTs(Date.now());
+      const intervalId = setInterval(() => {
+        setNowTs(Date.now());
+      }, NOW_REFRESH_INTERVAL_MS);
+      return () => clearInterval(intervalId);
+    }, [])
+  );
+
   const selectedKey = buildDateKey(selectedDate);
 
   useEffect(() => {
@@ -139,6 +160,10 @@ export function ScheduleScreen({ navigation }: Props) {
     }
   }, [slots.length, isLoading, error, selectedKey]);
 
+  useEffect(() => {
+    setCompletedExpanded(false);
+  }, [selectedKey]);
+
   const visibleDates = useMemo(() =>
     Array.from({ length: DATE_RANGE_DAYS }).map((_, index) =>
       addDays(todayDate, index)
@@ -149,12 +174,29 @@ export function ScheduleScreen({ navigation }: Props) {
 
   const sortedSlots = useMemo(() => slots.slice().sort(sortByStart), [slots]);
 
+  const activeSlots = useMemo(
+    () => sortedSlots.filter((slot) => isActiveSlotForMainList(slot, nowTs)),
+    [sortedSlots, nowTs]
+  );
+
+  const isSelectedToday = isSameLocalDay(selectedDate, todayDate);
+
+  const completedTodaySlots = useMemo(() => {
+    if (!isSelectedToday) {
+      return [];
+    }
+    return sortedSlots.filter((slot) => {
+      if (isAttendanceFinalStatus(slot)) {
+        return true;
+      }
+      return getSlotStatusType(slot) === 'available' && isFreeSlotPast(slot, nowTs);
+    });
+  }, [sortedSlots, nowTs, isSelectedToday]);
+
   const counts = useMemo(() => {
     let available = 0;
     let booked = 0;
-    let cancelled = 0;
-
-    sortedSlots.forEach((slot) => {
+    activeSlots.forEach((slot) => {
       const status = getSlotStatusType(slot);
       if (status === 'available') {
         available += 1;
@@ -162,21 +204,18 @@ export function ScheduleScreen({ navigation }: Props) {
       }
       if (status === 'booked') {
         booked += 1;
-        return;
       }
-      cancelled += 1;
     });
 
     return {
       available,
       booked,
-      cancelled,
       active: available + booked,
     };
-  }, [sortedSlots]);
+  }, [activeSlots]);
 
   const summaryLabel = counts.active
-    ? isSameLocalDay(selectedDate, todayDate)
+    ? isSelectedToday
       ? t('schedule.summaryToday', {
         total: counts.active,
         available: counts.available,
@@ -225,7 +264,6 @@ export function ScheduleScreen({ navigation }: Props) {
   };
 
   const openSlot = (slot: SlotDto) => {
-    console.log(slot.id)
     if (!slot.id) {
       return;
     }
@@ -306,13 +344,37 @@ export function ScheduleScreen({ navigation }: Props) {
       return;
     }
 
+    const statusType = getSlotStatusType(slot);
+    const startTs = slot.startsAtUtc ? new Date(slot.startsAtUtc).getTime() : null;
+    const hasValidStart = startTs !== null && !Number.isNaN(startTs);
+    const isBooked = statusType === 'booked';
+    const isFinalAttendance = isAttendanceFinalStatus(slot);
+    const isWithinThirtyMinutes = hasValidStart && nowTs >= startTs - CANCEL_FORBIDDEN_WITHIN_MS;
+
+    const title = isBooked
+      ? isWithinThirtyMinutes
+        ? t('schedule.actions.cancelTrainingConfirmSoonTitle')
+        : t('schedule.actions.cancelTrainingConfirmTitle')
+      : t('schedule.actions.cancelSlotConfirmTitle');
+    const message = isBooked
+      ? isWithinThirtyMinutes
+        ? t('schedule.actions.cancelTrainingConfirmSoonMessage')
+        : t('schedule.actions.cancelTrainingConfirmMessage')
+      : t('schedule.actions.cancelSlotConfirmMessage');
+
+    if (isBooked && isFinalAttendance) {
+      return;
+    }
+
     Alert.alert(
-      t('schedule.actions.cancelSlotConfirmTitle'),
-      t('schedule.actions.cancelSlotConfirmMessage'),
+      title,
+      message,
       [
         { text: t('profile.personal.cancel'), style: 'cancel' },
         {
-          text: t('schedule.actions.cancelSlotConfirm'),
+          text: isBooked
+            ? t('schedule.actions.cancelTrainingConfirm')
+            : t('schedule.actions.cancelSlotConfirm'),
           style: 'destructive',
           onPress: () => cancelMutation.mutate(slot.id as string),
         },
@@ -341,13 +403,51 @@ export function ScheduleScreen({ navigation }: Props) {
 
     return (
       <YStack gap="$4">
-        {sortedSlots.map((slot) => (
+        {activeSlots.map((slot) => (
           <SlotCard
             key={slot.id ?? `${slot.startsAtUtc ?? 'slot'}`}
             slot={slot}
             onPress={slot.id ? () => openSlot(slot) : undefined}
           />
         ))}
+        {isSelectedToday && completedTodaySlots.length > 0 ? (
+          <YStack gap="$3">
+            <Button
+              unstyled
+              backgroundColor="$surfaceMuted"
+              borderWidth={1}
+              borderColor="$border"
+              borderRadius="$4"
+              padding="$3"
+              onPress={() => setCompletedExpanded((prev) => !prev)}
+            >
+              <XStack alignItems="center" justifyContent="space-between">
+                <Text fontSize="$3" fontWeight="600" color="$text">
+                  {t('schedule.completedTodayTitle', { count: completedTodaySlots.length })}
+                </Text>
+                <YStack
+                  style={{
+                    transform: [{ rotate: completedExpanded ? '90deg' : '0deg' }],
+                  }}
+                >
+                  <AppIcon name="chevronRight" size={18} color="$muted" />
+                </YStack>
+              </XStack>
+            </Button>
+            {completedExpanded ? (
+              <YStack gap="$3">
+                {completedTodaySlots.map((slot) => (
+                  <SlotCard
+                    key={slot.id ?? `${slot.startsAtUtc ?? 'slot'}`}
+                    slot={slot}
+                    onPress={undefined}
+                    variant="muted"
+                  />
+                ))}
+              </YStack>
+            ) : null}
+          </YStack>
+        ) : null}
       </YStack>
     );
   };
@@ -433,6 +533,7 @@ export function ScheduleScreen({ navigation }: Props) {
       <SlotActionsSheet
         open={sheetOpen}
         slot={activeSlot}
+        nowTs={nowTs}
         onOpenChange={(open) => {
           if (!open) {
             closeSheet();
@@ -445,13 +546,30 @@ export function ScheduleScreen({ navigation }: Props) {
           if (!slot.id || completeMutation.isPending) {
             return;
           }
+          if (!canMarkCompleted(slot, nowTs)) {
+            return;
+          }
           completeMutation.mutate(slot.id);
         }}
         onMarkNoShow={(slot) => {
           if (!slot.id || noShowMutation.isPending) {
             return;
           }
-          noShowMutation.mutate(slot.id);
+          if (!canMarkNoShow(slot, nowTs)) {
+            return;
+          }
+          Alert.alert(
+            t('schedule.actions.noShowConfirmTitle'),
+            t('schedule.actions.noShowConfirmMessage'),
+            [
+              { text: t('profile.personal.cancel'), style: 'cancel' },
+              {
+                text: t('schedule.actions.noShowConfirm'),
+                style: 'destructive',
+                onPress: () => noShowMutation.mutate(slot.id as string),
+              },
+            ]
+          );
         }}
         isCancelling={cancelMutation.isPending}
         isMarkingCompleted={completeMutation.isPending}

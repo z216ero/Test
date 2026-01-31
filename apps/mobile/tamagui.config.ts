@@ -12,6 +12,7 @@ const tokens = {
     primaryText: '#FFFFFF',
     accent: '#78B792',
     accentText: '#FFFFFF',
+    danger: '#DC2626',
     border: '#E2E8F0',
     borderColorHover: '#E2E8F0',
   },

@@ -104,12 +104,20 @@ public sealed class BookingService(AppDbContext db)
                     "Slot does not exist.");
             }
 
-            if (slot.Status != TrainingSlotStatus.Booked)
+            if (slot.Status == TrainingSlotStatus.Cancelled)
             {
                 return ServiceResult<SlotDto>.Fail(
                     StatusCodes.Status409Conflict,
-                    "Cannot cancel slot",
-                    "Only booked slots can be cancelled.");
+                    "Slot already cancelled",
+                    "This slot has already been cancelled.");
+            }
+
+            if (slot.Status == TrainingSlotStatus.Open)
+            {
+                slot.Status = TrainingSlotStatus.Cancelled;
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return ServiceResult<SlotDto>.Success(ToSlotDto(slot));
             }
 
             if (slot.Booking is not null)
