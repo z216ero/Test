@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react';
 import { RefreshControl } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
+import { AppIcon } from '../../ui/AppIcon';
 import { getMyTrainerSlots } from '../../api/trainerSlotsApi';
 import type { SlotDto } from '../../generated/api';
 import { t } from '../../i18n';
@@ -251,14 +252,26 @@ export function ScheduleScreen({ navigation }: Props) {
         }
       >
         <YStack flex={1} padding="$6" gap="$4">
-          <YStack gap="$2">
-            <Text fontSize="$8" fontWeight="700" color="$text">
-              {t('schedule.title')}
-            </Text>
-            <Text fontSize="$4" color="$muted">
-              {t('schedule.subtitle')}
-            </Text>
-          </YStack>
+          <XStack alignItems="center" justifyContent="space-between" gap="$3">
+            <YStack gap="$2" flex={1}>
+              <Text fontSize="$8" fontWeight="700" color="$text">
+                {t('schedule.title')}
+              </Text>
+              <Text fontSize="$4" color="$muted">
+                {t('schedule.subtitle')}
+              </Text>
+            </YStack>
+            <Button
+              backgroundColor="$background"
+              borderRadius="$4"
+              borderWidth={1}
+              borderColor="$border"
+              padding="$3"
+              onPress={handleCreateSlot}
+            >
+              <AppIcon name="plus" size={18} color="$text" />
+            </Button>
+          </XStack>
           {renderContent()}
         </YStack>
       </ScrollView>
