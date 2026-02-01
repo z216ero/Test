@@ -1,6 +1,6 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
-import { useQueryClient } from '@tanstack/react-query';
+import { type QueryKey, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Image, RefreshControl } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
@@ -27,10 +27,9 @@ import {
   getClientAvatarUrl,
   getClientName,
   getSlotStartTimestamp,
-  getSlotStatusType,
   getSlotTimes,
-  isAttendanceFinalStatus,
   isFreeSlotPast,
+  getUiSlotStatus,
 } from '../../components/schedule/slotHelpers';
 import type { HomeMeState, HomeNavigation, HomeUser } from './types';
 
@@ -143,9 +142,10 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
   }, [trainerSlotsQuery.data, todayDate]);
 
   const activeBookedSlots = useMemo(() =>
-    sortedTodaySlots.filter((slot) =>
-      getSlotStatusType(slot) === 'booked' && !isAttendanceFinalStatus(slot)
-    ), [sortedTodaySlots]
+    sortedTodaySlots.filter((slot) => {
+      const status = getUiSlotStatus(slot, nowTs);
+      return status === 'booked' || status === 'needs_attention';
+    }), [sortedTodaySlots, nowTs]
   );
 
   const currentSlot = useMemo(() =>
@@ -174,8 +174,8 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     let booked = 0;
     let available = 0;
     sortedTodaySlots.forEach((slot) => {
-      const status = getSlotStatusType(slot);
-      if (status === 'booked') {
+      const status = getUiSlotStatus(slot, nowTs);
+      if (status === 'booked' || status === 'needs_attention') {
         booked += 1;
       }
       if (status === 'available' && !isFreeSlotPast(slot, nowTs)) {
@@ -246,13 +246,53 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     };
   }, [avatarToken, profileAvatarAbsolute]);
 
-  const completeMutation = useAppMutation({
+  const updateSlotsCache = useCallback((slotId: string, updater: (slot: SlotDto) => SlotDto) => {
+    queryClient.setQueriesData<SlotDto[]>(
+      { queryKey: keys.trainerSlots.mine() },
+      (current) => {
+        if (!current) {
+          return current;
+        }
+        let changed = false;
+        const next = current.map((slot) => {
+          if (slot.id !== slotId) {
+            return slot;
+          }
+          changed = true;
+          return updater(slot);
+        });
+        return changed ? next : current;
+      }
+    );
+  }, [queryClient]);
+
+  const rollbackSlotsCache = useCallback((snapshot: Array<[QueryKey, SlotDto[] | undefined]>) => {
+    snapshot.forEach(([key, data]) => {
+      queryClient.setQueryData(key, data);
+    });
+  }, [queryClient]);
+
+  type SlotsSnapshot = Array<[QueryKey, SlotDto[] | undefined]>;
+
+  const completeMutation = useAppMutation<unknown, unknown, string, { snapshot: SlotsSnapshot }>({
     mutationFn: (slotId: string) => markSlotCompleted(slotId),
+    onMutate: async (slotId) => {
+      await queryClient.cancelQueries({ queryKey: keys.trainerSlots.mine() });
+      const snapshot = queryClient.getQueriesData<SlotDto[]>({ queryKey: keys.trainerSlots.mine() });
+      updateSlotsCache(slotId, (slot) => ({
+        ...slot,
+        bookingStatus: 'Completed',
+      }));
+      return { snapshot };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       showToast({ type: 'success', title: t('status.completed') });
     },
-    onError: (error) => {
+    onError: (error, _variables, context) => {
+      if (context?.snapshot) {
+        rollbackSlotsCache(context.snapshot);
+      }
       const presented = presentApiError(error);
       showToast({
         type: 'error',
@@ -262,13 +302,25 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     },
   });
 
-  const noShowMutation = useAppMutation({
+  const noShowMutation = useAppMutation<unknown, unknown, string, { snapshot: SlotsSnapshot }>({
     mutationFn: (slotId: string) => markSlotNoShow(slotId),
+    onMutate: async (slotId) => {
+      await queryClient.cancelQueries({ queryKey: keys.trainerSlots.mine() });
+      const snapshot = queryClient.getQueriesData<SlotDto[]>({ queryKey: keys.trainerSlots.mine() });
+      updateSlotsCache(slotId, (slot) => ({
+        ...slot,
+        bookingStatus: 'NoShow',
+      }));
+      return { snapshot };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       showToast({ type: 'success', title: t('status.noShow') });
     },
-    onError: (error) => {
+    onError: (error, _variables, context) => {
+      if (context?.snapshot) {
+        rollbackSlotsCache(context.snapshot);
+      }
       const presented = presentApiError(error);
       showToast({
         type: 'error',

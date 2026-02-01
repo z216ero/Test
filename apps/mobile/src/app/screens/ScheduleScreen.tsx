@@ -38,9 +38,10 @@ import {
   isAttendanceFinalStatus,
   isFreeSlotPast,
   CANCEL_FORBIDDEN_WITHIN_MS,
-  getSlotStatusType,
+  getUiSlotStatus,
+  shouldShowInCompletedToday,
 } from '../components/schedule/slotHelpers';
-import { useQueryClient } from '@tanstack/react-query';
+import { type QueryKey, useQueryClient } from '@tanstack/react-query';
 
 const DATE_RANGE_DAYS = 14;
 const NOW_REFRESH_INTERVAL_MS = 30 * 1000;
@@ -185,24 +186,19 @@ export function ScheduleScreen({ navigation }: Props) {
     if (!isSelectedToday) {
       return [];
     }
-    return sortedSlots.filter((slot) => {
-      if (isAttendanceFinalStatus(slot)) {
-        return true;
-      }
-      return getSlotStatusType(slot) === 'available' && isFreeSlotPast(slot, nowTs);
-    });
-  }, [sortedSlots, nowTs, isSelectedToday]);
+    return sortedSlots.filter((slot) => shouldShowInCompletedToday(slot));
+  }, [sortedSlots, isSelectedToday]);
 
   const counts = useMemo(() => {
     let available = 0;
     let booked = 0;
     activeSlots.forEach((slot) => {
-      const status = getSlotStatusType(slot);
+      const status = getUiSlotStatus(slot, nowTs);
       if (status === 'available') {
         available += 1;
         return;
       }
-      if (status === 'booked') {
+      if (status === 'booked' || status === 'needs_attention') {
         booked += 1;
       }
     });
@@ -276,8 +272,53 @@ export function ScheduleScreen({ navigation }: Props) {
     setActiveSlot(null);
   };
 
-  const cancelMutation = useAppMutation({
+  const updateSlotsCache = useCallback((slotId: string, updater: (slot: SlotDto) => SlotDto) => {
+    queryClient.setQueriesData<SlotDto[]>(
+      { queryKey: keys.trainerSlots.mine() },
+      (current) => {
+        if (!current) {
+          return current;
+        }
+        let changed = false;
+        const next = current.map((slot) => {
+          if (slot.id !== slotId) {
+            return slot;
+          }
+          changed = true;
+          return updater(slot);
+        });
+        return changed ? next : current;
+      }
+    );
+  }, [queryClient]);
+
+  const rollbackSlotsCache = useCallback((snapshot: Array<[QueryKey, SlotDto[] | undefined]>) => {
+    snapshot.forEach(([key, data]) => {
+      queryClient.setQueryData(key, data);
+    });
+  }, [queryClient]);
+
+  type SlotsSnapshot = Array<[QueryKey, SlotDto[] | undefined]>;
+  type SlotsContext = { snapshot: SlotsSnapshot; activeSlot?: SlotDto | null };
+
+  const cancelMutation = useAppMutation<SlotDto, unknown, string, SlotsContext>({
     mutationFn: (slotId: string) => cancelTrainerSlot(slotId),
+    onMutate: async (slotId) => {
+      await queryClient.cancelQueries({ queryKey: keys.trainerSlots.mine() });
+      const snapshot = queryClient.getQueriesData<SlotDto[]>({ queryKey: keys.trainerSlots.mine() });
+      const activeSlotSnapshot = activeSlot;
+      updateSlotsCache(slotId, (slot) => ({
+        ...slot,
+        status: 'Cancelled',
+        bookingStatus: 'Cancelled',
+      }));
+      setActiveSlot((current) =>
+        current && current.id === slotId
+          ? { ...current, status: 'Cancelled', bookingStatus: 'Cancelled' }
+          : current
+      );
+      return { snapshot, activeSlot: activeSlotSnapshot };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
@@ -285,7 +326,13 @@ export function ScheduleScreen({ navigation }: Props) {
       showToast({ type: 'success', title: t('schedule.toast.cancelled') });
       closeSheet();
     },
-    onError: (err) => {
+    onError: (err, _variables, context) => {
+      if (context?.snapshot) {
+        rollbackSlotsCache(context.snapshot);
+      }
+      if (context?.activeSlot) {
+        setActiveSlot(context.activeSlot);
+      }
       const presented = presentApiError(err);
       const message =
         presented.kind === 'conflict' || presented.kind === 'notFound'
@@ -301,8 +348,23 @@ export function ScheduleScreen({ navigation }: Props) {
     },
   });
 
-  const completeMutation = useAppMutation({
+  const completeMutation = useAppMutation<unknown, unknown, string, SlotsContext>({
     mutationFn: (slotId: string) => markSlotCompleted(slotId),
+    onMutate: async (slotId) => {
+      await queryClient.cancelQueries({ queryKey: keys.trainerSlots.mine() });
+      const snapshot = queryClient.getQueriesData<SlotDto[]>({ queryKey: keys.trainerSlots.mine() });
+      const activeSlotSnapshot = activeSlot;
+      updateSlotsCache(slotId, (slot) => ({
+        ...slot,
+        bookingStatus: 'Completed',
+      }));
+      setActiveSlot((current) =>
+        current && current.id === slotId
+          ? { ...current, bookingStatus: 'Completed' }
+          : current
+      );
+      return { snapshot, activeSlot: activeSlotSnapshot };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
@@ -310,7 +372,13 @@ export function ScheduleScreen({ navigation }: Props) {
       showToast({ type: 'success', title: t('status.completed') });
       closeSheet();
     },
-    onError: (err) => {
+    onError: (err, _variables, context) => {
+      if (context?.snapshot) {
+        rollbackSlotsCache(context.snapshot);
+      }
+      if (context?.activeSlot) {
+        setActiveSlot(context.activeSlot);
+      }
       const presented = presentApiError(err);
       showToast({
         type: 'error',
@@ -320,8 +388,23 @@ export function ScheduleScreen({ navigation }: Props) {
     },
   });
 
-  const noShowMutation = useAppMutation({
+  const noShowMutation = useAppMutation<unknown, unknown, string, SlotsContext>({
     mutationFn: (slotId: string) => markSlotNoShow(slotId),
+    onMutate: async (slotId) => {
+      await queryClient.cancelQueries({ queryKey: keys.trainerSlots.mine() });
+      const snapshot = queryClient.getQueriesData<SlotDto[]>({ queryKey: keys.trainerSlots.mine() });
+      const activeSlotSnapshot = activeSlot;
+      updateSlotsCache(slotId, (slot) => ({
+        ...slot,
+        bookingStatus: 'NoShow',
+      }));
+      setActiveSlot((current) =>
+        current && current.id === slotId
+          ? { ...current, bookingStatus: 'NoShow' }
+          : current
+      );
+      return { snapshot, activeSlot: activeSlotSnapshot };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
@@ -329,7 +412,13 @@ export function ScheduleScreen({ navigation }: Props) {
       showToast({ type: 'success', title: t('status.noShow') });
       closeSheet();
     },
-    onError: (err) => {
+    onError: (err, _variables, context) => {
+      if (context?.snapshot) {
+        rollbackSlotsCache(context.snapshot);
+      }
+      if (context?.activeSlot) {
+        setActiveSlot(context.activeSlot);
+      }
       const presented = presentApiError(err);
       showToast({
         type: 'error',
@@ -344,10 +433,10 @@ export function ScheduleScreen({ navigation }: Props) {
       return;
     }
 
-    const statusType = getSlotStatusType(slot);
     const startTs = slot.startsAtUtc ? new Date(slot.startsAtUtc).getTime() : null;
     const hasValidStart = startTs !== null && !Number.isNaN(startTs);
-    const isBooked = statusType === 'booked';
+    const statusRaw = slot.status?.toLowerCase().trim();
+    const isBooked = statusRaw === 'booked';
     const isFinalAttendance = isAttendanceFinalStatus(slot);
     const isWithinThirtyMinutes = hasValidStart && nowTs >= startTs - CANCEL_FORBIDDEN_WITHIN_MS;
 
@@ -407,6 +496,7 @@ export function ScheduleScreen({ navigation }: Props) {
           <SlotCard
             key={slot.id ?? `${slot.startsAtUtc ?? 'slot'}`}
             slot={slot}
+            nowTs={nowTs}
             onPress={slot.id ? () => openSlot(slot) : undefined}
           />
         ))}
@@ -440,6 +530,7 @@ export function ScheduleScreen({ navigation }: Props) {
                   <SlotCard
                     key={slot.id ?? `${slot.startsAtUtc ?? 'slot'}`}
                     slot={slot}
+                    nowTs={nowTs}
                     onPress={undefined}
                     variant="muted"
                   />

@@ -15,19 +15,13 @@ import {
   canMarkNoShow,
   getClientAvatarUrl,
   getClientName,
-  getSlotStatusType,
+  getUiSlotStatus,
   getSlotTimes,
   getSlotStartTimestamp,
-  isAttendanceFinalStatus,
   isFreeSlotPast,
-  type SlotStatusType,
+  isUiSlotStatusFinal,
+  uiSlotStatusMeta,
 } from './slotHelpers';
-
-const statusLabelMap: Record<SlotStatusType, string> = {
-  available: t('schedule.status.available'),
-  booked: t('schedule.status.booked'),
-  cancelled: t('schedule.status.cancelled'),
-};
 
 type SlotActionsSheetProps = {
   open: boolean;
@@ -57,7 +51,10 @@ export function SlotActionsSheet({
   showAttendanceActions,
 }: SlotActionsSheetProps) {
   const [avatarToken, setAvatarToken] = useState<string | null>(null);
-  const statusType = slot ? getSlotStatusType(slot) : null;
+  const statusType = slot ? getUiSlotStatus(slot, nowTs) : null;
+  const statusMeta = statusType ? uiSlotStatusMeta[statusType] : null;
+  const statusLabel = statusMeta ? t(statusMeta.labelKey) : null;
+  const showStatusIcon = statusType === 'needs_attention';
   const times = slot ? getSlotTimes(slot) : null;
   const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : '';
   const clientName = slot ? getClientName(slot) : null;
@@ -86,13 +83,15 @@ export function SlotActionsSheet({
   }, []);
 
   const canMarkAttendance =
-    !!slot?.id && showAttendanceActions && statusType === 'booked';
+    !!slot?.id
+    && showAttendanceActions
+    && (statusType === 'booked' || statusType === 'needs_attention');
   const canShowNoShow = !!slot && canMarkAttendance && canMarkNoShow(slot, nowTs);
   const canShowComplete = !!slot && canMarkAttendance && canMarkCompleted(slot, nowTs);
   const canCancelAvailable = !!slot && canCancelSlot(slot, nowTs);
   const canCancelBooked = !!slot && canCancelBookedSlot(slot, nowTs);
   const isPastFreeSlot = !!slot && isFreeSlotPast(slot, nowTs);
-  const isFinalAttendance = !!slot && isAttendanceFinalStatus(slot);
+  const isFinalAttendance = !!slot && statusType ? isUiSlotStatusFinal(statusType) : false;
   const startTs = slot ? getSlotStartTimestamp(slot) : null;
   const isBeforeStart = startTs !== null && nowTs < startTs;
 
@@ -170,10 +169,21 @@ export function SlotActionsSheet({
                 <Text fontSize="$3" color="$muted">
                   {timeLabel || t('common.empty')}
                 </Text>
-                {statusType && statusType !== 'available' ? (
-                  <Text fontSize="$3" color="$muted">
-                    {statusLabelMap[statusType]}
-                  </Text>
+                {statusLabel ? (
+                  <XStack alignItems="center" gap="$2">
+                    <YStack
+                      width="$1"
+                      height="$1"
+                      borderRadius="$6"
+                      backgroundColor={statusMeta?.dotColor}
+                    />
+                    {showStatusIcon ? (
+                      <AppIcon name="alertCircle" size={12} color={statusMeta?.dotColor} />
+                    ) : null}
+                    <Text fontSize="$3" color={statusMeta?.labelColor ?? '$muted'}>
+                      {statusLabel}
+                    </Text>
+                  </XStack>
                 ) : null}
               </YStack>
             </XStack>
@@ -217,7 +227,7 @@ export function SlotActionsSheet({
               </YStack>
             ) : null}
 
-            {statusType === 'booked' ? (
+            {statusType === 'booked' || statusType === 'needs_attention' ? (
               <YStack gap="$3">
                 {canShowComplete && onMarkCompleted ? (
                   <Button

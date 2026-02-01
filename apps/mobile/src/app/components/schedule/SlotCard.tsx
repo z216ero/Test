@@ -6,31 +6,14 @@ import { t } from '../../../i18n';
 import { formatTimeRangeRu } from '../../../utils/datetime';
 import { buildAbsoluteUrl } from '../../../utils/url';
 import { getAccessToken } from '../../../auth/tokenStorage';
+import { AppIcon } from '../../../ui/AppIcon';
 import {
   getClientAvatarUrl,
   getClientName,
-  getSlotStatusType,
   getSlotTimes,
-  type SlotStatusType,
+  getUiSlotStatus,
+  uiSlotStatusMeta,
 } from './slotHelpers';
-
-const statusMeta: Record<SlotStatusType, { label: string; color: string; textColor: string }> = {
-  available: {
-    label: t('schedule.status.available'),
-    color: '$accent',
-    textColor: '$text',
-  },
-  booked: {
-    label: t('schedule.status.booked'),
-    color: '$primary',
-    textColor: '$text',
-  },
-  cancelled: {
-    label: t('schedule.status.cancelled'),
-    color: '$muted',
-    textColor: '$muted',
-  },
-};
 
 const getInitials = (name?: string | null) => {
   const value = name?.trim();
@@ -46,18 +29,20 @@ const getInitials = (name?: string | null) => {
 
 type SlotCardProps = {
   slot: SlotDto;
+  nowTs: number;
   onPress?: () => void;
   variant?: 'default' | 'muted';
 };
 
-export function SlotCard({ slot, onPress, variant = 'default' }: SlotCardProps) {
+export function SlotCard({ slot, nowTs, onPress, variant = 'default' }: SlotCardProps) {
   const [avatarToken, setAvatarToken] = useState<string | null>(null);
-  const statusType = getSlotStatusType(slot);
-  const status = statusMeta[statusType];
+  const statusType = getUiSlotStatus(slot, nowTs);
+  const status = uiSlotStatusMeta[statusType];
+  const statusLabel = t(status.labelKey);
   const times = getSlotTimes(slot);
   const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : '';
-  const clientName = statusType === 'booked' ? getClientName(slot) : null;
-  const avatarUrl = statusType === 'booked' ? getClientAvatarUrl(slot) : null;
+  const clientName = statusType !== 'available' ? getClientName(slot) : null;
+  const avatarUrl = statusType !== 'available' ? getClientAvatarUrl(slot) : null;
   const resolvedAvatar = avatarUrl ? buildAbsoluteUrl(avatarUrl) : null;
   const avatarSource = useMemo(() => {
     if (!resolvedAvatar || !avatarToken) {
@@ -82,10 +67,18 @@ export function SlotCard({ slot, onPress, variant = 'default' }: SlotCardProps) 
   }, []);
 
   const isMuted = variant === 'muted';
-  const titleColor = isMuted ? '$muted' : status.textColor;
-  const statusColor = isMuted ? '$muted' : status.color;
-  const labelColor = isMuted ? '$muted' : '$muted';
-  const cardBackground = isMuted ? '$surfaceMuted' : '$background';
+  const isNeedsAttention = statusType === 'needs_attention';
+  const titleColor = isMuted ? '$muted' : '$text';
+  const statusColor = status.dotColor;
+  const labelColor = status.labelColor;
+  const baseBackground = isMuted ? '$surfaceMuted' : '$background';
+  const cardBackground = isNeedsAttention && status.backgroundColor
+    ? status.backgroundColor
+    : baseBackground;
+  const borderColor = isNeedsAttention && status.borderColor
+    ? status.borderColor
+    : '$border';
+  const borderWidth = isNeedsAttention ? 2 : 1;
 
   return (
     <Button
@@ -94,8 +87,8 @@ export function SlotCard({ slot, onPress, variant = 'default' }: SlotCardProps) 
       unstyled
       backgroundColor={cardBackground}
       borderRadius="$5"
-      borderWidth={1}
-      borderColor="$border"
+      borderWidth={borderWidth}
+      borderColor={borderColor}
       padding="$4"
       alignItems="stretch"
       justifyContent="flex-start"
@@ -114,8 +107,11 @@ export function SlotCard({ slot, onPress, variant = 'default' }: SlotCardProps) 
               borderRadius="$6"
               backgroundColor={statusColor}
             />
+            {isNeedsAttention ? (
+              <AppIcon name="alertCircle" size={12} color={statusColor} />
+            ) : null}
             <Text fontSize="$2" color={labelColor}>
-              {status.label}
+              {statusLabel}
             </Text>
           </XStack>
         </XStack>
@@ -149,7 +145,7 @@ export function SlotCard({ slot, onPress, variant = 'default' }: SlotCardProps) 
                 {clientName}
               </Text>
               <Text fontSize="$3" color="$muted">
-                {status.label}
+                {statusLabel}
               </Text>
             </YStack>
           </XStack>
