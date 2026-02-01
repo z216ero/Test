@@ -36,7 +36,10 @@ public sealed class UserProfileTests : IClassFixture<ApiPostgresFixture>
 
         var response = await client.PatchAsJsonAsync("/users/me", new UpdateUserRequest(
             "Client Updated",
-            "Ignored"));
+            "Ignored",
+            null,
+            null,
+            null));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var updated = await response.Content.ReadFromJsonAsync<AuthUserDto>();
@@ -66,7 +69,10 @@ public sealed class UserProfileTests : IClassFixture<ApiPostgresFixture>
 
         var response = await client.PatchAsJsonAsync("/users/me", new UpdateUserRequest(
             "Trainer One",
-            "Yoga"));
+            "Yoga",
+            null,
+            new[] { "Full Body" },
+            "All"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var updated = await response.Content.ReadFromJsonAsync<AuthUserDto>();
@@ -95,7 +101,10 @@ public sealed class UserProfileTests : IClassFixture<ApiPostgresFixture>
 
         var response = await client.PatchAsJsonAsync("/users/me", new UpdateUserRequest(
             "Client Two",
-            "ShouldNotPersist"));
+            "ShouldNotPersist",
+            null,
+            null,
+            null));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var updated = await response.Content.ReadFromJsonAsync<AuthUserDto>();

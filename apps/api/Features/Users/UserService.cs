@@ -39,6 +39,24 @@ public sealed class UserService(AppDbContext db)
             profile.Specialization = string.IsNullOrWhiteSpace(request.Specialization)
                 ? null
                 : request.Specialization.Trim();
+
+            profile.About = string.IsNullOrWhiteSpace(request.About)
+                ? null
+                : request.About.Trim();
+
+            if (request.TrainingTypes is not null)
+            {
+                profile.TrainingTypes = request.TrainingTypes;
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ClientGenderPreference)
+                && Enum.TryParse<ClientGenderPreference>(
+                    request.ClientGenderPreference,
+                    true,
+                    out var preference))
+            {
+                profile.ClientGenderPreference = preference;
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);

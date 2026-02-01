@@ -79,6 +79,9 @@ public sealed class AuthService(
                     Specialization = string.IsNullOrWhiteSpace(request.Specialization)
                         ? null
                         : request.Specialization.Trim(),
+                    About = null,
+                    TrainingTypes = Array.Empty<string>(),
+                    ClientGenderPreference = ClientGenderPreference.All,
                     CreatedAtUtc = DateTime.UtcNow
                 });
             }
@@ -232,6 +235,11 @@ public sealed class AuthService(
     {
         string? specialization = null;
         string? gymName = null;
+        string? about = null;
+        IReadOnlyList<string> trainingTypes = Array.Empty<string>();
+        string? clientGenderPreference = null;
+        double? trainerRating = null;
+        int? trainerRatingCount = null;
         var hasAvatar = await db.UserAvatars
             .AsNoTracking()
             .AnyAsync(a => a.UserId == user.Id, cancellationToken);
@@ -244,6 +252,35 @@ public sealed class AuthService(
                 .FirstOrDefaultAsync(t => t.UserId == user.Id, cancellationToken);
             specialization = trainerProfile?.Specialization;
             gymName = trainerProfile?.GymName;
+            about = trainerProfile?.About;
+            if (trainerProfile?.TrainingTypes is { Length: > 0 })
+            {
+                trainingTypes = trainerProfile.TrainingTypes;
+            }
+            clientGenderPreference = trainerProfile?.ClientGenderPreference.ToString();
+
+            if (trainerProfile is not null)
+            {
+                var ratingSample = await db.Bookings
+                    .AsNoTracking()
+                    .Where(b => b.Slot != null
+                        && b.Slot.TrainerId == trainerProfile.Id
+                        && (b.Status == BookingStatus.Completed || b.Status == BookingStatus.NoShow))
+                    .OrderByDescending(b => b.Slot!.StartsAtUtc)
+                    .Take(10)
+                    .Select(b => b.Status)
+                    .ToListAsync(cancellationToken);
+
+                if (ratingSample.Count >= 5)
+                {
+                    var completedCount = ratingSample.Count(status => status == BookingStatus.Completed);
+                    trainerRatingCount = ratingSample.Count;
+                    trainerRating = Math.Round(
+                        completedCount / (double)trainerRatingCount * 5,
+                        1,
+                        MidpointRounding.AwayFromZero);
+                }
+            }
         }
 
         return new AuthUserDto(
@@ -253,6 +290,11 @@ public sealed class AuthService(
             user.Name,
             specialization,
             gymName,
+            about,
+            trainingTypes,
+            clientGenderPreference,
+            trainerRating,
+            trainerRatingCount,
             hasAvatar,
             avatarUrl);
     }

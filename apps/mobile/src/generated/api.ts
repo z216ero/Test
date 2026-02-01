@@ -25,6 +25,16 @@ export interface AuthUserDto {
   specialization?: string | null;
   /** @nullable */
   gymName?: string | null;
+  /** @nullable */
+  about?: string | null;
+  /** @nullable */
+  trainingTypes?: string[] | null;
+  /** @nullable */
+  clientGenderPreference?: string | null;
+  /** @nullable */
+  trainerRating?: number | null;
+  /** @nullable */
+  trainerRatingCount?: number | null;
   hasAvatar?: boolean;
   /** @nullable */
   avatarUrl?: string | null;
@@ -111,6 +121,12 @@ export interface UpdateUserRequest {
   name?: string | null;
   /** @nullable */
   specialization?: string | null;
+  /** @nullable */
+  about?: string | null;
+  /** @nullable */
+  trainingTypes?: string[] | null;
+  /** @nullable */
+  clientGenderPreference?: string | null;
 }
 
 export interface UploadAvatarRequest {

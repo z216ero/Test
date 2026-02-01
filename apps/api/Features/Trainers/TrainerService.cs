@@ -89,6 +89,9 @@ public sealed class TrainerService(AppDbContext db)
             Id = Guid.NewGuid(),
             UserId = userId,
             GymName = string.IsNullOrWhiteSpace(request.GymName) ? null : request.GymName.Trim(),
+            About = null,
+            TrainingTypes = Array.Empty<string>(),
+            ClientGenderPreference = ClientGenderPreference.All,
             CreatedAtUtc = DateTime.UtcNow
         };
 

@@ -16,6 +16,11 @@ public sealed record AuthUserDto(
     string Name,
     string? Specialization,
     string? GymName,
+    string? About,
+    IReadOnlyList<string> TrainingTypes,
+    string? ClientGenderPreference,
+    double? TrainerRating,
+    int? TrainerRatingCount,
     bool HasAvatar,
     string? AvatarUrl);
 

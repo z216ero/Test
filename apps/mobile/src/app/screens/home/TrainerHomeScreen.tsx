@@ -411,6 +411,7 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
         borderRadius="$6"
         borderWidth={1}
         borderColor="$border"
+        minHeight="200"
       >
         <YStack gap="$1">
           <Text fontSize="$4" fontWeight="700" color="$text">

@@ -58,6 +58,10 @@ A user can have ONLY ONE role in MVP.
 - pricePerSession
 - specialization (string, optional)
 - gymName (string, optional)
+- about (string, optional, max 250)
+- trainingTypes (string[], optional; predefined list from product requirements)
+- clientGenderPreference: Men | Women | All (default All)
+- rating (computed for UI; based on last 5–10 completed trainings)
 
 ### ClientProfile
 - userId

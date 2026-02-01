@@ -43,6 +43,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(x => x.Id);
             entity.Property(x => x.GymName)
                 .HasMaxLength(120);
+            entity.Property(x => x.About)
+                .HasMaxLength(250);
+            entity.Property(x => x.TrainingTypes)
+                .HasColumnType("text[]")
+                .IsRequired();
+            entity.Property(x => x.ClientGenderPreference)
+                .HasConversion<string>()
+                .HasMaxLength(12)
+                .HasDefaultValue(ClientGenderPreference.All);
             entity.Property(x => x.UserId)
                 .IsRequired();
             entity.Property(x => x.CreatedAtUtc)

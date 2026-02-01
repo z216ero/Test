@@ -1,5 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Image } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Input, Text, XStack, YStack } from 'tamagui';
@@ -13,6 +14,7 @@ import { getAccessToken } from '../../auth/tokenStorage';
 import { buildAbsoluteUrl } from '../../utils/url';
 import { t } from '../../i18n';
 import { formInputProps, primaryButtonProps, secondaryButtonProps } from '../../ui/formDefaults';
+import { AppIcon } from '../../ui/AppIcon';
 import { useToast } from '../../ui/feedback/useToast';
 import type { ProfileStackParamList } from '../navigation/types';
 import { useAppMutation, useAppQuery } from '../../query/hooks';
@@ -31,6 +33,33 @@ const getInitials = (name?: string | null) => {
   return value.slice(0, 2).toUpperCase();
 };
 
+const trainingTypeOptions = [
+  'Full Body',
+  'Силовая тренировка',
+  'Набор массы',
+  'Похудение',
+  'Функциональная тренировка',
+  'Грудь',
+  'Спина',
+  'Ноги',
+  'Пресс / Core',
+  'Кардио',
+  'HIIT',
+  'Растяжка / Mobility',
+  'Реабилитация',
+] as const;
+
+const trainingTypesPreviewCount = 4;
+
+type ClientGenderPreference = 'Men' | 'Women' | 'All';
+
+const normalizeGenderPreference = (value?: string | null): ClientGenderPreference => {
+  if (value === 'Men' || value === 'Women' || value === 'All') {
+    return value;
+  }
+  return 'All';
+};
+
 type SelectedAvatar = {
   uri: string;
   type: string;
@@ -43,12 +72,18 @@ export function PersonalInfoScreen({ navigation }: Props) {
   const [name, setName] = useState('');
   const [specialization, setSpecialization] = useState('');
   const [email, setEmail] = useState('');
+  const [about, setAbout] = useState('');
+  const [trainingTypes, setTrainingTypes] = useState<string[]>([]);
+  const [trainingTypesExpanded, setTrainingTypesExpanded] = useState(false);
+  const [clientGenderPreference, setClientGenderPreference] =
+    useState<ClientGenderPreference>('All');
   const [selectedAvatar, setSelectedAvatar] = useState<SelectedAvatar | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
   const [avatarToken, setAvatarToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const {
     data: me,
@@ -60,6 +95,11 @@ export function PersonalInfoScreen({ navigation }: Props) {
   });
 
   const isTrainer = me?.role === 'Trainer';
+  const genderOptions: { value: ClientGenderPreference; label: string }[] = [
+    { value: 'Men', label: t('profile.personal.genderMen') },
+    { value: 'Women', label: t('profile.personal.genderWomen') },
+    { value: 'All', label: t('profile.personal.genderAll') },
+  ];
 
   useEffect(() => {
     if (!me) {
@@ -68,6 +108,14 @@ export function PersonalInfoScreen({ navigation }: Props) {
     setName(me.name?.trim() ?? '');
     setSpecialization(me.specialization?.trim() ?? '');
     setEmail(me.email?.trim() ?? '');
+    setAbout(me.about?.trim() ?? '');
+    setTrainingTypes(
+      me.trainingTypes
+        ?.filter((value): value is string => Boolean(value))
+        .filter((value) => trainingTypeOptions.includes(value as (typeof trainingTypeOptions)[number]))
+      ?? []
+    );
+    setClientGenderPreference(normalizeGenderPreference(me.clientGenderPreference));
   }, [me]);
 
   useEffect(() => {
@@ -107,6 +155,22 @@ export function PersonalInfoScreen({ navigation }: Props) {
     }
     return null;
   }, [avatarPreviewUri, avatarToken, avatarUrl]);
+
+  const visibleTrainingTypes = useMemo(() => (
+    trainingTypesExpanded
+      ? trainingTypeOptions
+      : trainingTypeOptions.slice(0, trainingTypesPreviewCount)
+  ), [trainingTypesExpanded]);
+
+  const toggleTrainingType = useCallback((type: string) => {
+    setTrainingTypes((prev) => {
+      const exists = prev.includes(type);
+      const next = exists
+        ? prev.filter((item) => item !== type)
+        : [...prev, type];
+      return trainingTypeOptions.filter((item) => next.includes(item));
+    });
+  }, []);
 
   const handlePickPhoto = async () => {
     setError(null);
@@ -155,6 +219,15 @@ export function PersonalInfoScreen({ navigation }: Props) {
         specialization: isTrainer
           ? specialization.trim() || null
           : undefined,
+        about: isTrainer
+          ? about.trim() || null
+          : undefined,
+        trainingTypes: isTrainer
+          ? trainingTypes
+          : undefined,
+        clientGenderPreference: isTrainer
+          ? clientGenderPreference
+          : undefined,
       };
 
       const response = await patchUsersMe(payload);
@@ -169,7 +242,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
     },
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: keys.auth.me() });
-      showToast({ type: 'success', title: t('profile.personal.save') });
+      showToast({ type: 'success', title: t('profile.personal.updated') });
       navigation.goBack();
     },
     onError: (err) => {
@@ -185,6 +258,10 @@ export function PersonalInfoScreen({ navigation }: Props) {
 
   const handleSave = async () => {
     setError(null);
+    if (isTrainer && trainingTypes.length === 0) {
+      setError(t('profile.personal.trainingTypesRequired'));
+      return;
+    }
     try {
       await saveMutation.mutateAsync();
     } catch {
@@ -197,7 +274,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
       <ScrollView
         contentContainerStyle={{
           padding: 24,
-          paddingBottom: 32,
+          paddingBottom: 32 + tabBarHeight,
         }}
       >
         <YStack gap="$6">
@@ -319,6 +396,142 @@ export function PersonalInfoScreen({ navigation }: Props) {
               </YStack>
             ) : null}
           </YStack>
+
+          {isTrainer ? (
+            <YStack
+              gap="$3"
+              padding="$4"
+              backgroundColor="$background"
+              borderRadius="$5"
+              borderWidth={1}
+              borderColor="$border"
+            >
+              <Text fontSize="$4" fontWeight="700" color="$text">
+                {t('profile.personal.about')}
+              </Text>
+              <Input
+                value={about}
+                onChangeText={setAbout}
+                placeholder={t('profile.personal.aboutPlaceholder')}
+                multiline
+                numberOfLines={4}
+                maxLength={250}
+                {...formInputProps}
+                height={120}
+                textAlignVertical="top"
+              />
+            </YStack>
+          ) : null}
+
+          {isTrainer ? (
+            <YStack
+              gap="$3"
+              padding="$4"
+              backgroundColor="$background"
+              borderRadius="$5"
+              borderWidth={1}
+              borderColor="$border"
+            >
+              <Text fontSize="$4" fontWeight="700" color="$text">
+                {t('profile.personal.trainingTypes')}
+              </Text>
+              <XStack flexWrap="wrap" gap="$2">
+                {visibleTrainingTypes.map((type) => {
+                  const selected = trainingTypes.includes(type);
+                  return (
+                    <Button
+                      key={type}
+                      unstyled
+                      paddingHorizontal="$3"
+                      paddingVertical="$2"
+                      minHeight="$9"
+                      borderRadius="$4"
+                      backgroundColor={selected ? '$accent' : '$background'}
+                      borderWidth={1}
+                      borderColor={selected ? '$accent' : '$border'}
+                      onPress={() => toggleTrainingType(type)}
+                    >
+                      <XStack alignItems="center" gap="$2">
+                        <AppIcon
+                          name="check"
+                          size={16}
+                          color={selected ? '$accentText' : '$muted'}
+                        />
+                        <Text fontSize="$3" color={selected ? '$accentText' : '$text'}>
+                          {type}
+                        </Text>
+                      </XStack>
+                    </Button>
+                  );
+                })}
+              </XStack>
+              {trainingTypeOptions.length > trainingTypesPreviewCount ? (
+                <Button
+                  
+                  minHeight="$2"
+                  backgroundColor="$background"
+                  borderRadius="$4"
+                  borderWidth={1}
+                  borderColor="$border"
+                  onPress={() => setTrainingTypesExpanded((prev) => !prev)}
+                  paddingHorizontal="$3"
+                  
+                  {...secondaryButtonProps}
+                >
+                  <Text fontSize="$3" color="$text">
+                    {trainingTypesExpanded
+                      ? t('profile.personal.trainingTypesHide')
+                      : t('profile.personal.trainingTypesShowMore')}
+                  </Text>
+                </Button>
+              ) : null}
+              <YStack gap="$2">
+                <Text fontSize="$4" fontWeight="700" color="$text">
+                  {t('profile.personal.genderLabel')}
+                </Text>
+                <YStack gap="$2">
+                  {genderOptions.map((option) => {
+                    const selected = clientGenderPreference === option.value;
+                    return (
+                      <Button
+                        key={option.value}
+                        unstyled
+                        backgroundColor="$background"
+                        borderRadius="$4"
+                        borderWidth={1}
+                        borderColor={selected ? '$accent' : '$border'}
+                        padding="$3"
+                        minHeight="$10"
+                        width="100%"
+                        justifyContent="flex-start"
+                        onPress={() => setClientGenderPreference(option.value)}
+                      >
+                        <XStack alignItems="center" gap="$3" flex={1}>
+                          <YStack
+                            width="$4"
+                            height="$4"
+                            borderRadius="$10"
+                            borderWidth={1}
+                            borderColor={selected ? '$accent' : '$border'}
+                            backgroundColor={selected ? '$accent' : '$background'}
+                            alignItems="center"
+                            justifyContent="center"
+                          >
+                            {selected ? (
+                              <AppIcon name="check" size={12} color="$accentText" />
+                            ) : null}
+                          </YStack>
+                          <Text fontSize="$3" color="$text">
+                            {option.label}
+                          </Text>
+                        </XStack>
+                      </Button>
+                    );
+                  })}
+                </YStack>
+              </YStack>
+            </YStack>
+          ) : null}
 
           <YStack gap="$3">
             <Button

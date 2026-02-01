@@ -79,6 +79,16 @@ export function ProfileScreen({ navigation }: Props) {
   const roleLabel =
     role === 'Trainer' ? t('profile.roleTrainer') : t('profile.roleClient');
 
+  const trainerRating = me?.trainerRating;
+  const trainerRatingCount = me?.trainerRatingCount;
+  const showTrainerRating = role === 'Trainer'
+    && typeof trainerRating === 'number'
+    && typeof trainerRatingCount === 'number'
+    && trainerRatingCount > 0;
+  const ratingCaption = showTrainerRating
+    ? t('profile.rating.basedOn', { count: trainerRatingCount })
+    : t('profile.rating.empty');
+
   const name = me?.name?.trim() || t('common.unknownUser');
   const avatarUrl = useMemo(() => {
     if (!me?.avatarUrl) {
@@ -173,43 +183,60 @@ export function ProfileScreen({ navigation }: Props) {
       >
         <YStack gap="$6">
           <YStack gap="$4">
-            <XStack alignItems="center" gap="$4">
-              <YStack
-                width="$11"
-                height="$11"
-                borderRadius="$6"
-                backgroundColor="$background"
-                borderWidth={1}
-                borderColor="$border"
-                alignItems="center"
-                justifyContent="center"
-                overflow="hidden"
-              >
-                {avatarSource ? (
-                  <Image
-                    source={avatarSource}
-                    style={{ width: '100%', height: '100%' }}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <Text fontSize="$5" color="$muted">
-                    {getInitials(me?.name)}
+            <XStack alignItems="flex-start" justifyContent="space-between" gap="$4">
+              <XStack alignItems="center" gap="$4" flex={1}>
+                <YStack
+                  width="$11"
+                  height="$11"
+                  borderRadius="$6"
+                  backgroundColor="$background"
+                  borderWidth={1}
+                  borderColor="$border"
+                  alignItems="center"
+                  justifyContent="center"
+                  overflow="hidden"
+                >
+                  {avatarSource ? (
+                    <Image
+                      source={avatarSource}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Text fontSize="$5" color="$muted">
+                      {getInitials(me?.name)}
+                    </Text>
+                  )}
+                </YStack>
+                <YStack gap="$1" flex={1}>
+                  <Text fontSize="$6" fontWeight="700" color="$text">
+                    {name}
                   </Text>
-                )}
-              </YStack>
-              <YStack gap="$1">
-                <Text fontSize="$6" fontWeight="700" color="$text">
-                  {name}
-                </Text>
-                <Text fontSize="$3" color="$muted">
-                  {roleLabel}
-                </Text>
-                {role === 'Trainer' ? (
                   <Text fontSize="$3" color="$muted">
-                    {me?.specialization?.trim() || t('common.empty')}
+                    {roleLabel}
                   </Text>
-                ) : null}
-              </YStack>
+                  {role === 'Trainer' ? (
+                    <Text fontSize="$3" color="$muted">
+                      {me?.specialization?.trim() || t('common.empty')}
+                    </Text>
+                  ) : null}
+                </YStack>
+              </XStack>
+              {role === 'Trainer' ? (
+                <YStack alignItems="flex-end" gap="$1" maxWidth={160}>
+                  {showTrainerRating ? (
+                    <XStack alignItems="center" gap="$1">
+                      <AppIcon name="star" size={16} color="$accent" />
+                      <Text fontSize="$4" fontWeight="700" color="$text">
+                        {trainerRating.toFixed(1)}
+                      </Text>
+                    </XStack>
+                  ) : null}
+                  <Text fontSize="$2" color="$muted" textAlign="right">
+                    {ratingCaption}
+                  </Text>
+                </YStack>
+              ) : null}
             </XStack>
             {isLoading || loadingToken ? (
               <Text fontSize="$3" color="$muted">

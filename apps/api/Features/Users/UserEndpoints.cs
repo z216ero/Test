@@ -1,3 +1,4 @@
+using Api.Data;
 using Api.Features.Auth;
 using Api.Features.Common;
 
@@ -6,7 +7,26 @@ namespace Api.Features.Users;
 public static class UserEndpoints
 {
     private const int NameMaxLength = 100;
+    private const int AboutMaxLength = 250;
     private const long MaxAvatarBytes = 5 * 1024 * 1024;
+    private const int TrainingTypesMinCount = 1;
+
+    private static readonly Dictionary<string, string> TrainingTypeLookup = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Full Body"] = "Full Body",
+        ["Силовая тренировка"] = "Силовая тренировка",
+        ["Набор массы"] = "Набор массы",
+        ["Похудение"] = "Похудение",
+        ["Функциональная тренировка"] = "Функциональная тренировка",
+        ["Грудь"] = "Грудь",
+        ["Спина"] = "Спина",
+        ["Ноги"] = "Ноги",
+        ["Пресс / Core"] = "Пресс / Core",
+        ["Кардио"] = "Кардио",
+        ["HIIT"] = "HIIT",
+        ["Растяжка / Mobility"] = "Растяжка / Mobility",
+        ["Реабилитация"] = "Реабилитация"
+    };
 
     public static IEndpointRouteBuilder MapUserEndpoints(this IEndpointRouteBuilder app)
     {
@@ -36,6 +56,70 @@ public static class UserEndpoints
                 errors["name"] = new[] { $"Name must be {NameMaxLength} characters or fewer." };
             }
 
+            string? normalizedAbout = null;
+            if (!string.IsNullOrWhiteSpace(request.About))
+            {
+                normalizedAbout = request.About.Trim();
+                if (normalizedAbout.Length > AboutMaxLength)
+                {
+                    errors["about"] = new[] { $"About must be {AboutMaxLength} characters or fewer." };
+                }
+            }
+
+            string[]? normalizedTrainingTypes = null;
+            if (request.TrainingTypes is not null)
+            {
+                var collected = new List<string>();
+                foreach (var type in request.TrainingTypes)
+                {
+                    if (string.IsNullOrWhiteSpace(type))
+                    {
+                        continue;
+                    }
+
+                    var trimmed = type.Trim();
+                    if (!TrainingTypeLookup.TryGetValue(trimmed, out var canonical))
+                    {
+                        errors["trainingTypes"] = new[] { "TrainingTypes contain invalid values." };
+                        break;
+                    }
+
+                    if (!collected.Any(item =>
+                        string.Equals(item, canonical, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        collected.Add(canonical);
+                    }
+                }
+
+                if (!errors.ContainsKey("trainingTypes"))
+                {
+                    if (collected.Count < TrainingTypesMinCount)
+                    {
+                        errors["trainingTypes"] = new[] { "At least one training type is required." };
+                    }
+                    else
+                    {
+                        normalizedTrainingTypes = collected.ToArray();
+                    }
+                }
+            }
+
+            string? normalizedGenderPreference = null;
+            if (!string.IsNullOrWhiteSpace(request.ClientGenderPreference))
+            {
+                if (Enum.TryParse<ClientGenderPreference>(
+                    request.ClientGenderPreference,
+                    true,
+                    out var preference))
+                {
+                    normalizedGenderPreference = preference.ToString();
+                }
+                else
+                {
+                    errors["clientGenderPreference"] = new[] { "Client gender preference is invalid." };
+                }
+            }
+
             if (errors.Count > 0)
             {
                 return Problems.Validation(errors);
@@ -46,7 +130,13 @@ public static class UserEndpoints
                 return Problems.Unauthorized("Unauthorized", "Authentication is required.");
             }
 
-            var normalized = request with { Name = request.Name.Trim() };
+            var normalized = request with
+            {
+                Name = request.Name.Trim(),
+                About = normalizedAbout,
+                TrainingTypes = normalizedTrainingTypes,
+                ClientGenderPreference = normalizedGenderPreference
+            };
             var updateResult = await userService.UpdateProfileAsync(userId, normalized, cancellationToken);
             if (!updateResult.IsSuccess)
             {

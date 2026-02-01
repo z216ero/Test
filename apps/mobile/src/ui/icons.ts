@@ -12,6 +12,7 @@ import {
   Plus,
   Settings,
   Slash,
+  Star,
   Trash2,
   User,
   X,
@@ -31,6 +32,7 @@ export const iconsMap = {
   plus: Plus,
   settings: Settings,
   slash: Slash,
+  star: Star,
   trash: Trash2,
   user: User,
 } as const satisfies Record<string, LucideIcon>;
