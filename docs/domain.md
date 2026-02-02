@@ -50,6 +50,7 @@ A user can have ONLY ONE role in MVP.
 - id
 - role: Trainer | Client
 - name
+- avatar (optional): user profile photo
 - phone or email (auth identifier)
 
 ### TrainerProfile
@@ -57,9 +58,21 @@ A user can have ONLY ONE role in MVP.
 - pricePerSession
 - specialization (string, optional)
 - gymName (string, optional)
+- about (string, optional, max 250)
+- trainingTypes (string[], optional; predefined list from product requirements)
+- clientGenderPreference: Men | Women | All (default All)
+- rating (computed for UI; based on last 5–10 completed trainings)
 
 ### ClientProfile
 - userId
+
+### RefreshToken
+- id
+- userId
+- token
+- expiresAt (UTC)
+- createdAt (UTC)
+- revokedAt (UTC, optional)
 
 ### TrainingSlot
 - id
@@ -113,6 +126,10 @@ No integrations with banks.
 - Trainer creates slots with explicit startAt and endAt.
 - Slot duration is fixed per slot.
 - Overlapping slots are rejected.
+
+### Trainer cancels slot
+- Trainer can cancel an Available slot.
+- Cancelling an Available slot sets slot status to Cancelled.
 
 ### Client booking
 - Client can book ONLY Available slots.
