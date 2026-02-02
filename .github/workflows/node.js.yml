@@ -41,7 +41,7 @@ jobs:
         run: |
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > fitness-release.keystore
 
-      - name: Make gradlew executable
+       - name: Make gradlew executable
         working-directory: apps/mobile/android
         run: chmod +x ./gradlew
 
