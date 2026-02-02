@@ -48,12 +48,9 @@ export interface BookingDto {
   id?: string;
   slotId?: string;
   clientId?: string;
-  status?: string;
+  /** @nullable */
+  status?: string | null;
   createdAtUtc?: string;
-  /** @nullable */
-  clientName?: string | null;
-  /** @nullable */
-  clientAvatarUrl?: string | null;
 }
 
 export interface ClientProfileDto {
@@ -98,6 +95,11 @@ export interface ProblemDetails {
   [key: string]: unknown;
 }
 
+export interface RefreshRequest {
+  /** @nullable */
+  refreshToken?: string | null;
+}
+
 export interface RegisterRequest {
   /** @nullable */
   email?: string | null;
@@ -109,29 +111,6 @@ export interface RegisterRequest {
   name?: string | null;
   /** @nullable */
   specialization?: string | null;
-}
-
-export interface RefreshRequest {
-  /** @nullable */
-  refreshToken?: string | null;
-}
-
-export interface UpdateUserRequest {
-  /** @nullable */
-  name?: string | null;
-  /** @nullable */
-  specialization?: string | null;
-  /** @nullable */
-  about?: string | null;
-  /** @nullable */
-  trainingTypes?: string[] | null;
-  /** @nullable */
-  clientGenderPreference?: string | null;
-}
-
-export interface UploadAvatarRequest {
-  /** @nullable */
-  file?: Blob | null;
 }
 
 export interface SlotDto {
@@ -170,11 +149,30 @@ export interface UpcomingSessionDto {
   trainerName?: string | null;
   /** @nullable */
   trainerSpecialization?: string | null;
+  /** @nullable */
+  trainerAvatarUrl?: string | null;
+}
+
+export interface UpdateUserRequest {
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  specialization?: string | null;
+  /** @nullable */
+  about?: string | null;
+  /** @nullable */
+  trainingTypes?: string[] | null;
+  /** @nullable */
+  clientGenderPreference?: string | null;
 }
 
 export type GetTrainersTrainerIdSlotsParams = {
 fromUtc?: string;
 toUtc?: string;
+};
+
+export type PutUsersMeAvatarBody = {
+  file?: Blob;
 };
 
 export type postAuthRegisterResponse200 = {
@@ -396,197 +394,6 @@ export const postAuthLogout = async (logoutRequest: LogoutRequest, options?: Req
 
 
 
-export type patchUsersMeResponse200 = {
-  data: AuthUserDto
-  status: 200
-}
-
-export type patchUsersMeResponse400 = {
-  data: ProblemDetails
-  status: 400
-}
-
-export type patchUsersMeResponse401 = {
-  data: ProblemDetails
-  status: 401
-}
-
-export type patchUsersMeResponse404 = {
-  data: ProblemDetails
-  status: 404
-}
-    
-export type patchUsersMeResponseSuccess = (patchUsersMeResponse200) & {
-  headers: Headers;
-};
-export type patchUsersMeResponseError = (patchUsersMeResponse400 | patchUsersMeResponse401 | patchUsersMeResponse404) & {
-  headers: Headers;
-};
-
-export type patchUsersMeResponse = (patchUsersMeResponseSuccess | patchUsersMeResponseError)
-
-export const getPatchUsersMeUrl = () => {
-
-
-  
-
-  return `/users/me`
-}
-
-export const patchUsersMe = async (updateUserRequest: UpdateUserRequest, options?: RequestInit): Promise<patchUsersMeResponse> => {
-  
-  return customFetch<patchUsersMeResponse>(getPatchUsersMeUrl(),
-  {      
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      updateUserRequest,)
-  }
-);}
-
-
-
-export type putUsersMeAvatarResponse204 = {
-  data: void
-  status: 204
-}
-
-export type putUsersMeAvatarResponse400 = {
-  data: ProblemDetails
-  status: 400
-}
-
-export type putUsersMeAvatarResponse401 = {
-  data: ProblemDetails
-  status: 401
-}
-    
-export type putUsersMeAvatarResponseSuccess = (putUsersMeAvatarResponse204) & {
-  headers: Headers;
-};
-export type putUsersMeAvatarResponseError = (putUsersMeAvatarResponse400 | putUsersMeAvatarResponse401) & {
-  headers: Headers;
-};
-
-export type putUsersMeAvatarResponse = (putUsersMeAvatarResponseSuccess | putUsersMeAvatarResponseError)
-
-export const getPutUsersMeAvatarUrl = () => {
-
-
-  
-
-  return `/users/me/avatar`
-}
-
-export const putUsersMeAvatar = async (uploadAvatarRequest: UploadAvatarRequest, options?: RequestInit): Promise<putUsersMeAvatarResponse> => {
-    const formData = new FormData();
-if(uploadAvatarRequest.file !== undefined && uploadAvatarRequest.file !== null) {
- formData.append(`file`, uploadAvatarRequest.file)
- }
-
-  return customFetch<putUsersMeAvatarResponse>(getPutUsersMeAvatarUrl(),
-  {      
-    ...options,
-    method: 'PUT'
-    ,
-    body: 
-      formData,
-  }
-);}
-
-
-
-export type getUsersMeAvatarResponse200 = {
-  data: Blob
-  status: 200
-}
-
-export type getUsersMeAvatarResponse401 = {
-  data: ProblemDetails
-  status: 401
-}
-
-export type getUsersMeAvatarResponse404 = {
-  data: ProblemDetails
-  status: 404
-}
-    
-export type getUsersMeAvatarResponseSuccess = (getUsersMeAvatarResponse200) & {
-  headers: Headers;
-};
-export type getUsersMeAvatarResponseError = (getUsersMeAvatarResponse401 | getUsersMeAvatarResponse404) & {
-  headers: Headers;
-};
-
-export type getUsersMeAvatarResponse = (getUsersMeAvatarResponseSuccess | getUsersMeAvatarResponseError)
-
-export const getGetUsersMeAvatarUrl = () => {
-
-
-  
-
-  return `/users/me/avatar`
-}
-
-export const getUsersMeAvatar = async ( options?: RequestInit): Promise<getUsersMeAvatarResponse> => {
-  
-  return customFetch<getUsersMeAvatarResponse>(getGetUsersMeAvatarUrl(),
-  {      
-    ...options,
-    method: 'GET'
-    
-    
-  }
-);}
-
-
-
-export type getUsersUserIdAvatarResponse200 = {
-  data: Blob
-  status: 200
-}
-
-export type getUsersUserIdAvatarResponse401 = {
-  data: ProblemDetails
-  status: 401
-}
-
-export type getUsersUserIdAvatarResponse404 = {
-  data: ProblemDetails
-  status: 404
-}
-    
-export type getUsersUserIdAvatarResponseSuccess = (getUsersUserIdAvatarResponse200) & {
-  headers: Headers;
-};
-export type getUsersUserIdAvatarResponseError = (getUsersUserIdAvatarResponse401 | getUsersUserIdAvatarResponse404) & {
-  headers: Headers;
-};
-
-export type getUsersUserIdAvatarResponse = (getUsersUserIdAvatarResponseSuccess | getUsersUserIdAvatarResponseError)
-
-export const getGetUsersUserIdAvatarUrl = (userId: string,) => {
-
-
-  
-
-  return `/users/${userId}/avatar`
-}
-
-export const getUsersUserIdAvatar = async (userId: string, options?: RequestInit): Promise<getUsersUserIdAvatarResponse> => {
-  
-  return customFetch<getUsersUserIdAvatarResponse>(getGetUsersUserIdAvatarUrl(userId),
-  {      
-    ...options,
-    method: 'GET'
-    
-    
-  }
-);}
-
-
-
 export type postSlotsSlotIdBookResponse201 = {
   data: BookingDto
   status: 201
@@ -649,6 +456,16 @@ export type postSlotsSlotIdCancelResponse400 = {
   status: 400
 }
 
+export type postSlotsSlotIdCancelResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postSlotsSlotIdCancelResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
 export type postSlotsSlotIdCancelResponse404 = {
   data: ProblemDetails
   status: 404
@@ -662,7 +479,7 @@ export type postSlotsSlotIdCancelResponse409 = {
 export type postSlotsSlotIdCancelResponseSuccess = (postSlotsSlotIdCancelResponse200) & {
   headers: Headers;
 };
-export type postSlotsSlotIdCancelResponseError = (postSlotsSlotIdCancelResponse400 | postSlotsSlotIdCancelResponse404 | postSlotsSlotIdCancelResponse409) & {
+export type postSlotsSlotIdCancelResponseError = (postSlotsSlotIdCancelResponse400 | postSlotsSlotIdCancelResponse401 | postSlotsSlotIdCancelResponse403 | postSlotsSlotIdCancelResponse404 | postSlotsSlotIdCancelResponse409) & {
   headers: Headers;
 };
 
@@ -835,7 +652,7 @@ export const getClientsMe = async ( options?: RequestInit): Promise<getClientsMe
 
 
 export type getClientsMeUpcomingResponse200 = {
-  data: UpcomingSessionDto
+  data: UpcomingSessionDto[]
   status: 200
 }
 
@@ -869,6 +686,51 @@ export const getGetClientsMeUpcomingUrl = () => {
 export const getClientsMeUpcoming = async ( options?: RequestInit): Promise<getClientsMeUpcomingResponse> => {
   
   return customFetch<getClientsMeUpcomingResponse>(getGetClientsMeUpcomingUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getClientsMeHistoryResponse200 = {
+  data: UpcomingSessionDto[]
+  status: 200
+}
+
+export type getClientsMeHistoryResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getClientsMeHistoryResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type getClientsMeHistoryResponseSuccess = (getClientsMeHistoryResponse200) & {
+  headers: Headers;
+};
+export type getClientsMeHistoryResponseError = (getClientsMeHistoryResponse401 | getClientsMeHistoryResponse404) & {
+  headers: Headers;
+};
+
+export type getClientsMeHistoryResponse = (getClientsMeHistoryResponseSuccess | getClientsMeHistoryResponseError)
+
+export const getGetClientsMeHistoryUrl = () => {
+
+
+  
+
+  return `/clients/me/history`
+}
+
+export const getClientsMeHistory = async ( options?: RequestInit): Promise<getClientsMeHistoryResponse> => {
+  
+  return customFetch<getClientsMeHistoryResponse>(getGetClientsMeHistoryUrl(),
   {      
     ...options,
     method: 'GET'
@@ -1197,6 +1059,197 @@ export const getGetTrainersUrl = () => {
 export const getTrainers = async ( options?: RequestInit): Promise<getTrainersResponse> => {
   
   return customFetch<getTrainersResponse>(getGetTrainersUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type patchUsersMeResponse200 = {
+  data: AuthUserDto
+  status: 200
+}
+
+export type patchUsersMeResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type patchUsersMeResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type patchUsersMeResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type patchUsersMeResponseSuccess = (patchUsersMeResponse200) & {
+  headers: Headers;
+};
+export type patchUsersMeResponseError = (patchUsersMeResponse400 | patchUsersMeResponse401 | patchUsersMeResponse404) & {
+  headers: Headers;
+};
+
+export type patchUsersMeResponse = (patchUsersMeResponseSuccess | patchUsersMeResponseError)
+
+export const getPatchUsersMeUrl = () => {
+
+
+  
+
+  return `/users/me`
+}
+
+export const patchUsersMe = async (updateUserRequest: UpdateUserRequest, options?: RequestInit): Promise<patchUsersMeResponse> => {
+  
+  return customFetch<patchUsersMeResponse>(getPatchUsersMeUrl(),
+  {      
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateUserRequest,)
+  }
+);}
+
+
+
+export type putUsersMeAvatarResponse204 = {
+  data: void
+  status: 204
+}
+
+export type putUsersMeAvatarResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type putUsersMeAvatarResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+    
+export type putUsersMeAvatarResponseSuccess = (putUsersMeAvatarResponse204) & {
+  headers: Headers;
+};
+export type putUsersMeAvatarResponseError = (putUsersMeAvatarResponse400 | putUsersMeAvatarResponse401) & {
+  headers: Headers;
+};
+
+export type putUsersMeAvatarResponse = (putUsersMeAvatarResponseSuccess | putUsersMeAvatarResponseError)
+
+export const getPutUsersMeAvatarUrl = () => {
+
+
+  
+
+  return `/users/me/avatar`
+}
+
+export const putUsersMeAvatar = async (putUsersMeAvatarBody: PutUsersMeAvatarBody, options?: RequestInit): Promise<putUsersMeAvatarResponse> => {
+    const formData = new FormData();
+if(putUsersMeAvatarBody.file !== undefined) {
+ formData.append(`file`, putUsersMeAvatarBody.file)
+ }
+
+  return customFetch<putUsersMeAvatarResponse>(getPutUsersMeAvatarUrl(),
+  {      
+    ...options,
+    method: 'PUT'
+    ,
+    body: 
+      formData,
+  }
+);}
+
+
+
+export type getUsersMeAvatarResponse200 = {
+  data: void
+  status: 200
+}
+
+export type getUsersMeAvatarResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getUsersMeAvatarResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type getUsersMeAvatarResponseSuccess = (getUsersMeAvatarResponse200) & {
+  headers: Headers;
+};
+export type getUsersMeAvatarResponseError = (getUsersMeAvatarResponse401 | getUsersMeAvatarResponse404) & {
+  headers: Headers;
+};
+
+export type getUsersMeAvatarResponse = (getUsersMeAvatarResponseSuccess | getUsersMeAvatarResponseError)
+
+export const getGetUsersMeAvatarUrl = () => {
+
+
+  
+
+  return `/users/me/avatar`
+}
+
+export const getUsersMeAvatar = async ( options?: RequestInit): Promise<getUsersMeAvatarResponse> => {
+  
+  return customFetch<getUsersMeAvatarResponse>(getGetUsersMeAvatarUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getUsersUserIdAvatarResponse200 = {
+  data: void
+  status: 200
+}
+
+export type getUsersUserIdAvatarResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getUsersUserIdAvatarResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type getUsersUserIdAvatarResponseSuccess = (getUsersUserIdAvatarResponse200) & {
+  headers: Headers;
+};
+export type getUsersUserIdAvatarResponseError = (getUsersUserIdAvatarResponse401 | getUsersUserIdAvatarResponse404) & {
+  headers: Headers;
+};
+
+export type getUsersUserIdAvatarResponse = (getUsersUserIdAvatarResponseSuccess | getUsersUserIdAvatarResponseError)
+
+export const getGetUsersUserIdAvatarUrl = (userId: string,) => {
+
+
+  
+
+  return `/users/${userId}/avatar`
+}
+
+export const getUsersUserIdAvatar = async (userId: string, options?: RequestInit): Promise<getUsersUserIdAvatarResponse> => {
+  
+  return customFetch<getUsersUserIdAvatarResponse>(getGetUsersUserIdAvatarUrl(userId),
   {      
     ...options,
     method: 'GET'

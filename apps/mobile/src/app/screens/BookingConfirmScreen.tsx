@@ -58,6 +58,8 @@ export function BookingConfirmScreen({ navigation, route }: Props) {
         });
       }
       queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
+      queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
+      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Client') });
 
       try {
         await onBookingCreated({
@@ -77,7 +79,7 @@ export function BookingConfirmScreen({ navigation, route }: Props) {
 
       showToast({ type: 'success', title: t('notifications.event.booked') });
       navigation.popToTop();
-      navigation.getParent()?.navigate('Bookings');
+      navigation.getParent()?.navigate('Bookings', { screen: 'BookingsHome' });
     },
     onError: (err) => {
       const presented = presentApiError(err);

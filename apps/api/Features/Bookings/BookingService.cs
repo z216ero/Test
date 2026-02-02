@@ -85,7 +85,11 @@ public sealed class BookingService(AppDbContext db)
         });
     }
 
-    public async Task<ServiceResult<SlotDto>> CancelSlotAsync(Guid slotId, CancellationToken cancellationToken)
+    public async Task<ServiceResult<SlotDto>> CancelSlotAsync(
+        Guid slotId,
+        Guid userId,
+        string? role,
+        CancellationToken cancellationToken)
     {
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
@@ -112,21 +116,115 @@ public sealed class BookingService(AppDbContext db)
                     "This slot has already been cancelled.");
             }
 
-            if (slot.Status == TrainingSlotStatus.Open)
+            var isTrainer = string.Equals(role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase);
+            var isClient = string.Equals(role, UserRoles.Client, StringComparison.OrdinalIgnoreCase);
+
+            if (!isTrainer && !isClient)
             {
-                slot.Status = TrainingSlotStatus.Cancelled;
-                await db.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                return ServiceResult<SlotDto>.Success(ToSlotDto(slot));
+                return ServiceResult<SlotDto>.Fail(
+                    StatusCodes.Status403Forbidden,
+                    "Forbidden",
+                    "User role is not allowed to cancel this slot.");
             }
 
-            if (slot.Booking is not null)
+            if (isTrainer)
             {
+                var trainerProfile = await db.TrainerProfiles
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(t => t.UserId == userId, cancellationToken);
+
+                if (trainerProfile is null)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status404NotFound,
+                        "Trainer profile not found",
+                        "Trainer profile is not available for this user.");
+                }
+
+                if (slot.TrainerId != trainerProfile.Id)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status403Forbidden,
+                        "Forbidden",
+                        "Slot does not belong to this trainer.");
+                }
+
+                if (slot.Booking is null)
+                {
+                    slot.Status = TrainingSlotStatus.Cancelled;
+                    await db.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    return ServiceResult<SlotDto>.Success(ToSlotDto(slot));
+                }
+
+                if (slot.Booking.Status == BookingStatus.Cancelled)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Booking already cancelled",
+                        "This booking has already been cancelled.");
+                }
+
+                if (slot.Booking.Status == BookingStatus.Completed
+                    || slot.Booking.Status == BookingStatus.NoShow)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Booking already closed",
+                        "This booking has already been marked as completed or no-show.");
+                }
+
+                slot.Booking.Status = BookingStatus.Cancelled;
+                slot.Status = TrainingSlotStatus.Cancelled;
+            }
+            else
+            {
+                if (slot.Booking is null)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status404NotFound,
+                        "Booking not found",
+                        "Booking does not exist.");
+                }
+
+                if (slot.Booking.ClientId != userId)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status403Forbidden,
+                        "Forbidden",
+                        "Booking does not belong to this client.");
+                }
+
+                if (slot.Booking.Status != BookingStatus.Booked)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Booking already closed",
+                        "Only booked sessions can be cancelled.");
+                }
+
+                if (slot.Status != TrainingSlotStatus.Booked)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Slot not booked",
+                        "Only booked slots can be cancelled.");
+                }
+
+                var now = DateTime.UtcNow;
+                if (slot.StartsAtUtc <= now)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Booking already started",
+                        "Training has already started.");
+                }
+
                 db.Bookings.Remove(slot.Booking);
                 slot.Booking = null;
+                slot.Status = TrainingSlotStatus.Open;
             }
 
-            slot.Status = TrainingSlotStatus.Open;
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 

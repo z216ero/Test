@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { TextStyle } from 'react-native';
 import { BootstrapScreen } from '../screens/BootstrapScreen';
 import { BookingConfirmScreen } from '../screens/BookingConfirmScreen';
+import { BookingDetailsScreen } from '../screens/BookingDetailsScreen';
 import { BookingsScreen } from '../screens/BookingsScreen';
 import { CreateSlotTabScreen } from '../screens/CreateSlotTabScreen';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -19,6 +20,7 @@ import { TrainerSlotDetailsScreen } from '../screens/TrainerSlotDetailsScreen';
 import type {
   ClientTabsParamList,
   AuthStackParamList,
+  BookingsStackParamList,
   ProfileStackParamList,
   RootStackParamList,
   ScheduleStackParamList,
@@ -37,6 +39,7 @@ const TrainerTabs = createBottomTabNavigator<TrainerTabsParamList>();
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 const SlotsStack = createNativeStackNavigator<SlotsStackParamList>();
 const ScheduleStack = createNativeStackNavigator<ScheduleStackParamList>();
+const BookingsStack = createNativeStackNavigator<BookingsStackParamList>();
 
 const AuthStackNavigator = () => (
   <AuthStack.Navigator>
@@ -65,6 +68,13 @@ const ScheduleStackNavigator = () => (
     <ScheduleStack.Screen name="ScheduleHome" component={ScheduleScreen} />
     <ScheduleStack.Screen name="SlotDetails" component={TrainerSlotDetailsScreen} />
   </ScheduleStack.Navigator>
+);
+
+const BookingsStackNavigator = () => (
+  <BookingsStack.Navigator screenOptions={{ headerShown: false }}>
+    <BookingsStack.Screen name="BookingsHome" component={BookingsScreen} />
+    <BookingsStack.Screen name="BookingDetails" component={BookingDetailsScreen} />
+  </BookingsStack.Navigator>
 );
 
 const tokens = config.tokens;
@@ -125,7 +135,7 @@ const ClientTabsNavigator = () => (
     />
     <ClientTabs.Screen
       name="Bookings"
-      component={BookingsScreen}
+      component={BookingsStackNavigator}
       options={{ title: t('tabs.bookings'), tabBarIcon: makeTabIcon('history') }}
     />
     <ClientTabs.Screen

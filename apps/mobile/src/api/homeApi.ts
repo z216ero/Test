@@ -2,20 +2,20 @@ import type {
   AuthUserDto,
   SlotDto,
   TrainerDto,
-  UpcomingSessionDto,
 } from '../generated/api';
 import {
   getAuthMe,
-  getClientsMeUpcoming,
   getTrainersMe,
   getTrainersTrainerIdSlots,
 } from '../generated/api';
 import { unwrap } from './core';
+import { getClientUpcomingBookings } from './bookingsApi';
 
 export type UpcomingSession = {
   slot: SlotDto;
   trainerName?: string | null;
   specialization?: string | null;
+  trainerAvatarUrl?: string | null;
 };
 
 export const getMe = async (options?: RequestInit): Promise<AuthUserDto> => {
@@ -81,19 +81,29 @@ export const getUpcomingForTrainer = async (
 export const getUpcomingForClient = async (
   options?: RequestInit
 ): Promise<UpcomingSession | null> => {
-  const response = await getClientsMeUpcoming(options);
-  const data = unwrap<UpcomingSessionDto | null>(
-    response,
-    'Unable to load upcoming session.'
-  );
+  const bookings = await getClientUpcomingBookings(options);
+  const sorted = bookings
+    .filter((item) => item.slot?.startsAtUtc)
+    .slice()
+    .sort((a, b) => {
+      const aTime = a.slot.startsAtUtc
+        ? new Date(a.slot.startsAtUtc).getTime()
+        : 0;
+      const bTime = b.slot.startsAtUtc
+        ? new Date(b.slot.startsAtUtc).getTime()
+        : 0;
+      return aTime - bTime;
+    });
 
-  if (!data?.slot) {
+  const upcoming = sorted[0] ?? bookings[0];
+  if (!upcoming?.slot) {
     return null;
   }
 
   return {
-    slot: data.slot,
-    trainerName: data.trainerName,
-    specialization: data.trainerSpecialization,
+    slot: upcoming.slot,
+    trainerName: upcoming.trainerName,
+    specialization: upcoming.trainerSpecialization,
+    trainerAvatarUrl: upcoming.trainerAvatarUrl,
   };
 };

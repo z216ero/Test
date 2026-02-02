@@ -42,6 +42,33 @@ export const formatDateRu = (value: string | Date): string => {
   return raw.replace('.', '');
 };
 
+export const formatDateWithWeekdayRu = (value: string | Date): string => {
+  const date = toDate(value);
+  if (!date) {
+    return '';
+  }
+
+  const parts = new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    weekday: 'short',
+  }).formatToParts(date);
+
+  const day = parts.find((part) => part.type === 'day')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const weekdayRaw = parts.find((part) => part.type === 'weekday')?.value;
+  if (!day || !month) {
+    return '';
+  }
+
+  const cleanedWeekday = weekdayRaw?.replace('.', '') ?? '';
+  const weekday = cleanedWeekday
+    ? cleanedWeekday.charAt(0).toUpperCase() + cleanedWeekday.slice(1)
+    : '';
+
+  return weekday ? `${day} ${month}, ${weekday}` : `${day} ${month}`;
+};
+
 export const formatTimeRangeRu = (
   start: string | Date,
   end: string | Date

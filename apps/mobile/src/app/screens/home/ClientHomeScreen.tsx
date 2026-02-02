@@ -7,6 +7,7 @@ import { t } from '../../../i18n';
 import { useAppQuery } from '../../../query/hooks';
 import { keys } from '../../../query/keys';
 import { AppIcon } from '../../../ui/AppIcon';
+import { TrainerAvatar } from '../../components/bookings/TrainerAvatar';
 import type { HomeMeState, HomeNavigation, HomeUser } from './types';
 
 const formatDate = (utc: string | undefined) => {
@@ -196,19 +197,11 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
           {dateLabel}
         </Text>
         <XStack gap="$3" alignItems="center">
-          <YStack
-            width="$10"
-            height="$10"
-            borderRadius="$6"
-            backgroundColor="$surfaceMuted"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Text fontSize="$4" color="$muted">
-              {upcoming.trainerName?.slice(0, 2).toUpperCase()
-                ?? t('common.initialsPlaceholder')}
-            </Text>
-          </YStack>
+          <TrainerAvatar
+            name={upcoming.trainerName}
+            avatarUrl={upcoming.trainerAvatarUrl}
+            size="$10"
+          />
           <YStack gap="$1">
             {upcoming.trainerName ? (
               <Text fontSize="$4" fontWeight="700" color="$text">
@@ -285,7 +278,7 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
                     return;
                   }
                   if (card.id === 'my-bookings') {
-                    navigation.navigate('Bookings');
+                    navigation.navigate('Bookings', { screen: 'BookingsHome' });
                   }
                 }}
               >

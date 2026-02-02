@@ -6,6 +6,16 @@ export type ScheduleStackParamList = {
   SlotDetails: { slot: SlotDto };
 };
 
+export type BookingsStackParamList = {
+  BookingsHome: undefined;
+  BookingDetails: {
+    slot: SlotDto;
+    trainerName?: string | null;
+    trainerSpecialization?: string | null;
+    trainerAvatarUrl?: string | null;
+  };
+};
+
 export type ProfileStackParamList = {
   ProfileHome: undefined;
   PersonalInfo: undefined;
@@ -26,7 +36,7 @@ export type SlotsStackParamList = {
 export type ClientTabsParamList = {
   Home: undefined;
   Slots: NavigatorScreenParams<SlotsStackParamList>;
-  Bookings: undefined;
+  Bookings: NavigatorScreenParams<BookingsStackParamList>;
   Profile: NavigatorScreenParams<ProfileStackParamList>;
 };
 

@@ -1,4 +1,5 @@
 using Api.Data;
+using Api.Features.Auth;
 using Api.Features.Common;
 using Api.Features.Slots;
 
@@ -48,10 +49,17 @@ public static class BookingEndpoints
 
         group.MapPost("/cancel", async (
             Guid slotId,
+            HttpContext httpContext,
             BookingService service,
             CancellationToken cancellationToken) =>
         {
-            var result = await service.CancelSlotAsync(slotId, cancellationToken);
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            var result = await service.CancelSlotAsync(slotId, userId, role, cancellationToken);
             if (!result.IsSuccess)
             {
                 return Problems.FromServiceError(result.Error!);
@@ -59,8 +67,11 @@ public static class BookingEndpoints
 
             return Results.Ok(result.Value);
         })
+        .RequireAuthorization()
         .Produces<SlotDto>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict);
 

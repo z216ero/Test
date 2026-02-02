@@ -24,6 +24,7 @@ export const keys = {
   },
   bookings: {
     upcoming: () => ['bookings', 'upcoming'] as const,
+    history: () => ['bookings', 'history'] as const,
   },
   slots: {
     available: (params?: GetTrainersTrainerIdSlotsParams) =>

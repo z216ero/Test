@@ -1,18 +1,19 @@
 import type { AuthUserDto, BookingDto, SlotDto, UpcomingSessionDto } from '../generated/api';
 import {
   getAuthMe,
-  getClientsMeUpcoming,
   postSlotsSlotIdBook,
   postSlotsSlotIdCancel,
 } from '../generated/api';
 import { t } from '../i18n';
 import { ApiError, unwrap } from './core';
 import { ApiTimeoutError } from './fetcher';
+import { customFetch } from './custom-fetch';
 
 export type ClientBooking = {
   slot: SlotDto;
   trainerName?: string | null;
   trainerSpecialization?: string | null;
+  trainerAvatarUrl?: string | null;
 };
 
 export class BookingConflictError extends ApiError {}
@@ -84,26 +85,54 @@ export const createBooking = async (
 export const getMyBookings = async (
   options?: RequestInit
 ): Promise<ClientBooking[]> => {
-  const response = await getClientsMeUpcoming(options);
-  const data = unwrap<UpcomingSessionDto | null>(
-    response,
-    t('errors.generic')
-  );
-
-  if (!data?.slot) {
-    return [];
-  }
-
-  return [
-    {
-      slot: data.slot,
-      trainerName: data.trainerName,
-      trainerSpecialization: data.trainerSpecialization,
-    },
-  ];
+  return getClientUpcomingBookings(options);
 };
 
 export const cancelBooking = async (slotId: string): Promise<void> => {
   const response = await postSlotsSlotIdCancel(slotId);
   unwrap<SlotDto>(response, t('errors.generic'));
+};
+
+const mapSessionToBooking = (session: UpcomingSessionDto): ClientBooking | null => {
+  if (!session.slot) {
+    return null;
+  }
+  return {
+    slot: session.slot,
+    trainerName: session.trainerName,
+    trainerSpecialization: session.trainerSpecialization,
+    trainerAvatarUrl: session.trainerAvatarUrl,
+  };
+};
+
+export const getClientUpcomingBookings = async (
+  options?: RequestInit
+): Promise<ClientBooking[]> => {
+  const response = await customFetch<{ status: number; data: UpcomingSessionDto[] }>(
+    '/clients/me/upcoming',
+    {
+      ...options,
+      method: 'GET',
+    }
+  );
+  const data = unwrap<UpcomingSessionDto[]>(response, t('errors.generic'));
+  return data
+    .map(mapSessionToBooking)
+    .filter((item): item is ClientBooking => item !== null);
+};
+
+export const getClientBookingHistory = async (
+  options?: RequestInit
+): Promise<ClientBooking[]> => {
+  const response = await customFetch<{ status: number; data: UpcomingSessionDto[] }>(
+    '/clients/me/history',
+    {
+      ...options,
+      method: 'GET',
+    }
+  );
+  const data = unwrap<UpcomingSessionDto[]>(response, t('errors.generic'));
+  return data
+    .map(mapSessionToBooking)
+    .filter((item): item is ClientBooking => item !== null);
 };
