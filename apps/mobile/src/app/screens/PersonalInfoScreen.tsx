@@ -20,6 +20,7 @@ import type { ProfileStackParamList } from '../navigation/types';
 import { useAppMutation, useAppQuery } from '../../query/hooks';
 import { keys } from '../../query/keys';
 import { useQueryClient } from '@tanstack/react-query';
+import { formatPrice } from '../../utils/price';
 
 const getInitials = (name?: string | null) => {
   const value = name?.trim();
@@ -77,6 +78,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
   const [trainingTypesExpanded, setTrainingTypesExpanded] = useState(false);
   const [clientGenderPreference, setClientGenderPreference] =
     useState<ClientGenderPreference>('All');
+  const [pricePerSession, setPricePerSession] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState<SelectedAvatar | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
   const [avatarToken, setAvatarToken] = useState<string | null>(null);
@@ -95,6 +97,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
   });
 
   const isTrainer = me?.role === 'Trainer';
+  const maxPriceRub = 10_000;
   const genderOptions: { value: ClientGenderPreference; label: string }[] = [
     { value: 'Men', label: t('profile.personal.genderMen') },
     { value: 'Women', label: t('profile.personal.genderWomen') },
@@ -116,6 +119,12 @@ export function PersonalInfoScreen({ navigation }: Props) {
       ?? []
     );
     setClientGenderPreference(normalizeGenderPreference(me.clientGenderPreference));
+    if (typeof me.pricePerSession === 'number') {
+      const rubles = Math.floor(me.pricePerSession / 100);
+      setPricePerSession(Number.isFinite(rubles) ? String(rubles) : '');
+    } else {
+      setPricePerSession('');
+    }
   }, [me]);
 
   useEffect(() => {
@@ -170,6 +179,11 @@ export function PersonalInfoScreen({ navigation }: Props) {
         : [...prev, type];
       return trainingTypeOptions.filter((item) => next.includes(item));
     });
+  }, []);
+
+  const handlePriceChange = useCallback((value: string) => {
+    const normalized = value.replace(/\D/g, '');
+    setPricePerSession(normalized);
   }, []);
 
   const handlePickPhoto = async () => {
@@ -228,6 +242,11 @@ export function PersonalInfoScreen({ navigation }: Props) {
         clientGenderPreference: isTrainer
           ? clientGenderPreference
           : undefined,
+        pricePerSession: isTrainer
+          ? (pricePerSession.trim().length > 0
+            ? Number(pricePerSession) * 100
+            : null)
+          : undefined,
       };
 
       const response = await patchUsersMe(payload);
@@ -261,6 +280,17 @@ export function PersonalInfoScreen({ navigation }: Props) {
     if (isTrainer && trainingTypes.length === 0) {
       setError(t('profile.personal.trainingTypesRequired'));
       return;
+    }
+    if (isTrainer && pricePerSession.trim().length > 0) {
+      const value = Number(pricePerSession);
+      if (!Number.isFinite(value)) {
+        setError(t('profile.personal.priceInvalid'));
+        return;
+      }
+      if (value < 0 || value > maxPriceRub) {
+        setError(t('profile.personal.priceInvalid'));
+        return;
+      }
     }
     try {
       await saveMutation.mutateAsync();
@@ -378,6 +408,31 @@ export function PersonalInfoScreen({ navigation }: Props) {
                   placeholder={t('profile.personal.specialization')}
                   {...formInputProps}
                 />
+              </YStack>
+            ) : null}
+            {isTrainer ? (
+              <YStack gap="$2">
+                <Text fontSize="$3" color="$text">
+                  {t('profile.personal.price')}
+                </Text>
+                <Input
+                  value={pricePerSession}
+                  onChangeText={handlePriceChange}
+                  placeholder={t('profile.personal.pricePlaceholder')}
+                  keyboardType="numeric"
+                  {...formInputProps}
+                />
+                {pricePerSession.trim().length > 0 ? (
+                  <Text fontSize="$2" color="$muted">
+                    {t('profile.personal.pricePreview', {
+                      price: formatPrice(Number(pricePerSession) * 100) ?? '',
+                    })}
+                  </Text>
+                ) : (
+                  <Text fontSize="$2" color="$muted">
+                    {t('profile.personal.priceEmpty')}
+                  </Text>
+                )}
               </YStack>
             ) : null}
             {email ? (

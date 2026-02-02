@@ -11,4 +11,5 @@ public sealed record SlotDto(
     string? BookingStatus,
     DateTime CreatedAtUtc,
     string? ClientName,
-    string? ClientAvatarUrl);
+    string? ClientAvatarUrl,
+    int? TrainerPricePerSession);

@@ -5,6 +5,7 @@ public sealed record UpdateUserRequest(
     string? Specialization,
     string? About,
     string[]? TrainingTypes,
-    string? ClientGenderPreference);
+    string? ClientGenderPreference,
+    int? PricePerSession);
 
 public sealed record UserAvatarResult(string ContentType, byte[] Bytes);

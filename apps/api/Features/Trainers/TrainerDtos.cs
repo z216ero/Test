@@ -6,4 +6,5 @@ public sealed record TrainerDto(
     Guid Id,
     string DisplayName,
     string? GymName,
+    int? PricePerSession,
     DateTime CreatedAtUtc);

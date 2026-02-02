@@ -18,6 +18,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppMutation, useAppQuery } from '../../query/hooks';
 import { keys } from '../../query/keys';
+import { formatPrice } from '../../utils/price';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
 
@@ -90,6 +91,7 @@ export function ProfileScreen({ navigation }: Props) {
     : t('profile.rating.empty');
 
   const name = me?.name?.trim() || t('common.unknownUser');
+  const priceLabel = formatPrice(me?.pricePerSession);
   const avatarUrl = useMemo(() => {
     if (!me?.avatarUrl) {
       return null;
@@ -218,6 +220,13 @@ export function ProfileScreen({ navigation }: Props) {
                   {role === 'Trainer' ? (
                     <Text fontSize="$3" color="$muted">
                       {me?.specialization?.trim() || t('common.empty')}
+                    </Text>
+                  ) : null}
+                  {role === 'Trainer' ? (
+                    <Text fontSize="$3" color="$muted">
+                      {priceLabel
+                        ? t('profile.price.value', { price: priceLabel })
+                        : t('profile.price.empty')}
                     </Text>
                   ) : null}
                 </YStack>

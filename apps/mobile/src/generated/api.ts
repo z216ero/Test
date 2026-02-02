@@ -32,6 +32,8 @@ export interface AuthUserDto {
   /** @nullable */
   clientGenderPreference?: string | null;
   /** @nullable */
+  pricePerSession?: number | null;
+  /** @nullable */
   trainerRating?: number | null;
   /** @nullable */
   trainerRatingCount?: number | null;
@@ -127,6 +129,8 @@ export interface SlotDto {
   clientName?: string | null;
   /** @nullable */
   clientAvatarUrl?: string | null;
+  /** @nullable */
+  trainerPricePerSession?: number | null;
 }
 
 export interface StringFAnonymousType1 {
@@ -140,6 +144,8 @@ export interface TrainerDto {
   displayName?: string | null;
   /** @nullable */
   gymName?: string | null;
+  /** @nullable */
+  pricePerSession?: number | null;
   createdAtUtc?: string;
 }
 
@@ -164,6 +170,8 @@ export interface UpdateUserRequest {
   trainingTypes?: string[] | null;
   /** @nullable */
   clientGenderPreference?: string | null;
+  /** @nullable */
+  pricePerSession?: number | null;
 }
 
 export type GetTrainersTrainerIdSlotsParams = {

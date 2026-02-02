@@ -99,6 +99,7 @@ public sealed class BookingService(AppDbContext db)
 
             var slot = await db.TrainingSlots
                 .Include(s => s.Booking)
+                .Include(s => s.TrainerProfile)
                 .FirstOrDefaultAsync(s => s.Id == slotId, cancellationToken);
             if (slot is null)
             {
@@ -154,7 +155,7 @@ public sealed class BookingService(AppDbContext db)
                     slot.Status = TrainingSlotStatus.Cancelled;
                     await db.SaveChangesAsync(cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
-                    return ServiceResult<SlotDto>.Success(ToSlotDto(slot));
+                    return ServiceResult<SlotDto>.Success(ToSlotDto(slot, slot.TrainerProfile?.PricePerSession));
                 }
 
                 if (slot.Booking.Status == BookingStatus.Cancelled)
@@ -228,7 +229,7 @@ public sealed class BookingService(AppDbContext db)
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            return ServiceResult<SlotDto>.Success(ToSlotDto(slot));
+            return ServiceResult<SlotDto>.Success(ToSlotDto(slot, slot.TrainerProfile?.PricePerSession));
         });
     }
 
@@ -304,7 +305,7 @@ public sealed class BookingService(AppDbContext db)
             booking.Status.ToString(),
             booking.CreatedAtUtc);
 
-    private static SlotDto ToSlotDto(TrainingSlot slot)
+    private static SlotDto ToSlotDto(TrainingSlot slot, int? trainerPricePerSession)
         => new(
             slot.Id,
             slot.TrainerId,
@@ -314,7 +315,8 @@ public sealed class BookingService(AppDbContext db)
             slot.Booking?.Status.ToString(),
             slot.CreatedAtUtc,
             null,
-            null);
+            null,
+            trainerPricePerSession);
 
     private static bool IsBookingConflict(Exception ex)
     {

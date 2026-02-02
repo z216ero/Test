@@ -13,6 +13,7 @@ import { useAppMutation } from '../../query/hooks';
 import { keys } from '../../query/keys';
 import { useToast } from '../../ui/feedback/useToast';
 import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
+import { formatPrice } from '../../utils/price';
 import type { ScheduleStackParamList } from '../navigation/types';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -66,17 +67,6 @@ const getSlotStatus = (slot: SlotDto): string | null => {
   return slot.bookingStatus ?? slot.status ?? null;
 };
 
-const getPriceLabel = (slot: SlotDto): string | null => {
-  const candidate = (slot as SlotDto & { price?: string | number | null }).price;
-  if (candidate === null || candidate === undefined) {
-    return null;
-  }
-  if (typeof candidate === 'number') {
-    return `${candidate}`;
-  }
-  const trimmed = String(candidate).trim();
-  return trimmed.length > 0 ? trimmed : null;
-};
 
 export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   const { slot } = route.params;
@@ -92,7 +82,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   const slotStatus = getSlotStatus(slot);
   const statusLabel = getStatusLabel(slotStatus);
   const clientName = getClientName(slot);
-  const priceLabel = getPriceLabel(slot);
+  const priceLabel = formatPrice(slot.trainerPricePerSession);
 
   const canMark =
     attendanceActionsAvailable && slotStatus === 'Booked' && !!slot.id;
@@ -192,7 +182,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
           ) : null}
           {priceLabel ? (
             <Text fontSize="$3" color="$muted">
-              {priceLabel}
+              {t('slots.priceLabel', { price: priceLabel })}
             </Text>
           ) : null}
         </YStack>
