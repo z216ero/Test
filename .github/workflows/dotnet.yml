@@ -2,7 +2,7 @@ name: Migrate staging database
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main", "master"]
 
 jobs:
   migrate:
