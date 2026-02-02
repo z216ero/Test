@@ -19,6 +19,7 @@ public sealed record AuthUserDto(
     string? About,
     IReadOnlyList<string> TrainingTypes,
     string? ClientGenderPreference,
+    int? PricePerSession,
     double? TrainerRating,
     int? TrainerRatingCount,
     bool HasAvatar,

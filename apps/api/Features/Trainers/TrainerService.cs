@@ -43,6 +43,7 @@ public sealed class TrainerService(AppDbContext db)
             profile.Id,
             profile.User!.Name,
             profile.GymName,
+            profile.PricePerSession,
             profile.CreatedAtUtc));
     }
 
@@ -102,6 +103,7 @@ public sealed class TrainerService(AppDbContext db)
             trainer.Id,
             user.Name,
             trainer.GymName,
+            trainer.PricePerSession,
             trainer.CreatedAtUtc));
     }
 
@@ -113,6 +115,7 @@ public sealed class TrainerService(AppDbContext db)
                 t.Id,
                 t.User!.Name,
                 t.GymName,
+                t.PricePerSession,
                 t.CreatedAtUtc))
             .ToListAsync(cancellationToken);
     }

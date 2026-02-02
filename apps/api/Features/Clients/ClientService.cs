@@ -207,5 +207,6 @@ public sealed class ClientService(AppDbContext db)
             bookingStatus?.ToString(),
             slot.CreatedAtUtc,
             null,
-            null);
+            null,
+            slot.TrainerProfile?.PricePerSession);
 }

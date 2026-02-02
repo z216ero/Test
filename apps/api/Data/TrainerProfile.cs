@@ -5,6 +5,7 @@ public sealed class TrainerProfile
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public AppUser? User { get; set; }
+    public int? PricePerSession { get; set; }
     public string? GymName { get; set; }
     public string? Specialization { get; set; }
     public string? About { get; set; }

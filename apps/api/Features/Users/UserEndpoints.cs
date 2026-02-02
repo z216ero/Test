@@ -10,6 +10,8 @@ public static class UserEndpoints
     private const int AboutMaxLength = 250;
     private const long MaxAvatarBytes = 5 * 1024 * 1024;
     private const int TrainingTypesMinCount = 1;
+    private const int PricePerSessionMin = 0;
+    private const int PricePerSessionMax = 1_000_000;
 
     private static readonly Dictionary<string, string> TrainingTypeLookup = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -117,6 +119,18 @@ public static class UserEndpoints
                 else
                 {
                     errors["clientGenderPreference"] = new[] { "Client gender preference is invalid." };
+                }
+            }
+
+            if (request.PricePerSession.HasValue)
+            {
+                var price = request.PricePerSession.Value;
+                if (price < PricePerSessionMin || price > PricePerSessionMax)
+                {
+                    errors["pricePerSession"] = new[]
+                    {
+                        $"PricePerSession must be between {PricePerSessionMin} and {PricePerSessionMax}."
+                    };
                 }
             }
 

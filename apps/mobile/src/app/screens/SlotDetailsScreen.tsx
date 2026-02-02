@@ -6,9 +6,11 @@ import { presentApiError } from '../../api/ApiErrorPresenter';
 import { unwrap } from '../../api/core';
 import { useAppMutation } from '../../query/hooks';
 import { keys } from '../../query/keys';
+import { t } from '../../i18n';
 import { primaryButtonProps, secondaryButtonProps } from '../../ui/formDefaults';
 import { useToast } from '../../ui/feedback/useToast';
 import { formatUtcRange } from '../../utils/time';
+import { formatPrice } from '../../utils/price';
 import type { AppStackParamList } from '../navigation/types';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -25,6 +27,7 @@ export function SlotDetailsScreen({ route, navigation }: Props) {
     slot.startsAtUtc ?? '',
     slot.durationMinutes ?? 0
   );
+  const priceLabel = formatPrice(slot.trainerPricePerSession);
 
   const bookMutation = useAppMutation({
     mutationFn: async (payload: { slotId: string; clientId: string }) => {
@@ -105,6 +108,11 @@ export function SlotDetailsScreen({ route, navigation }: Props) {
         <Text fontSize="$3" color="$muted">
           Status: {slot.status ?? 'Unknown'}
         </Text>
+        {priceLabel ? (
+          <Text fontSize="$3" color="$muted">
+            {t('slots.priceLabel', { price: priceLabel })}
+          </Text>
+        ) : null}
       </YStack>
       {error ? (
         <Text fontSize="$3" color="$primary">

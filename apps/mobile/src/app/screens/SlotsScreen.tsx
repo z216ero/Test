@@ -13,6 +13,7 @@ import { EmptyState } from '../../ui/states/EmptyState';
 import { ErrorState } from '../../ui/states/ErrorState';
 import { LoadingState } from '../../ui/states/LoadingState';
 import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
+import { formatPrice } from '../../utils/price';
 import type { SlotsStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<SlotsStackParamList, 'SlotsList'>;
@@ -92,6 +93,7 @@ export function SlotsScreen({ navigation }: Props) {
     const trainer = slot.trainerId ? trainersById[slot.trainerId] : undefined;
     const trainerName = trainer?.displayName ?? null;
     const trainerInitials = buildInitials(trainerName);
+    const priceLabel = formatPrice(slot.trainerPricePerSession);
 
     return (
       <YStack
@@ -131,6 +133,11 @@ export function SlotsScreen({ navigation }: Props) {
               </Text>
             </YStack>
           </XStack>
+        ) : null}
+        {priceLabel ? (
+          <Text fontSize="$3" color="$muted">
+            {t('slots.priceLabel', { price: priceLabel })}
+          </Text>
         ) : null}
         <XStack justifyContent="flex-end">
           <Button

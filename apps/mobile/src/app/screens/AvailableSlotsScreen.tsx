@@ -13,6 +13,7 @@ import { EmptyState } from '../../ui/states/EmptyState';
 import { ErrorState } from '../../ui/states/ErrorState';
 import { LoadingState } from '../../ui/states/LoadingState';
 import { formatUtcRange } from '../../utils/time';
+import { formatPrice } from '../../utils/price';
 import type { AppStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AvailableSlots'>;
@@ -76,6 +77,7 @@ export function AvailableSlotsScreen({ route, navigation }: Props) {
             );
             const slotId = slot.id ?? '';
             const canOpen = canBook && slotId.length > 0;
+            const priceLabel = formatPrice(slot.trainerPricePerSession);
             return (
               <YStack
                 key={slot.id ?? `${slot.startsAtUtc ?? 'slot'}-${index}`}
@@ -91,6 +93,11 @@ export function AvailableSlotsScreen({ route, navigation }: Props) {
                 <Text fontSize="$3" color="$muted">
                   Duration: {slot.durationMinutes ?? 0} min
                 </Text>
+                {priceLabel ? (
+                  <Text fontSize="$3" color="$muted">
+                    {t('slots.priceLabel', { price: priceLabel })}
+                  </Text>
+                ) : null}
                 <Button
                   size="$3"
                   backgroundColor="$primary"

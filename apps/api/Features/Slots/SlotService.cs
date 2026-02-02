@@ -45,9 +45,12 @@ public sealed class SlotService(AppDbContext db)
                 "StartsAtUtc must be in the future.");
         }
 
-        var trainerExists = await db.TrainerProfiles
-            .AnyAsync(t => t.Id == trainerId, cancellationToken);
-        if (!trainerExists)
+        var trainerProfile = await db.TrainerProfiles
+            .AsNoTracking()
+            .Where(t => t.Id == trainerId)
+            .Select(t => new { t.Id, t.PricePerSession })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (trainerProfile is null)
         {
             return ServiceResult<SlotDto>.Fail(
                 StatusCodes.Status404NotFound,
@@ -82,7 +85,7 @@ public sealed class SlotService(AppDbContext db)
         db.TrainingSlots.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult<SlotDto>.Success(ToDto(entity, null, null));
+        return ServiceResult<SlotDto>.Success(ToDto(entity, null, null, trainerProfile.PricePerSession));
     }
 
     public async Task<ServiceResult<IReadOnlyList<SlotDto>>> GetSlotsAsync(
@@ -91,9 +94,12 @@ public sealed class SlotService(AppDbContext db)
         DateTime? toUtc,
         CancellationToken cancellationToken)
     {
-        var trainerExists = await db.TrainerProfiles
-            .AnyAsync(t => t.Id == trainerId, cancellationToken);
-        if (!trainerExists)
+        var trainerProfile = await db.TrainerProfiles
+            .AsNoTracking()
+            .Where(t => t.Id == trainerId)
+            .Select(t => new { t.Id, t.PricePerSession })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (trainerProfile is null)
         {
             return ServiceResult<IReadOnlyList<SlotDto>>.Fail(
                 StatusCodes.Status404NotFound,
@@ -181,7 +187,7 @@ public sealed class SlotService(AppDbContext db)
                 }
             }
 
-            return ToDto(slot, clientName, clientAvatarUrl);
+            return ToDto(slot, clientName, clientAvatarUrl, trainerProfile.PricePerSession);
         }).ToList();
 
         return ServiceResult<IReadOnlyList<SlotDto>>.Success(dtos);
@@ -206,7 +212,11 @@ public sealed class SlotService(AppDbContext db)
         };
     }
 
-    private static SlotDto ToDto(TrainingSlot slot, string? clientName, string? clientAvatarUrl)
+    private static SlotDto ToDto(
+        TrainingSlot slot,
+        string? clientName,
+        string? clientAvatarUrl,
+        int? trainerPricePerSession)
         => new(
             slot.Id,
             slot.TrainerId,
@@ -216,5 +226,6 @@ public sealed class SlotService(AppDbContext db)
             slot.Booking?.Status.ToString(),
             slot.CreatedAtUtc,
             clientName,
-            clientAvatarUrl);
+            clientAvatarUrl,
+            trainerPricePerSession);
 }

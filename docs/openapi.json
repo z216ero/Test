@@ -1178,6 +1178,11 @@
             "type": "string",
             "nullable": true
           },
+          "pricePerSession": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
           "trainerRating": {
             "type": "number",
             "format": "double",
@@ -1397,6 +1402,11 @@
           "clientAvatarUrl": {
             "type": "string",
             "nullable": true
+          },
+          "trainerPricePerSession": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -1424,6 +1434,11 @@
           },
           "gymName": {
             "type": "string",
+            "nullable": true
+          },
+          "pricePerSession": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           },
           "createdAtUtc": {
@@ -1478,6 +1493,11 @@
           },
           "clientGenderPreference": {
             "type": "string",
+            "nullable": true
+          },
+          "pricePerSession": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           }
         },

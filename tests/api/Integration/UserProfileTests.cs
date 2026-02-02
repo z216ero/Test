@@ -39,6 +39,7 @@ public sealed class UserProfileTests : IClassFixture<ApiPostgresFixture>
             "Ignored",
             null,
             null,
+            null,
             null));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -72,12 +73,57 @@ public sealed class UserProfileTests : IClassFixture<ApiPostgresFixture>
             "Yoga",
             null,
             new[] { "Full Body" },
-            "All"));
+            "All",
+            150_000));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var updated = await response.Content.ReadFromJsonAsync<AuthUserDto>();
         Assert.NotNull(updated);
         Assert.Equal("Yoga", updated!.Specialization);
+        Assert.Equal(150_000, updated.PricePerSession);
+    }
+
+    [Fact]
+    public async Task PatchUsersMe_WhenTrainer_CanClearPricePerSession()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var registerResponse = await client.PostAsJsonAsync("/auth/register", new RegisterRequest(
+            "trainer-price@example.com",
+            "Password123",
+            "Trainer",
+            "Trainer Price",
+            "Strength"));
+
+        Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
+        var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.NotNull(auth);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+
+        var setResponse = await client.PatchAsJsonAsync("/users/me", new UpdateUserRequest(
+            "Trainer Price",
+            "Strength",
+            null,
+            new[] { "Full Body" },
+            "All",
+            200_000));
+
+        Assert.Equal(HttpStatusCode.OK, setResponse.StatusCode);
+
+        var clearResponse = await client.PatchAsJsonAsync("/users/me", new UpdateUserRequest(
+            "Trainer Price",
+            "Strength",
+            null,
+            new[] { "Full Body" },
+            "All",
+            null));
+
+        Assert.Equal(HttpStatusCode.OK, clearResponse.StatusCode);
+        var updated = await clearResponse.Content.ReadFromJsonAsync<AuthUserDto>();
+        Assert.NotNull(updated);
+        Assert.Null(updated!.PricePerSession);
     }
 
     [Fact]
@@ -102,6 +148,7 @@ public sealed class UserProfileTests : IClassFixture<ApiPostgresFixture>
         var response = await client.PatchAsJsonAsync("/users/me", new UpdateUserRequest(
             "Client Two",
             "ShouldNotPersist",
+            null,
             null,
             null,
             null));

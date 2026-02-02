@@ -57,6 +57,8 @@ public sealed class UserService(AppDbContext db)
             {
                 profile.ClientGenderPreference = preference;
             }
+
+            profile.PricePerSession = request.PricePerSession;
         }
 
         await db.SaveChangesAsync(cancellationToken);

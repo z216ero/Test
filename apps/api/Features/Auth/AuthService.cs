@@ -238,6 +238,7 @@ public sealed class AuthService(
         string? about = null;
         IReadOnlyList<string> trainingTypes = Array.Empty<string>();
         string? clientGenderPreference = null;
+        int? pricePerSession = null;
         double? trainerRating = null;
         int? trainerRatingCount = null;
         var hasAvatar = await db.UserAvatars
@@ -258,6 +259,7 @@ public sealed class AuthService(
                 trainingTypes = trainerProfile.TrainingTypes;
             }
             clientGenderPreference = trainerProfile?.ClientGenderPreference.ToString();
+            pricePerSession = trainerProfile?.PricePerSession;
 
             if (trainerProfile is not null)
             {
@@ -293,6 +295,7 @@ public sealed class AuthService(
             about,
             trainingTypes,
             clientGenderPreference,
+            pricePerSession,
             trainerRating,
             trainerRatingCount,
             hasAvatar,
