@@ -1,7 +1,6 @@
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image } from 'react-native';
-import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { logout } from '../../api/authApi';
 import { presentApiError } from '../../api/ApiErrorPresenter';
@@ -13,7 +12,7 @@ import { t } from '../../i18n';
 import { AppIcon } from '../../ui/AppIcon';
 import type { AppIconName } from '../../ui/icons';
 import type { ProfileStackParamList, RootStackParamList } from '../navigation/types';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { TabScrollView } from '../../ui/layout/TabScrollView';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppMutation, useAppQuery } from '../../query/hooks';
@@ -91,7 +90,6 @@ export function ProfileScreen({ navigation }: Props) {
     : t('profile.rating.empty');
 
   const name = me?.name?.trim() || t('common.unknownUser');
-  const priceLabel = formatPrice(me?.pricePerSession);
   const avatarUrl = useMemo(() => {
     if (!me?.avatarUrl) {
       return null;
@@ -174,15 +172,9 @@ export function ProfileScreen({ navigation }: Props) {
     }
   }, [meError]);
 
-  const tabBarHeight = useBottomTabBarHeight();
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
-      <ScrollView
-        contentContainerStyle={{
-          padding: 24,
-          paddingBottom: 24 + tabBarHeight,
-        }}
-      >
+      <TabScrollView contentContainerStyle={{ padding: 24 }}>
         <YStack gap="$6">
           <YStack gap="$4">
             <XStack alignItems="flex-start" justifyContent="space-between" gap="$4">
@@ -217,18 +209,6 @@ export function ProfileScreen({ navigation }: Props) {
                   <Text fontSize="$3" color="$muted">
                     {roleLabel}
                   </Text>
-                  {role === 'Trainer' ? (
-                    <Text fontSize="$3" color="$muted">
-                      {me?.specialization?.trim() || t('common.empty')}
-                    </Text>
-                  ) : null}
-                  {role === 'Trainer' ? (
-                    <Text fontSize="$3" color="$muted">
-                      {priceLabel
-                        ? t('profile.price.value', { price: priceLabel })
-                        : t('profile.price.empty')}
-                    </Text>
-                  ) : null}
                 </YStack>
               </XStack>
               {role === 'Trainer' ? (
@@ -288,7 +268,7 @@ export function ProfileScreen({ navigation }: Props) {
             ))}
           </YStack>
         </YStack>
-      </ScrollView>
+      </TabScrollView>
       <Button
         backgroundColor="$background"
         borderWidth={1}

@@ -1,6 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
@@ -8,7 +7,6 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, RefreshControl } from 'react-native';
-import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   attendanceActionsAvailable,
@@ -23,6 +21,8 @@ import { t } from '../../i18n';
 import { useAppMutation, useAppQuery } from '../../query/hooks';
 import { keys } from '../../query/keys';
 import { useToast } from '../../ui/feedback/useToast';
+import { useTabBarPadding } from '../../ui/layout/useTabBarPadding';
+import { TabScrollView } from '../../ui/layout/TabScrollView';
 import { AppIcon } from '../../ui/AppIcon';
 import { EmptyState } from '../../ui/states/EmptyState';
 import { ErrorState } from '../../ui/states/ErrorState';
@@ -36,7 +36,6 @@ import {
   canMarkCompleted,
   isActiveSlotForMainList,
   isAttendanceFinalStatus,
-  isFreeSlotPast,
   CANCEL_FORBIDDEN_WITHIN_MS,
   getUiSlotStatus,
   shouldShowInCompletedToday,
@@ -77,7 +76,7 @@ type Props = NativeStackScreenProps<ScheduleStackParamList, 'ScheduleHome'>;
 export function ScheduleScreen({ navigation }: Props) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-  const tabBarHeight = useBottomTabBarHeight();
+  const { contentBottomPadding } = useTabBarPadding();
 
   const [selectedDate, setSelectedDate] = useState(() => startOfLocalDay(new Date()));
   const [todayDate, setTodayDate] = useState(() => startOfLocalDay(new Date()));
@@ -208,7 +207,7 @@ export function ScheduleScreen({ navigation }: Props) {
       booked,
       active: available + booked,
     };
-  }, [activeSlots]);
+  }, [activeSlots, nowTs]);
 
   const summaryLabel = counts.active
     ? isSelectedToday
@@ -545,7 +544,7 @@ export function ScheduleScreen({ navigation }: Props) {
 
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
-      <ScrollView
+      <TabScrollView
         refreshControl={
           <RefreshControl
             refreshing={isFetching && !isLoading}
@@ -554,8 +553,8 @@ export function ScheduleScreen({ navigation }: Props) {
         }
         contentContainerStyle={{
           padding: 24,
-          paddingBottom: tabBarHeight + 96,
         }}
+        extraBottom={72}
       >
         <YStack gap="$4">
           <Text fontSize="$8" fontWeight="700" color="$text">
@@ -604,11 +603,11 @@ export function ScheduleScreen({ navigation }: Props) {
           ) : null}
           {renderContent()}
         </YStack>
-      </ScrollView>
+      </TabScrollView>
       <Button
         position="absolute"
         right="$6"
-        bottom={tabBarHeight + 24}
+        bottom={contentBottomPadding}
         width="$10"
         height="$10"
         borderRadius="$6"

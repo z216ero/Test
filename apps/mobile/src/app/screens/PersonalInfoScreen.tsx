@@ -1,8 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Image } from 'react-native';
-import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Input, Text, XStack, YStack } from 'tamagui';
 import { launchImageLibrary } from 'react-native-image-picker';
 import type { UpdateUserRequest } from '../../generated/api';
@@ -16,6 +14,7 @@ import { t } from '../../i18n';
 import { formInputProps, primaryButtonProps, secondaryButtonProps } from '../../ui/formDefaults';
 import { AppIcon } from '../../ui/AppIcon';
 import { useToast } from '../../ui/feedback/useToast';
+import { TabScrollView } from '../../ui/layout/TabScrollView';
 import type { ProfileStackParamList } from '../navigation/types';
 import { useAppMutation, useAppQuery } from '../../query/hooks';
 import { keys } from '../../query/keys';
@@ -85,7 +84,6 @@ export function PersonalInfoScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-  const tabBarHeight = useBottomTabBarHeight();
 
   const {
     data: me,
@@ -301,11 +299,9 @@ export function PersonalInfoScreen({ navigation }: Props) {
 
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
-      <ScrollView
-        contentContainerStyle={{
-          padding: 24,
-          paddingBottom: 32 + tabBarHeight,
-        }}
+      <TabScrollView
+        contentContainerStyle={{ padding: 24 }}
+        extraBottomToken={2}
       >
         <YStack gap="$6">
           <YStack gap="$2">
@@ -616,7 +612,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
             </Button>
           </YStack>
         </YStack>
-      </ScrollView>
+      </TabScrollView>
     </YStack>
   );
 }

@@ -158,6 +158,7 @@ export function RegisterScreen({ navigation }: Props) {
                   borderRadius="$3"
                   onPress={() => setRole(item)}
                   flex={1}
+                  minHeight="$10"
                 >
                   {item === 'Client' ? t('auth.register.roleClient') : t('auth.register.roleTrainer')}
                 </Button>
@@ -184,6 +185,7 @@ export function RegisterScreen({ navigation }: Props) {
                     borderColor="$border"
                     borderRadius="$3"
                     onPress={() => setSpecialization(item.value)}
+                    minHeight="$9"
                   >
                     {t(item.labelKey)}
                   </Button>

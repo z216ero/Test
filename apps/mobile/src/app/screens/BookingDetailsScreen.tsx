@@ -1,9 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useCallback, useMemo, useState } from 'react';
-import { getTokens } from '@tamagui/core';
-import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { cancelBooking, type ClientBooking } from '../../api/bookingsApi';
 import { ApiError } from '../../api/core';
@@ -15,6 +12,7 @@ import { keys } from '../../query/keys';
 import { useToast } from '../../ui/feedback/useToast';
 import { Banner } from '../../ui/feedback/Banner';
 import { AppIcon } from '../../ui/AppIcon';
+import { TabScrollView } from '../../ui/layout/TabScrollView';
 import { formatDateWithWeekdayRu, formatTimeRangeRu } from '../../utils/datetime';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -37,8 +35,6 @@ const NOW_REFRESH_INTERVAL_MS = 60 * 1000;
 
 export function BookingDetailsScreen({ navigation, route }: Props) {
   const { slot, trainerName, trainerSpecialization, trainerAvatarUrl } = route.params;
-  const tabBarHeight = useBottomTabBarHeight();
-  const tokens = getTokens();
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [networkError, setNetworkError] = useState<PresentedError | null>(null);
   const queryClient = useQueryClient();
@@ -130,11 +126,7 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
 
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
-      <ScrollView
-        contentContainerStyle={{
-          paddingBottom: tabBarHeight + (tokens.space[6]?.val ?? 24),
-        }}
-      >
+      <TabScrollView>
         <YStack gap="$4" padding="$6">
           <Button unstyled onPress={() => navigation.goBack()}>
             <XStack alignItems="center" gap="$2">
@@ -218,7 +210,7 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
             </Button>
           ) : null}
         </YStack>
-      </ScrollView>
+      </TabScrollView>
     </YStack>
   );
 }

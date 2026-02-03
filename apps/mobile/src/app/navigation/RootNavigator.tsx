@@ -28,7 +28,7 @@ import type {
   TrainerTabsParamList,
 } from './types';
 import { Text, YStack } from 'tamagui';
-import { config } from '../../../tamagui.config';
+import { config } from '../../../tamagui.config.cjs';
 import { t } from '../../i18n';
 import { AppIcon } from '../../ui/AppIcon';
 

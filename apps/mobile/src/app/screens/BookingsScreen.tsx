@@ -1,10 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl } from 'react-native';
-import { getTokens } from '@tamagui/core';
-import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   cancelBooking,
@@ -22,6 +19,7 @@ import { useToast } from '../../ui/feedback/useToast';
 import { Banner } from '../../ui/feedback/Banner';
 import { ErrorState } from '../../ui/states/ErrorState';
 import { LoadingState } from '../../ui/states/LoadingState';
+import { TabScrollView } from '../../ui/layout/TabScrollView';
 import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -60,8 +58,6 @@ const buildDateKey = (value: Date): string => {
 };
 
 export function BookingsScreen({ navigation }: Props) {
-  const tabBarHeight = useBottomTabBarHeight();
-  const tokens = getTokens();
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -88,11 +84,14 @@ export function BookingsScreen({ navigation }: Props) {
     }, [])
   );
 
+  const { refetch: refetchUpcoming } = upcomingQuery;
+  const { refetch: refetchHistory } = historyQuery;
+
   useFocusEffect(
     useCallback(() => {
-      upcomingQuery.refetch();
-      historyQuery.refetch();
-    }, [upcomingQuery.refetch, historyQuery.refetch])
+      refetchUpcoming();
+      refetchHistory();
+    }, [refetchUpcoming, refetchHistory])
   );
 
   const handleRefresh = () => {
@@ -218,7 +217,6 @@ export function BookingsScreen({ navigation }: Props) {
     key: string
   ) => {
     const times = getSlotTimes(booking.slot);
-    const dateLabel = times ? formatDateRu(times.start) : t('common.empty');
     const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : t('common.empty');
     const statusType = getBookingStatusType(booking.slot);
     const statusMeta = bookingStatusMeta[statusType];
@@ -410,16 +408,13 @@ export function BookingsScreen({ navigation }: Props) {
 
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
-      <ScrollView
+      <TabScrollView
         refreshControl={
           <RefreshControl
             refreshing={activeFetching && !activeLoading}
             onRefresh={handleRefresh}
           />
         }
-        contentContainerStyle={{
-          paddingBottom: tabBarHeight + (tokens.space[6]?.val ?? 24),
-        }}
       >
         <YStack gap="$4" padding="$6">
           <Text fontSize="$8" fontWeight="700" color="$text">
@@ -471,7 +466,7 @@ export function BookingsScreen({ navigation }: Props) {
           ) : null}
           {renderContent()}
         </YStack>
-      </ScrollView>
+      </TabScrollView>
     </YStack>
   );
 }
