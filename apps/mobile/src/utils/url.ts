@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../config/env';
+import { API_BASE_URL } from '@config/env';
 
 export const buildAbsoluteUrl = (path: string): string => {
   if (path.startsWith('http://') || path.startsWith('https://')) {
@@ -13,3 +13,4 @@ export const buildAbsoluteUrl = (path: string): string => {
 
 export const buildAvatarUrl = (userId: string): string =>
   buildAbsoluteUrl(`/users/${userId}/avatar`);
+

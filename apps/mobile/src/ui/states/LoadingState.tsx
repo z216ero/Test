@@ -1,5 +1,5 @@
 import { Spinner, Text, XStack, YStack } from 'tamagui';
-import { t } from '../../i18n';
+import { t } from '@i18n';
 
 type LoadingStateProps = {
   label?: string;
@@ -19,3 +19,4 @@ export function LoadingState({
     </YStack>
   );
 }
+

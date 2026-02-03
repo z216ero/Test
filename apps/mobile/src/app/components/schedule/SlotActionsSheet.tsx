@@ -2,12 +2,12 @@ import { Sheet } from '@tamagui/sheet';
 import { useEffect, useMemo, useState } from 'react';
 import { Image } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import type { SlotDto } from '../../../generated/api';
-import { t } from '../../../i18n';
-import { formatTimeRangeRu } from '../../../utils/datetime';
-import { getAccessToken } from '../../../auth/tokenStorage';
-import { AppIcon } from '../../../ui/AppIcon';
-import { buildAbsoluteUrl } from '../../../utils/url';
+import type { SlotDto } from '@generated/api';
+import { t } from '@i18n';
+import { formatTimeRangeRu } from '@utils/datetime';
+import { getAccessToken } from '@auth/tokenStorage';
+import { AppIcon } from '@ui/AppIcon';
+import { buildAbsoluteUrl } from '@utils/url';
 import {
   canCancelBookedSlot,
   canCancelSlot,
@@ -348,3 +348,5 @@ export function SlotActionsSheet({
     </Sheet>
   );
 }
+
+

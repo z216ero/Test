@@ -2,12 +2,12 @@ import { useMemo } from 'react';
 import { RefreshControl } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { getUpcomingForClient } from '../../../api/homeApi';
-import { t } from '../../../i18n';
-import { useAppQuery } from '../../../query/hooks';
-import { keys } from '../../../query/keys';
-import { AppIcon } from '../../../ui/AppIcon';
-import { TrainerAvatar } from '../../components/bookings/TrainerAvatar';
+import { getUpcomingForClient } from '@api/homeApi';
+import { t } from '@i18n';
+import { useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
+import { AppIcon } from '@ui/AppIcon';
+import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 import type { HomeMeState, HomeNavigation, HomeUser } from './types';
 
 const formatDate = (utc: string | undefined) => {
@@ -311,3 +311,6 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
     </YStack>
   );
 }
+
+
+

@@ -3,23 +3,23 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image } from 'react-native';
 import { Button, Input, Text, XStack, YStack } from 'tamagui';
 import { launchImageLibrary } from 'react-native-image-picker';
-import type { UpdateUserRequest } from '../../generated/api';
-import { patchUsersMe, putUsersMeAvatar } from '../../generated/api';
-import { presentApiError } from '../../api/ApiErrorPresenter';
-import { unwrap } from '../../api/core';
-import { getMe } from '../../api/homeApi';
-import { getAccessToken } from '../../auth/tokenStorage';
-import { buildAbsoluteUrl } from '../../utils/url';
-import { t } from '../../i18n';
-import { formInputProps, primaryButtonProps, secondaryButtonProps } from '../../ui/formDefaults';
-import { AppIcon } from '../../ui/AppIcon';
-import { useToast } from '../../ui/feedback/useToast';
-import { TabScrollView } from '../../ui/layout/TabScrollView';
-import type { ProfileStackParamList } from '../navigation/types';
-import { useAppMutation, useAppQuery } from '../../query/hooks';
-import { keys } from '../../query/keys';
+import type { UpdateUserRequest } from '@generated/api';
+import { patchUsersMe, putUsersMeAvatar } from '@generated/api';
+import { presentApiError } from '@api/ApiErrorPresenter';
+import { unwrap } from '@api/core';
+import { getMe } from '@api/homeApi';
+import { getAccessToken } from '@auth/tokenStorage';
+import { buildAbsoluteUrl } from '@utils/url';
+import { t } from '@i18n';
+import { formInputProps, primaryButtonProps, secondaryButtonProps } from '@ui/formDefaults';
+import { AppIcon } from '@ui/AppIcon';
+import { useToast } from '@ui/feedback/useToast';
+import { TabScrollView } from '@ui/layout/TabScrollView';
+import type { ProfileStackParamList } from '@app/navigation/types';
+import { useAppMutation, useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
 import { useQueryClient } from '@tanstack/react-query';
-import { formatPrice } from '../../utils/price';
+import { formatPrice } from '@utils/price';
 
 const getInitials = (name?: string | null) => {
   const value = name?.trim();
@@ -616,3 +616,6 @@ export function PersonalInfoScreen({ navigation }: Props) {
     </YStack>
   );
 }
+
+
+

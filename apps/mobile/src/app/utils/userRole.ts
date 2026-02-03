@@ -1,4 +1,4 @@
-import type { UserRole } from '../navigation/types';
+import type { UserRole } from '@app/navigation/types';
 
 export const getUserRole = (role?: string | null): UserRole | null => {
   if (role === 'Client' || role === 'Trainer') {
@@ -6,3 +6,4 @@ export const getUserRole = (role?: string | null): UserRole | null => {
   }
   return null;
 };
+

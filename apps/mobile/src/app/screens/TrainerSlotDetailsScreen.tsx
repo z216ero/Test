@@ -5,16 +5,16 @@ import {
   attendanceActionsAvailable,
   markSlotCompleted,
   markSlotNoShow,
-} from '../../api/trainerSlotsApi';
-import { presentApiError } from '../../api/ApiErrorPresenter';
-import type { SlotDto } from '../../generated/api';
-import { t } from '../../i18n';
-import { useAppMutation } from '../../query/hooks';
-import { keys } from '../../query/keys';
-import { useToast } from '../../ui/feedback/useToast';
-import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
-import { formatPrice } from '../../utils/price';
-import type { ScheduleStackParamList } from '../navigation/types';
+} from '@api/trainerSlotsApi';
+import { presentApiError } from '@api/ApiErrorPresenter';
+import type { SlotDto } from '@generated/api';
+import { t } from '@i18n';
+import { useAppMutation } from '@query/hooks';
+import { keys } from '@query/keys';
+import { useToast } from '@ui/feedback/useToast';
+import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
+import { formatPrice } from '@utils/price';
+import type { ScheduleStackParamList } from '@app/navigation/types';
 import { useQueryClient } from '@tanstack/react-query';
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, 'SlotDetails'>;
@@ -241,3 +241,6 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
     </YStack>
   );
 }
+
+
+

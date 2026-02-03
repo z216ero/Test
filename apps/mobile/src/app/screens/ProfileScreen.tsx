@@ -2,22 +2,21 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { logout } from '../../api/authApi';
-import { presentApiError } from '../../api/ApiErrorPresenter';
-import { getMe } from '../../api/homeApi';
-import { clearSession } from '../../auth/tokenStorage';
-import { getAccessToken } from '../../auth/tokenStorage';
-import { buildAbsoluteUrl } from '../../utils/url';
-import { t } from '../../i18n';
-import { AppIcon } from '../../ui/AppIcon';
-import type { AppIconName } from '../../ui/icons';
-import type { ProfileStackParamList, RootStackParamList } from '../navigation/types';
-import { TabScrollView } from '../../ui/layout/TabScrollView';
+import { logout } from '@api/authApi';
+import { presentApiError } from '@api/ApiErrorPresenter';
+import { getMe } from '@api/homeApi';
+import { clearSession } from '@auth/tokenStorage';
+import { getAccessToken } from '@auth/tokenStorage';
+import { buildAbsoluteUrl } from '@utils/url';
+import { t } from '@i18n';
+import { AppIcon } from '@ui/AppIcon';
+import type { AppIconName } from '@ui/icons';
+import type { ProfileStackParamList, RootStackParamList } from '@app/navigation/types';
+import { TabScrollView } from '@ui/layout/TabScrollView';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { useAppMutation, useAppQuery } from '../../query/hooks';
-import { keys } from '../../query/keys';
-import { formatPrice } from '../../utils/price';
+import { useAppMutation, useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
 
@@ -41,6 +40,7 @@ export function ProfileScreen({ navigation }: Props) {
   const {
     data: me,
     isLoading,
+    isStale,
     error: meError,
     refetch,
   } = useAppQuery({
@@ -69,10 +69,10 @@ export function ProfileScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      if (!isLoading) {
+      if (!isLoading && isStale) {
         refetch();
       }
-    }, [isLoading, refetch])
+    }, [isLoading, isStale, refetch])
   );
 
   const role = me?.role === 'Trainer' ? 'Trainer' : 'Client';
@@ -286,3 +286,5 @@ export function ProfileScreen({ navigation }: Props) {
     </YStack>
   );
 }
+
+

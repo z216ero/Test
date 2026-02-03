@@ -1,9 +1,24 @@
 {
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
-    "types": ["jest"],
+    "baseUrl": ".",
+    "paths": {
+      "@app/*": ["src/app/*"],
+      "@api/*": ["src/api/*"],
+      "@auth/*": ["src/auth/*"],
+      "@config/*": ["src/config/*"],
+      "@generated/*": ["src/generated/*"],
+      "@i18n/*": ["src/i18n/*"],
+      "@i18n": ["src/i18n"],
+      "@notifications/*": ["src/notifications/*"],
+      "@query/*": ["src/query/*"],
+      "@ui/*": ["src/ui/*"],
+      "@utils/*": ["src/utils/*"],
+      "@userRole": ["src/app/utils/userRole"]
+    },
+    "types": [],
     "jsx": "react-jsx"
   },
-  "include": ["**/*.ts", "**/*.tsx", "tamagui.config.cjs"],
+  "include": ["**/*.ts", "**/*.tsx", "**/*.d.ts", "tamagui.config.cjs"],
   "exclude": ["**/node_modules", "**/Pods"]
 }

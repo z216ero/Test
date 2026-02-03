@@ -2,27 +2,27 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { cancelBooking, type ClientBooking } from '../../api/bookingsApi';
-import { ApiError } from '../../api/core';
-import { presentApiError, type PresentedError } from '../../api/ApiErrorPresenter';
-import { t } from '../../i18n';
-import { onBookingCancelled } from '../../notifications/orchestrator';
-import { useAppMutation } from '../../query/hooks';
-import { keys } from '../../query/keys';
-import { useToast } from '../../ui/feedback/useToast';
-import { Banner } from '../../ui/feedback/Banner';
-import { AppIcon } from '../../ui/AppIcon';
-import { TabScrollView } from '../../ui/layout/TabScrollView';
-import { formatDateWithWeekdayRu, formatTimeRangeRu } from '../../utils/datetime';
+import { cancelBooking, type ClientBooking } from '@api/bookingsApi';
+import { ApiError } from '@api/core';
+import { presentApiError, type PresentedError } from '@api/ApiErrorPresenter';
+import { t } from '@i18n';
+import { onBookingCancelled } from '@notifications/orchestrator';
+import { useAppMutation } from '@query/hooks';
+import { keys } from '@query/keys';
+import { useToast } from '@ui/feedback/useToast';
+import { Banner } from '@ui/feedback/Banner';
+import { AppIcon } from '@ui/AppIcon';
+import { TabScrollView } from '@ui/layout/TabScrollView';
+import { formatDateWithWeekdayRu, formatTimeRangeRu } from '@utils/datetime';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   bookingStatusMeta,
   canCancelBooking,
   getBookingStatusType,
   getSlotTimes,
-} from '../components/bookings/bookingUtils';
-import { TrainerAvatar } from '../components/bookings/TrainerAvatar';
-import type { BookingsStackParamList } from '../navigation/types';
+} from '@app/components/bookings/bookingUtils';
+import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
+import type { BookingsStackParamList } from '@app/navigation/types';
 
 type Props = NativeStackScreenProps<BookingsStackParamList, 'BookingDetails'>;
 
@@ -214,3 +214,6 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
     </YStack>
   );
 }
+
+
+

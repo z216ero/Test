@@ -1,6 +1,6 @@
 import { Button, Text, YStack } from 'tamagui';
-import { presentApiError, type PresentedError } from '../../api/ApiErrorPresenter';
-import { t } from '../../i18n';
+import { presentApiError, type PresentedError } from '@api/ApiErrorPresenter';
+import { t } from '@i18n';
 import { secondaryButtonProps } from '../formDefaults';
 
 type ErrorStateProps = {
@@ -51,3 +51,5 @@ export function ErrorState({
     </YStack>
   );
 }
+
+

@@ -4,7 +4,7 @@ import type {
   GetTrainersTrainerIdSlotsParams,
   SlotDto,
   TrainerDto,
-} from '../generated/api';
+} from '@generated/api';
 import {
   getTrainersMe,
   getTrainersTrainerIdSlots,
@@ -12,8 +12,8 @@ import {
   postSlotsSlotIdComplete,
   postSlotsSlotIdNoShow,
   postTrainersTrainerIdSlots,
-} from '../generated/api';
-import { t } from '../i18n';
+} from '@generated/api';
+import { t } from '@i18n';
 import { ApiError, unwrap } from './core';
 import { ApiTimeoutError } from './fetcher';
 
@@ -214,3 +214,5 @@ export const cancelTrainerSlot = async (
     throw mapAttendanceError(error);
   }
 };
+
+

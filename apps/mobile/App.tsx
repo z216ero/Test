@@ -4,11 +4,11 @@ import { StatusBar } from 'react-native';
 import { enableScreens } from 'react-native-screens';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { PortalProvider } from '@tamagui/portal';
-import { TamaguiProvider } from 'tamagui';
-import { RootNavigator } from './src/app/navigation/RootNavigator';
-import { queryClient } from './src/query/queryClient';
-import { ToastProvider } from './src/ui/feedback/ToastProvider';
+import { RootNavigator } from '@app/navigation/RootNavigator';
+import { queryClient } from '@query/queryClient';
+import { ToastProvider } from '@ui/feedback/ToastProvider';
 import config from './tamagui.config.cjs';
+import { TamaguiProvider } from '@tamagui/core';
 
 enableScreens();
 

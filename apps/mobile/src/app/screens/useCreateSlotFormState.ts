@@ -9,14 +9,14 @@ import type {
   CreateSlotRequest,
   GetTrainersTrainerIdSlotsParams,
   SlotDto,
-} from '../../generated/api';
-import { ApiError } from '../../api/core';
-import { ApiTimeoutError } from '../../api/fetcher';
-import { TrainerSlotsOverlapError } from '../../api/trainerSlotsApi';
-import { t } from '../../i18n';
-import { useAppMutation, useAppQuery } from '../../query/hooks';
-import { useToast } from '../../ui/feedback/useToast';
-import { formatTimeRangeRu } from '../../utils/datetime';
+} from '@generated/api';
+import { ApiError } from '@api/core';
+import { ApiTimeoutError } from '@api/fetcher';
+import { TrainerSlotsOverlapError } from '@api/trainerSlotsApi';
+import { t } from '@i18n';
+import { useAppMutation, useAppQuery } from '@query/hooks';
+import { useToast } from '@ui/feedback/useToast';
+import { formatTimeRangeRu } from '@utils/datetime';
 import {
   buildTimeGrid,
   computeRange,
@@ -27,8 +27,8 @@ import {
   WORKDAY_END_HOUR,
   WORKDAY_START_HOUR,
   type LocalSlotRange,
-} from '../../utils/slotTimeGrid';
-import { presentApiError } from '../../api/ApiErrorPresenter';
+} from '@utils/slotTimeGrid';
+import { presentApiError } from '@api/ApiErrorPresenter';
 import { useFocusEffect } from '@react-navigation/native';
 
 export type UseCreateSlotFormStateArgs = {
@@ -481,3 +481,5 @@ export const useCreateSlotFormState = ({
     isCreating: createMutation.isPending,
   };
 };
+
+

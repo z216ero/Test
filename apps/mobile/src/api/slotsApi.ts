@@ -2,9 +2,9 @@ import type {
   GetTrainersTrainerIdSlotsParams,
   SlotDto,
   TrainerDto,
-} from '../generated/api';
-import { getTrainers, getTrainersTrainerIdSlots } from '../generated/api';
-import { t } from '../i18n';
+} from '@generated/api';
+import { getTrainers, getTrainersTrainerIdSlots } from '@generated/api';
+import { t } from '@i18n';
 import { unwrap } from './core';
 
 const isAvailableStatus = (status?: string | null) => {
@@ -90,3 +90,5 @@ export const getAvailableSlotsWithTrainers = async (
 
   return { slots, trainersById };
 };
+
+

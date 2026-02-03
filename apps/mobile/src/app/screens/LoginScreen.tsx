@@ -1,12 +1,12 @@
-﻿import type {
+import type {
   NativeStackNavigationProp,
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { login, me } from '../../api/authApi';
-import { presentApiError } from '../../api/ApiErrorPresenter';
-import { ApiError } from '../../api/core';
-import { t } from '../../i18n';
+import { login, me } from '@api/authApi';
+import { presentApiError } from '@api/ApiErrorPresenter';
+import { ApiError } from '@api/core';
+import { t } from '@i18n';
 import { XStack } from 'tamagui';
 import {
   AuthCard,
@@ -16,11 +16,11 @@ import {
   AuthHeader,
   AuthPrimaryButton,
   AuthScreen,
-} from '../../ui/authUi';
-import { AppIcon } from '../../ui/AppIcon';
-import type { AuthStackParamList, RootStackParamList } from '../navigation/types';
-import { getUserRole } from '../utils/userRole';
-import { useAppMutation } from '../../query/hooks';
+} from '@ui/authUi';
+import { AppIcon } from '@ui/AppIcon';
+import type { AuthStackParamList, RootStackParamList } from '@app/navigation/types';
+import { getUserRole } from '@userRole';
+import { useAppMutation } from '@query/hooks';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -113,3 +113,6 @@ export function LoginScreen({ navigation }: Props) {
     </AuthScreen>
   );
 }
+
+
+

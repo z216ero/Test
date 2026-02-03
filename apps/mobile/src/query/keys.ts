@@ -1,4 +1,4 @@
-import type { GetTrainersTrainerIdSlotsParams } from '../generated/api';
+import type { GetTrainersTrainerIdSlotsParams } from '@generated/api';
 
 export const keys = {
   auth: {
@@ -33,3 +33,4 @@ export const keys = {
         : (['slots', 'available'] as const),
   },
 };
+

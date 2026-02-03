@@ -1,8 +1,8 @@
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { t } from '../../../i18n';
-import { AppIcon } from '../../../ui/AppIcon';
-import { formatDateRu } from '../../../utils/datetime';
+import { t } from '@i18n';
+import { AppIcon } from '@ui/AppIcon';
+import { formatDateRu } from '@utils/datetime';
 
 const isSameLocalDay = (left: Date, right: Date) =>
   left.getFullYear() === right.getFullYear()
@@ -112,3 +112,5 @@ export function DateStrip({
     </XStack>
   );
 }
+
+

@@ -4,8 +4,8 @@ import {
   getRefreshToken,
   setAccessToken,
   setRefreshToken,
-} from '../auth/tokenStorage';
-import { API_BASE_URL } from '../config/env';
+} from '@auth/tokenStorage';
+import { API_BASE_URL } from '@config/env';
 import { fetchWithTimeout, readResponseTextSafe } from './fetcher';
 
 const trimTrailingSlash = (value: string): string =>
@@ -117,3 +117,4 @@ const tryRefreshToken = async (): Promise<string | null> => {
 
   return data.accessToken ?? null;
 };
+

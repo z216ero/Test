@@ -1,10 +1,10 @@
-import type { AuthUserDto, BookingDto, SlotDto, UpcomingSessionDto } from '../generated/api';
+import type { AuthUserDto, BookingDto, SlotDto, UpcomingSessionDto } from '@generated/api';
 import {
   getAuthMe,
   postSlotsSlotIdBook,
   postSlotsSlotIdCancel,
-} from '../generated/api';
-import { t } from '../i18n';
+} from '@generated/api';
+import { t } from '@i18n';
 import { ApiError, unwrap } from './core';
 import { ApiTimeoutError } from './fetcher';
 import { customFetch } from './custom-fetch';
@@ -136,3 +136,5 @@ export const getClientBookingHistory = async (
     .map(mapSessionToBooking)
     .filter((item): item is ClientBooking => item !== null);
 };
+
+

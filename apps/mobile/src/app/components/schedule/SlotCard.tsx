@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import type { SlotDto } from '../../../generated/api';
-import { t } from '../../../i18n';
-import { formatTimeRangeRu } from '../../../utils/datetime';
-import { buildAbsoluteUrl } from '../../../utils/url';
-import { getAccessToken } from '../../../auth/tokenStorage';
-import { AppIcon } from '../../../ui/AppIcon';
+import type { SlotDto } from '@generated/api';
+import { t } from '@i18n';
+import { formatTimeRangeRu } from '@utils/datetime';
+import { buildAbsoluteUrl } from '@utils/url';
+import { getAccessToken } from '@auth/tokenStorage';
+import { AppIcon } from '@ui/AppIcon';
 import {
   getClientAvatarUrl,
   getClientName,
@@ -154,3 +154,5 @@ export function SlotCard({ slot, nowTs, onPress, variant = 'default' }: SlotCard
     </Button>
   );
 }
+
+

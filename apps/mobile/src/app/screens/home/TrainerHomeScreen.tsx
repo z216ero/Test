@@ -8,19 +8,19 @@ import {
   getMyTrainerSlots,
   markSlotCompleted,
   markSlotNoShow,
-} from '../../../api/trainerSlotsApi';
-import { presentApiError } from '../../../api/ApiErrorPresenter';
-import { getAccessToken } from '../../../auth/tokenStorage';
-import type { SlotDto } from '../../../generated/api';
-import { t } from '../../../i18n';
-import { useAppMutation, useAppQuery } from '../../../query/hooks';
-import { keys } from '../../../query/keys';
-import { AppIcon } from '../../../ui/AppIcon';
-import { useToast } from '../../../ui/feedback/useToast';
-import { useTabBarPadding } from '../../../ui/layout/useTabBarPadding';
-import { TabScrollView } from '../../../ui/layout/TabScrollView';
-import { formatTimeRangeRu } from '../../../utils/datetime';
-import { buildAbsoluteUrl } from '../../../utils/url';
+} from '@api/trainerSlotsApi';
+import { presentApiError } from '@api/ApiErrorPresenter';
+import { getAccessToken } from '@auth/tokenStorage';
+import type { SlotDto } from '@generated/api';
+import { t } from '@i18n';
+import { useAppMutation, useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
+import { AppIcon } from '@ui/AppIcon';
+import { useToast } from '@ui/feedback/useToast';
+import { useTabBarPadding } from '@ui/layout/useTabBarPadding';
+import { TabScrollView } from '@ui/layout/TabScrollView';
+import { formatTimeRangeRu } from '@utils/datetime';
+import { buildAbsoluteUrl } from '@utils/url';
 import {
   canMarkCompleted,
   canMarkNoShow,
@@ -30,7 +30,7 @@ import {
   getSlotTimes,
   isFreeSlotPast,
   getUiSlotStatus,
-} from '../../components/schedule/slotHelpers';
+} from '@app/components/schedule/slotHelpers';
 import type { HomeMeState, HomeNavigation, HomeUser } from './types';
 
 const NOW_REFRESH_INTERVAL_MS = 30 * 1000;
@@ -658,3 +658,6 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     </YStack>
   );
 }
+
+
+

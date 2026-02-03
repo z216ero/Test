@@ -4,7 +4,7 @@
  * Api
  * OpenAPI spec version: 1.0
  */
-import { customFetch } from '../api/custom-fetch';
+import { customFetch } from '@api/custom-fetch';
 export interface AuthResponse {
   /** @nullable */
   accessToken?: string | null;
@@ -1265,3 +1265,4 @@ export const getUsersUserIdAvatar = async (userId: string, options?: RequestInit
     
   }
 );}
+

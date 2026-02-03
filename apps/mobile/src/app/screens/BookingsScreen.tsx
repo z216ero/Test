@@ -8,19 +8,19 @@ import {
   getClientBookingHistory,
   getClientUpcomingBookings,
   type ClientBooking,
-} from '../../api/bookingsApi';
-import { ApiError } from '../../api/core';
-import { presentApiError } from '../../api/ApiErrorPresenter';
-import { t } from '../../i18n';
-import { onBookingCancelled } from '../../notifications/orchestrator';
-import { useAppMutation, useAppQuery } from '../../query/hooks';
-import { keys } from '../../query/keys';
-import { useToast } from '../../ui/feedback/useToast';
-import { Banner } from '../../ui/feedback/Banner';
-import { ErrorState } from '../../ui/states/ErrorState';
-import { LoadingState } from '../../ui/states/LoadingState';
-import { TabScrollView } from '../../ui/layout/TabScrollView';
-import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
+} from '@api/bookingsApi';
+import { ApiError } from '@api/core';
+import { presentApiError } from '@api/ApiErrorPresenter';
+import { t } from '@i18n';
+import { onBookingCancelled } from '@notifications/orchestrator';
+import { useAppMutation, useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
+import { useToast } from '@ui/feedback/useToast';
+import { Banner } from '@ui/feedback/Banner';
+import { ErrorState } from '@ui/states/ErrorState';
+import { LoadingState } from '@ui/states/LoadingState';
+import { TabScrollView } from '@ui/layout/TabScrollView';
+import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   bookingStatusMeta,
@@ -29,9 +29,9 @@ import {
   getSlotTimes,
   isHistoryBooking,
   isUpcomingBooking,
-} from '../components/bookings/bookingUtils';
-import { TrainerAvatar } from '../components/bookings/TrainerAvatar';
-import type { BookingsStackParamList } from '../navigation/types';
+} from '@app/components/bookings/bookingUtils';
+import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
+import type { BookingsStackParamList } from '@app/navigation/types';
 
 type Props = NativeStackScreenProps<BookingsStackParamList, 'BookingsHome'>;
 
@@ -470,3 +470,6 @@ export function BookingsScreen({ navigation }: Props) {
     </YStack>
   );
 }
+
+
+

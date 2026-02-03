@@ -1,5 +1,5 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
-import type { SlotDto } from '../../generated/api';
+import type { SlotDto } from '@generated/api';
 
 export type ScheduleStackParamList = {
   ScheduleHome: undefined;
@@ -77,3 +77,4 @@ export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
   App: { role: UserRole } | undefined;
 };
+

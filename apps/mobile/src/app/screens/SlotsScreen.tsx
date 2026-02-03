@@ -4,17 +4,17 @@ import { useCallback, useState } from 'react';
 import { RefreshControl } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { getAvailableSlotsWithTrainers } from '../../api/slotsApi';
-import type { SlotDto, TrainerDto } from '../../generated/api';
-import { t } from '../../i18n';
-import { useAppQuery } from '../../query/hooks';
-import { keys } from '../../query/keys';
-import { EmptyState } from '../../ui/states/EmptyState';
-import { ErrorState } from '../../ui/states/ErrorState';
-import { LoadingState } from '../../ui/states/LoadingState';
-import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
-import { formatPrice } from '../../utils/price';
-import type { SlotsStackParamList } from '../navigation/types';
+import { getAvailableSlotsWithTrainers } from '@api/slotsApi';
+import type { SlotDto, TrainerDto } from '@generated/api';
+import { t } from '@i18n';
+import { useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
+import { EmptyState } from '@ui/states/EmptyState';
+import { ErrorState } from '@ui/states/ErrorState';
+import { LoadingState } from '@ui/states/LoadingState';
+import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
+import { formatPrice } from '@utils/price';
+import type { SlotsStackParamList } from '@app/navigation/types';
 
 type Props = NativeStackScreenProps<SlotsStackParamList, 'SlotsList'>;
 
@@ -232,3 +232,6 @@ export function SlotsScreen({ navigation }: Props) {
     </YStack>
   );
 }
+
+
+

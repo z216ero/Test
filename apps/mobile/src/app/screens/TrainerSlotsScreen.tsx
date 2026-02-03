@@ -2,17 +2,17 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { JSX, useCallback } from 'react';
 import { Button, ScrollView, Text, YStack } from 'tamagui';
-import { apiClient } from '../../api/client';
-import { unwrap } from '../../api/core';
-import type { SlotDto } from '../../generated/api';
-import { useAppQuery } from '../../query/hooks';
-import { keys } from '../../query/keys';
-import { primaryButtonProps } from '../../ui/formDefaults';
-import { EmptyState } from '../../ui/states/EmptyState';
-import { ErrorState } from '../../ui/states/ErrorState';
-import { LoadingState } from '../../ui/states/LoadingState';
-import { formatUtcRange } from '../../utils/time';
-import type { AppStackParamList } from '../navigation/types';
+import { apiClient } from '@api/client';
+import { unwrap } from '@api/core';
+import type { SlotDto } from '@generated/api';
+import { useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
+import { primaryButtonProps } from '@ui/formDefaults';
+import { EmptyState } from '@ui/states/EmptyState';
+import { ErrorState } from '@ui/states/ErrorState';
+import { LoadingState } from '@ui/states/LoadingState';
+import { formatUtcRange } from '@utils/time';
+import type { AppStackParamList } from '@app/navigation/types';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'TrainerSlots'>;
 
@@ -110,3 +110,5 @@ export function TrainerSlotsScreen({ route, navigation }: Props) {
     </YStack>
   );
 }
+
+

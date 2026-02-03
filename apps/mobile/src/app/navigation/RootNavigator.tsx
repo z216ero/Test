@@ -3,20 +3,20 @@ import type { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { TextStyle } from 'react-native';
-import { BootstrapScreen } from '../screens/BootstrapScreen';
-import { BookingConfirmScreen } from '../screens/BookingConfirmScreen';
-import { BookingDetailsScreen } from '../screens/BookingDetailsScreen';
-import { BookingsScreen } from '../screens/BookingsScreen';
-import { CreateSlotTabScreen } from '../screens/CreateSlotTabScreen';
-import { HomeScreen } from '../screens/HomeScreen';
-import { LoginScreen } from '../screens/LoginScreen';
-import { NotificationsScreen } from '../screens/NotificationsScreen';
-import { PersonalInfoScreen } from '../screens/PersonalInfoScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
-import { RegisterScreen } from '../screens/RegisterScreen';
-import { ScheduleScreen } from '../screens/ScheduleScreen';
-import { SlotsScreen } from '../screens/SlotsScreen';
-import { TrainerSlotDetailsScreen } from '../screens/TrainerSlotDetailsScreen';
+import { BootstrapScreen } from '@app/screens/BootstrapScreen';
+import { BookingConfirmScreen } from '@app/screens/BookingConfirmScreen';
+import { BookingDetailsScreen } from '@app/screens/BookingDetailsScreen';
+import { BookingsScreen } from '@app/screens/BookingsScreen';
+import { CreateSlotTabScreen } from '@app/screens/CreateSlotTabScreen';
+import { HomeScreen } from '@app/screens/HomeScreen';
+import { LoginScreen } from '@app/screens/LoginScreen';
+import { NotificationsScreen } from '@app/screens/NotificationsScreen';
+import { PersonalInfoScreen } from '@app/screens/PersonalInfoScreen';
+import { ProfileScreen } from '@app/screens/ProfileScreen';
+import { RegisterScreen } from '@app/screens/RegisterScreen';
+import { ScheduleScreen } from '@app/screens/ScheduleScreen';
+import { SlotsScreen } from '@app/screens/SlotsScreen';
+import { TrainerSlotDetailsScreen } from '@app/screens/TrainerSlotDetailsScreen';
 import type {
   ClientTabsParamList,
   AuthStackParamList,
@@ -29,8 +29,8 @@ import type {
 } from './types';
 import { Text, YStack } from 'tamagui';
 import { config } from '../../../tamagui.config.cjs';
-import { t } from '../../i18n';
-import { AppIcon } from '../../ui/AppIcon';
+import { t } from '@i18n';
+import { AppIcon } from '@ui/AppIcon';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -208,3 +208,6 @@ export function RootNavigator() {
     </RootStack.Navigator>
   );
 }
+
+
+

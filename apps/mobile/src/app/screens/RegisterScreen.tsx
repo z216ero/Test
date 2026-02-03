@@ -1,14 +1,14 @@
-﻿import type {
+import type {
   NativeStackNavigationProp,
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 import { useMemo, useState } from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { me, register } from '../../api/authApi';
-import { presentApiError } from '../../api/ApiErrorPresenter';
-import { ApiError } from '../../api/core';
-import { t } from '../../i18n';
-import type { TranslationKey } from '../../i18n';
+import { me, register } from '@api/authApi';
+import { presentApiError } from '@api/ApiErrorPresenter';
+import { ApiError } from '@api/core';
+import { t } from '@i18n';
+import type { TranslationKey } from '@i18n';
 import {
   AuthCard,
   AuthError,
@@ -17,10 +17,10 @@ import {
   AuthHeader,
   AuthPrimaryButton,
   AuthScreen,
-} from '../../ui/authUi';
-import type { AuthStackParamList, RootStackParamList } from '../navigation/types';
-import { getUserRole } from '../utils/userRole';
-import { useAppMutation } from '../../query/hooks';
+} from '@ui/authUi';
+import type { AuthStackParamList, RootStackParamList } from '@app/navigation/types';
+import { getUserRole } from '@userRole';
+import { useAppMutation } from '@query/hooks';
 
 const SPECIALIZATIONS: Array<{ value: string; labelKey: TranslationKey }> = [
   { value: 'Strength', labelKey: 'auth.register.specializationStrength' },
@@ -207,3 +207,6 @@ export function RegisterScreen({ navigation }: Props) {
     </AuthScreen>
   );
 }
+
+
+

@@ -3,25 +3,25 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Switch, Text, XStack, YStack } from 'tamagui';
-import { AppIcon } from '../../ui/AppIcon';
-import { t } from '../../i18n';
-import type { ProfileStackParamList } from '../navigation/types';
+import { AppIcon } from '@ui/AppIcon';
+import { t } from '@i18n';
+import type { ProfileStackParamList } from '@app/navigation/types';
 import { useFocusEffect } from '@react-navigation/native';
-import { getMe } from '../../api/homeApi';
-import { useAppQuery } from '../../query/hooks';
-import { keys } from '../../query/keys';
+import { getMe } from '@api/homeApi';
+import { useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
 import {
   getNotificationSettings,
   NotificationSettings,
   setNotificationSettings,
-} from '../../notifications/settings';
+} from '@notifications/settings';
 import {
   clearEvents,
   InAppEvent,
   listEvents,
-} from '../../notifications/inAppLog';
-import { onSettingsChanged } from '../../notifications/orchestrator';
-import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
+} from '@notifications/inAppLog';
+import { onSettingsChanged } from '@notifications/orchestrator';
+import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Notifications'>;
 
@@ -338,3 +338,6 @@ export function NotificationsScreen({ navigation }: Props) {
     </YStack>
   );
 }
+
+
+

@@ -6,15 +6,15 @@ import {
   BookingConflictError,
   BookingNotFoundError,
   createBooking,
-} from '../../api/bookingsApi';
-import { presentApiError } from '../../api/ApiErrorPresenter';
-import { t } from '../../i18n';
-import { useAppMutation } from '../../query/hooks';
-import { keys } from '../../query/keys';
-import { useToast } from '../../ui/feedback/useToast';
-import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
-import { onBookingCreated } from '../../notifications/orchestrator';
-import type { SlotsStackParamList } from '../navigation/types';
+} from '@api/bookingsApi';
+import { presentApiError } from '@api/ApiErrorPresenter';
+import { t } from '@i18n';
+import { useAppMutation } from '@query/hooks';
+import { keys } from '@query/keys';
+import { useToast } from '@ui/feedback/useToast';
+import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
+import { onBookingCreated } from '@notifications/orchestrator';
+import type { SlotsStackParamList } from '@app/navigation/types';
 
 type Props = NativeStackScreenProps<SlotsStackParamList, 'BookingConfirm'>;
 
@@ -194,3 +194,6 @@ export function BookingConfirmScreen({ navigation, route }: Props) {
     </YStack>
   );
 }
+
+
+

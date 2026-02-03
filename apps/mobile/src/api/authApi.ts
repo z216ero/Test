@@ -3,19 +3,19 @@ import type {
   AuthUserDto,
   LoginRequest,
   RegisterRequest,
-} from '../generated/api';
+} from '@generated/api';
 import {
   getAuthMe,
   postAuthLogin,
   postAuthLogout,
   postAuthRegister,
-} from '../generated/api';
+} from '@generated/api';
 import { unwrap } from './core';
 import {
   getRefreshToken,
   setAccessToken,
   setRefreshToken,
-} from '../auth/tokenStorage';
+} from '@auth/tokenStorage';
 
 export const register = async (
   payload: RegisterRequest
@@ -53,3 +53,4 @@ export const logout = async (): Promise<void> => {
   const response = await postAuthLogout({ refreshToken: refreshToken ?? null });
   unwrap(response, 'Unable to logout.');
 };
+

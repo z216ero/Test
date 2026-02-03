@@ -5,7 +5,7 @@ import type {
   CreateSlotRequest,
   GetTrainersTrainerIdSlotsParams,
   SlotDto,
-} from '../../generated/api';
+} from '@generated/api';
 import { CreateSlotDateSection } from './CreateSlotDateSection';
 import { CreateSlotFooter } from './CreateSlotFooter';
 import { CreateSlotHeader } from './CreateSlotHeader';
@@ -133,3 +133,4 @@ export function CreateSlotForm({
     </YStack>
   );
 }
+

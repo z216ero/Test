@@ -2,12 +2,12 @@ import type {
   AuthUserDto,
   SlotDto,
   TrainerDto,
-} from '../generated/api';
+} from '@generated/api';
 import {
   getAuthMe,
   getTrainersMe,
   getTrainersTrainerIdSlots,
-} from '../generated/api';
+} from '@generated/api';
 import { unwrap } from './core';
 import { getClientUpcomingBookings } from './bookingsApi';
 
@@ -107,3 +107,4 @@ export const getUpcomingForClient = async (
     trainerAvatarUrl: upcoming.trainerAvatarUrl,
   };
 };
+
