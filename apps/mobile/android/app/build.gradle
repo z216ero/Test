@@ -93,16 +93,16 @@ android {
             keyPassword 'android'
         }
          release {
-            def keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
-            def keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
-            def keyAlias = System.getenv("ANDROID_KEY_ALIAS")
-            def keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            def ksPath = System.getenv("ANDROID_KEYSTORE_PATH")
+            def ksPassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            def aliasName = System.getenv("ANDROID_KEY_ALIAS")
+            def keyPass = System.getenv("ANDROID_KEY_PASSWORD")
 
-            if (keystorePath != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
-                storeFile file(keystorePath)
-                storePassword keystorePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
+            if (ksPath != null && ksPassword != null && aliasName != null && keyPass != null) {
+                storeFile file(ksPath)
+                storePassword ksPassword
+                keyAlias aliasName
+                keyPassword keyPass
             }
         }
     }
