@@ -1,5 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { QueryClientProvider } from '@tanstack/react-query';
+import messaging from '@react-native-firebase/messaging';
+import { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { enableScreens } from 'react-native-screens';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -7,6 +9,11 @@ import { PortalProvider } from '@tamagui/portal';
 import { RootNavigator } from '@app/navigation/RootNavigator';
 import { queryClient } from '@query/queryClient';
 import { ToastProvider } from '@ui/feedback/ToastProvider';
+import { handlePushMessage } from '@notifications/pushHandlers';
+import {
+  registerPushTokenIfPossible,
+  registerPushTokenRefreshListener,
+} from '@notifications/pushRegistration';
 import config from './tamagui.config.cjs';
 import { TamaguiProvider } from '@tamagui/core';
 
@@ -23,6 +30,17 @@ const baseInsetPadding = (getTokenValue(tokens.space[2]) as number) ?? 8;
 const safeAreaBackground = (getTokenValue(tokens.color.background) as string) ?? '#ffffff';
 
 function App() {
+  useEffect(() => {
+    const unsubscribeMessage = messaging().onMessage(handlePushMessage);
+    const unsubscribeToken = registerPushTokenRefreshListener();
+    registerPushTokenIfPossible();
+
+    return () => {
+      unsubscribeMessage();
+      unsubscribeToken();
+    };
+  }, []);
+
   return (
     <SafeAreaProvider>
       <TamaguiProvider config={config} defaultTheme="light">

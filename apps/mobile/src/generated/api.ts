@@ -4,7 +4,7 @@
  * Api
  * OpenAPI spec version: 1.0
  */
-import { customFetch } from '@api/custom-fetch';
+import { customFetch } from '../api/custom-fetch';
 export interface AuthResponse {
   /** @nullable */
   accessToken?: string | null;
@@ -83,6 +83,11 @@ export interface LogoutRequest {
   refreshToken?: string | null;
 }
 
+export interface DisablePushTokenRequest {
+  /** @nullable */
+  token?: string | null;
+}
+
 export interface ProblemDetails {
   /** @nullable */
   type?: string | null;
@@ -95,6 +100,13 @@ export interface ProblemDetails {
   /** @nullable */
   instance?: string | null;
   [key: string]: unknown;
+}
+
+export interface RegisterPushTokenRequest {
+  /** @nullable */
+  token?: string | null;
+  /** @nullable */
+  platform?: string | null;
 }
 
 export interface RefreshRequest {
@@ -1266,3 +1278,94 @@ export const getUsersUserIdAvatar = async (userId: string, options?: RequestInit
   }
 );}
 
+
+
+export type postPushTokensResponse200 = {
+  data: void
+  status: 200
+}
+
+export type postPushTokensResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postPushTokensResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+    
+export type postPushTokensResponseSuccess = (postPushTokensResponse200) & {
+  headers: Headers;
+};
+export type postPushTokensResponseError = (postPushTokensResponse400 | postPushTokensResponse401) & {
+  headers: Headers;
+};
+
+export type postPushTokensResponse = (postPushTokensResponseSuccess | postPushTokensResponseError)
+
+export const getPostPushTokensUrl = () => {
+
+
+  
+
+  return `/push/tokens`
+}
+
+export const postPushTokens = async (registerPushTokenRequest: RegisterPushTokenRequest, options?: RequestInit): Promise<postPushTokensResponse> => {
+  
+  return customFetch<postPushTokensResponse>(getPostPushTokensUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      registerPushTokenRequest,)
+  }
+);}
+
+
+
+export type postPushTokensDisableResponse200 = {
+  data: void
+  status: 200
+}
+
+export type postPushTokensDisableResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postPushTokensDisableResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+    
+export type postPushTokensDisableResponseSuccess = (postPushTokensDisableResponse200) & {
+  headers: Headers;
+};
+export type postPushTokensDisableResponseError = (postPushTokensDisableResponse400 | postPushTokensDisableResponse401) & {
+  headers: Headers;
+};
+
+export type postPushTokensDisableResponse = (postPushTokensDisableResponseSuccess | postPushTokensDisableResponseError)
+
+export const getPostPushTokensDisableUrl = () => {
+
+
+  
+
+  return `/push/tokens/disable`
+}
+
+export const postPushTokensDisable = async (disablePushTokenRequest: DisablePushTokenRequest, options?: RequestInit): Promise<postPushTokensDisableResponse> => {
+  
+  return customFetch<postPushTokensDisableResponse>(getPostPushTokensDisableUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      disablePushTokenRequest,)
+  }
+);}

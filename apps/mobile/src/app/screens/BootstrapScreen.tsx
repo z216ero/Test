@@ -12,6 +12,7 @@ import { keys } from '@query/keys';
 import { ErrorState } from '@ui/states/ErrorState';
 import { LoadingState } from '@ui/states/LoadingState';
 import { getUserRole } from '@userRole';
+import { registerPushTokenIfPossible } from '@notifications/pushRegistration';
 import type { RootStackParamList } from '@app/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Bootstrap'>;
@@ -42,6 +43,7 @@ export function BootstrapScreen({ navigation }: Props) {
         if (!role) {
           return { target: 'unknown' as const };
         }
+        registerPushTokenIfPossible().catch(() => {});
         return { target: 'app' as const, role };
       } catch (err) {
         if (

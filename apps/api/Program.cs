@@ -3,6 +3,7 @@ using Api.Features.Auth;
 using Api.Features.Bookings;
 using Api.Features.Clients;
 using Api.Features.Health;
+using Api.Features.Push;
 using Api.Features.Slots;
 using Api.Features.Trainers;
 using Api.Features.Users;
@@ -35,6 +36,9 @@ builder.Services.AddOptions<JwtOptions>()
     .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
     .Validate(options => !string.IsNullOrWhiteSpace(options.SigningKey), "Jwt:SigningKey is required.")
     .ValidateOnStart();
+
+builder.Services.AddOptions<PushOptions>()
+    .Bind(builder.Configuration.GetSection(PushOptions.SectionName));
 
 builder.Services
     .AddIdentityCore<AppUser>(options =>
@@ -102,6 +106,8 @@ builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ClientService>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<PushService>();
+builder.Services.AddSingleton<FirebaseMessagingClient>();
 
 var app = builder.Build();
 
@@ -117,6 +123,7 @@ app.MapSlotEndpoints();
 app.MapBookingEndpoints();
 app.MapClientEndpoints();
 app.MapUserEndpoints();
+app.MapPushEndpoints();
 
 await app.RunAsync();
 

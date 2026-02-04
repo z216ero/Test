@@ -21,6 +21,7 @@ import { AppIcon } from '@ui/AppIcon';
 import type { AuthStackParamList, RootStackParamList } from '@app/navigation/types';
 import { getUserRole } from '@userRole';
 import { useAppMutation } from '@query/hooks';
+import { registerPushTokenIfPossible } from '@notifications/pushRegistration';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -44,6 +45,12 @@ export function LoginScreen({ navigation }: Props) {
       const role = roleFromResponse ?? getUserRole((await me()).role);
       if (!role) {
         throw new ApiError(t('auth.errorMissingRole'));
+      }
+
+      try {
+        await registerPushTokenIfPossible();
+      } catch {
+        // non-blocking
       }
 
       return role;

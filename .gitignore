@@ -59,6 +59,8 @@ ios/*.xcodeproj/xcuserdata/
 ios/*.xcodeproj/project.xcworkspace/xcuserdata/
 *.xcuserstate
 # Android
+apps/mobile/android/app/google-services.json
+apps/mobile/secrets/
 android/.gradle/
 android/app/build/
 android/build/
@@ -87,3 +89,4 @@ $RECYCLE.BIN/
 **/*.pfx
 **/*.crt
 **/*.key
+

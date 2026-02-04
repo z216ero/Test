@@ -1,13 +1,14 @@
 using System.Data;
 using Api.Data;
 using Api.Features.Common;
+using Api.Features.Push;
 using Api.Features.Slots;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace Api.Features.Bookings;
 
-public sealed class BookingService(AppDbContext db)
+public sealed class BookingService(AppDbContext db, PushService pushService)
 {
     public async Task<ServiceResult<BookingDto>> BookSlotAsync(
         Guid slotId,
@@ -81,6 +82,13 @@ public sealed class BookingService(AppDbContext db)
                     "Slot already has a booking.");
             }
 
+            await pushService.NotifyBookingCreatedAsync(
+                slot.Id,
+                slot.TrainerId,
+                booking.ClientId,
+                slot.StartsAtUtc,
+                cancellationToken);
+
             return ServiceResult<BookingDto>.Success(ToDto(booking));
         });
     }
@@ -128,6 +136,10 @@ public sealed class BookingService(AppDbContext db)
                     "User role is not allowed to cancel this slot.");
             }
 
+            var startsAtUtc = slot.StartsAtUtc;
+            var trainerId = slot.TrainerId;
+            var bookingClientId = slot.Booking?.ClientId;
+
             if (isTrainer)
             {
                 var trainerProfile = await db.TrainerProfiles
@@ -155,6 +167,13 @@ public sealed class BookingService(AppDbContext db)
                     slot.Status = TrainingSlotStatus.Cancelled;
                     await db.SaveChangesAsync(cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
+                    await pushService.NotifySlotCancelledByTrainerAsync(
+                        slot.Id,
+                        trainerId,
+                        bookingClientId,
+                        startsAtUtc,
+                        cancellationToken);
+
                     return ServiceResult<SlotDto>.Success(ToSlotDto(slot, slot.TrainerProfile?.PricePerSession));
                 }
 
@@ -229,6 +248,25 @@ public sealed class BookingService(AppDbContext db)
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
+            if (isTrainer)
+            {
+                await pushService.NotifySlotCancelledByTrainerAsync(
+                    slot.Id,
+                    trainerId,
+                    bookingClientId,
+                    startsAtUtc,
+                    cancellationToken);
+            }
+            else if (bookingClientId.HasValue)
+            {
+                await pushService.NotifyBookingCancelledAsync(
+                    slot.Id,
+                    trainerId,
+                    bookingClientId.Value,
+                    startsAtUtc,
+                    cancellationToken);
+            }
+
             return ServiceResult<SlotDto>.Success(ToSlotDto(slot, slot.TrainerProfile?.PricePerSession));
         });
     }
@@ -293,6 +331,13 @@ public sealed class BookingService(AppDbContext db)
 
         slot.Booking.Status = status;
         await db.SaveChangesAsync(cancellationToken);
+
+        await pushService.NotifyAttendanceMarkedAsync(
+            slot.Id,
+            slot.TrainerId,
+            slot.Booking.ClientId,
+            slot.StartsAtUtc,
+            cancellationToken);
 
         return ServiceResult<BookingDto>.Success(ToDto(slot.Booking));
     }

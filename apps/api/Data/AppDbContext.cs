@@ -14,6 +14,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<UserAvatar> UserAvatars => Set<UserAvatar>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -153,6 +154,31 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasIndex(x => x.UserId);
             entity.HasOne(x => x.User)
                 .WithMany(x => x.RefreshTokens)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DeviceToken>(entity =>
+        {
+            entity.ToTable("device_tokens");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Platform)
+                .HasMaxLength(12)
+                .IsRequired();
+            entity.Property(x => x.Token)
+                .HasMaxLength(512)
+                .IsRequired();
+            entity.Property(x => x.CreatedAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.Property(x => x.LastSeenAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.Property(x => x.IsEnabled)
+                .HasDefaultValue(true);
+            entity.HasIndex(x => x.Token)
+                .IsUnique();
+            entity.HasIndex(x => new { x.UserId, x.Platform });
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.DeviceTokens)
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

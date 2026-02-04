@@ -74,6 +74,15 @@ A user can have ONLY ONE role in MVP.
 - createdAt (UTC)
 - revokedAt (UTC, optional)
 
+### DeviceToken
+- id
+- userId
+- platform: android | ios
+- token (unique)
+- createdAt (UTC)
+- lastSeenAt (UTC)
+- isEnabled (bool)
+
 ### TrainingSlot
 - id
 - trainerId

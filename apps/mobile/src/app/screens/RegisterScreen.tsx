@@ -21,6 +21,7 @@ import {
 import type { AuthStackParamList, RootStackParamList } from '@app/navigation/types';
 import { getUserRole } from '@userRole';
 import { useAppMutation } from '@query/hooks';
+import { registerPushTokenIfPossible } from '@notifications/pushRegistration';
 
 const SPECIALIZATIONS: Array<{ value: string; labelKey: TranslationKey }> = [
   { value: 'Strength', labelKey: 'auth.register.specializationStrength' },
@@ -72,6 +73,12 @@ export function RegisterScreen({ navigation }: Props) {
       const resolvedRole = roleFromResponse ?? getUserRole((await me()).role);
       if (!resolvedRole) {
         throw new ApiError(t('auth.errorMissingRole'));
+      }
+
+      try {
+        await registerPushTokenIfPossible();
+      } catch {
+        // non-blocking
       }
 
       return resolvedRole;

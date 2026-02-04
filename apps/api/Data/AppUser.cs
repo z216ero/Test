@@ -8,4 +8,5 @@ public sealed class AppUser : IdentityUser<Guid>
     public string Role { get; set; } = UserRoles.Client;
     public UserAvatar? Avatar { get; set; }
     public List<RefreshToken> RefreshTokens { get; set; } = new();
+    public List<DeviceToken> DeviceTokens { get; set; } = new();
 }

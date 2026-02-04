@@ -9,5 +9,12 @@ module.exports = {
         sourceType: 'script',
       },
     },
+    {
+      files: ['index.js'],
+      parserOptions: {
+        requireConfigFile: false,
+        sourceType: 'module',
+      },
+    },
   ],
 };

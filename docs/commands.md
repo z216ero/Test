@@ -47,6 +47,14 @@
   - `npx react-native start`
   - `npx react-native run-android`
 
+## Push (Android, FCM)
+- В `apps/mobile/android/app` нужен `google-services.json` из Firebase Console (НЕ хранить в репозитории).
+- В API задать Firebase credentials через env/secret:
+  - `Push__FirebaseCredentialsPath=<path-to-service-account.json>`
+  - или `Push__FirebaseCredentialsJson=<json>`
+  - (опционально) `Push__FirebaseProjectId=<project-id>`
+- Для локального запуска с Aspire можно задавать эти переменные в окружении перед `dotnet run --project apps/apphost`.
+
 ## OpenAPI snapshot и клиент
 - Обновить `docs/openapi.json` из запущенного API:
   - `.\scripts\update-openapi.ps1 -BaseUrl https://localhost:<port>`
