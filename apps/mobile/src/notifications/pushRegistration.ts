@@ -6,7 +6,8 @@ import {
 } from '@react-native-firebase/messaging';
 import { PermissionsAndroid, Platform } from 'react-native';
 import { getAccessToken } from '@auth/tokenStorage';
-import { registerPushToken } from '@api/pushApi';
+import { disablePushToken, registerPushToken } from '@api/pushApi';
+import { getNotificationSettings } from './settings';
 
 const PLATFORM_ANDROID = 'android' as const;
 
@@ -44,6 +45,13 @@ const registerTokenWithBackend = async (token: string): Promise<void> => {
   await registerPushToken(token, PLATFORM_ANDROID);
 };
 
+const syncTokenEnabledState = async (token: string): Promise<void> => {
+  const settings = await getNotificationSettings();
+  if (!settings.inAppBookingEventsEnabled) {
+    await disablePushToken(token);
+  }
+};
+
 export const registerPushTokenIfPossible = async (): Promise<void> => {
   if (Platform.OS !== 'android') {
     return;
@@ -60,6 +68,7 @@ export const registerPushTokenIfPossible = async (): Promise<void> => {
       return;
     }
     await registerTokenWithBackend(token);
+    await syncTokenEnabledState(token);
   } catch (err) {
     if (__DEV__) {
       console.warn('push: token registration failed', err);
@@ -72,10 +81,41 @@ export const registerPushTokenRefreshListener = (): (() => void) => {
   return onTokenRefresh(messaging, async (token) => {
     try {
       await registerTokenWithBackend(token);
+      await syncTokenEnabledState(token);
     } catch (err) {
       if (__DEV__) {
         console.warn('push: token refresh failed', err);
       }
     }
   });
+};
+
+export const setPushTokenEnabled = async (enabled: boolean): Promise<void> => {
+  if (Platform.OS !== 'android') {
+    return;
+  }
+
+  if (enabled) {
+    const hasPermission = await ensurePermission();
+    if (!hasPermission) {
+      return;
+    }
+  }
+
+  try {
+    const token = await getToken(getMessaging(getApp()));
+    if (!token) {
+      return;
+    }
+    if (enabled) {
+      await registerTokenWithBackend(token);
+      return;
+    }
+    await registerTokenWithBackend(token);
+    await disablePushToken(token);
+  } catch (err) {
+    if (__DEV__) {
+      console.warn('push: token toggle failed', err);
+    }
+  }
 };

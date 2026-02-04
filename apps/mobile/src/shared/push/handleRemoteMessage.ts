@@ -8,6 +8,7 @@ import {
   upsertSlotHighlight,
   type SlotHighlight,
 } from '@notifications/pushIndicators';
+import { getNotificationSettings } from '@notifications/settings';
 import { appendEvent } from '../notifications/eventStore';
 
 type PushRoleHint = 'Trainer' | 'Client';
@@ -232,6 +233,9 @@ export const handleRemoteMessage = async (
     }
   }
 
+  const settings = await getNotificationSettings();
+  const inAppEventsEnabled = settings.inAppBookingEventsEnabled;
+
   const isTrainerTarget = payload.roleHint === 'Trainer' || payload.roleHint === null;
 
   if (
@@ -245,18 +249,20 @@ export const handleRemoteMessage = async (
     }
   }
 
-  await appendEvent({
-    id: payload.eventId,
-    type: payload.type,
-    occurredAtUtc: payload.occurredAtUtc,
-    slotId: payload.slotId,
-    slotStartsAtUtc: payload.slotStartsAtUtc,
-    slotDurationMinutes: payload.slotDurationMinutes,
-    actorName: payload.actorName,
-    actorRole: payload.actorRole,
-    trainerName: payload.trainerName,
-    clientName: payload.clientName,
-  });
+  if (inAppEventsEnabled) {
+    await appendEvent({
+      id: payload.eventId,
+      type: payload.type,
+      occurredAtUtc: payload.occurredAtUtc,
+      slotId: payload.slotId,
+      slotStartsAtUtc: payload.slotStartsAtUtc,
+      slotDurationMinutes: payload.slotDurationMinutes,
+      actorName: payload.actorName,
+      actorRole: payload.actorRole,
+      trainerName: payload.trainerName,
+      clientName: payload.clientName,
+    });
+  }
 
   const keysToInvalidate = buildInvalidationKeys(payload);
   if (keysToInvalidate.length === 0) {
@@ -265,3 +271,4 @@ export const handleRemoteMessage = async (
 
   pushInvalidations(keysToInvalidate);
 };
+

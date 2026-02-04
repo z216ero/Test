@@ -46,7 +46,8 @@ import {
   usePushIndicators,
 } from '@notifications/pushIndicators';
 
-const DATE_RANGE_DAYS = 14;
+const FUTURE_DATE_RANGE_DAYS = 14;
+const PAST_DATE_RANGE_DAYS = 14;
 const NOW_REFRESH_INTERVAL_MS = 30 * 1000;
 
 const startOfLocalDay = (value: Date) =>
@@ -265,13 +266,14 @@ export function ScheduleScreen({ navigation }: Props) {
     setCompletedExpanded(false);
   }, [selectedKey]);
 
-  const visibleDates = useMemo(() =>
-    Array.from({ length: DATE_RANGE_DAYS }).map((_, index) =>
-      addDays(todayDate, index)
-    ), [todayDate]
-  );
+  const minDate = useMemo(() => addDays(todayDate, -PAST_DATE_RANGE_DAYS), [todayDate]);
+  const maxDate = useMemo(() => addDays(todayDate, FUTURE_DATE_RANGE_DAYS), [todayDate]);
 
-  const maxDate = useMemo(() => addDays(todayDate, DATE_RANGE_DAYS - 1), [todayDate]);
+  const visibleDates = useMemo(() =>
+    Array.from({ length: PAST_DATE_RANGE_DAYS + FUTURE_DATE_RANGE_DAYS + 1 }).map((_, index) =>
+      addDays(minDate, index)
+    ), [minDate]
+  );
 
   const sortedSlots = useMemo(() => slots.slice().sort(sortByStart), [slots]);
 
@@ -281,6 +283,8 @@ export function ScheduleScreen({ navigation }: Props) {
   );
 
   const isSelectedToday = isSameLocalDay(selectedDate, todayDate);
+  const isPastDay = selectedDate.getTime() < todayDate.getTime();
+  const canCreateSlot = selectedDate.getTime() >= todayDate.getTime();
 
   const completedTodaySlots = useMemo(() => {
     if (!isSelectedToday) {
@@ -351,7 +355,7 @@ export function ScheduleScreen({ navigation }: Props) {
       DateTimePickerAndroid.open({
         value: selectedDate,
         mode: 'date',
-        minimumDate: todayDate,
+        minimumDate: minDate,
         maximumDate: maxDate,
         onChange: handleDateChange,
       });
@@ -361,6 +365,9 @@ export function ScheduleScreen({ navigation }: Props) {
   };
 
   const handleCreateSlot = () => {
+    if (!canCreateSlot) {
+      return;
+    }
     navigation.getParent()?.navigate('CreateSlot', {
       initialDateIsoLocal: selectedDate.toISOString(),
     });
@@ -599,19 +606,23 @@ export function ScheduleScreen({ navigation }: Props) {
       return <ErrorState error={error} onRetry={refetch} />;
     }
 
-    if (sortedSlots.length === 0) {
+    const visibleSlots = isPastDay
+      ? sortedSlots.filter((slot) => getUiSlotStatus(slot, nowTs) !== 'available')
+      : activeSlots;
+
+    if (visibleSlots.length === 0) {
       return (
         <EmptyState
           title={t('schedule.emptyDay')}
-          ctaLabel={t('schedule.createCta')}
-          onCtaPress={handleCreateSlot}
+          ctaLabel={canCreateSlot ? t('schedule.createCta') : undefined}
+          onCtaPress={canCreateSlot ? handleCreateSlot : undefined}
         />
       );
     }
 
     return (
       <YStack gap="$4">
-        {activeSlots.map((slot) => (
+        {visibleSlots.map((slot) => (
           <SlotCard
             key={slot.id ?? `${slot.startsAtUtc ?? 'slot'}`}
             slot={slot}
@@ -677,7 +688,7 @@ export function ScheduleScreen({ navigation }: Props) {
                 value={selectedDate}
                 mode="date"
                 display="inline"
-                minimumDate={todayDate}
+                minimumDate={minDate}
                 maximumDate={maxDate}
                 onChange={handleDateChange}
               />
@@ -702,22 +713,24 @@ export function ScheduleScreen({ navigation }: Props) {
         </YStack>
       </TabScrollView>
       {/* FAB: создание слота */}
-      <Button
-        position="absolute"
-        right="$6"
-        bottom={contentBottomPadding}
-        width="$10"
-        height="$10"
-        borderRadius="$6"
-        backgroundColor="$accent"
-        elevation={2}
-        shadowColor="$border"
-        shadowOpacity={0.2}
-        shadowRadius={6}
-        onPress={handleCreateSlot}
-      >
-        <AppIcon name="plus" size={22} color="$accentText" />
-      </Button>
+      {canCreateSlot ? (
+        <Button
+          position="absolute"
+          right="$6"
+          bottom={contentBottomPadding}
+          width="$10"
+          height="$10"
+          borderRadius="$6"
+          backgroundColor="$accent"
+          elevation={2}
+          shadowColor="$border"
+          shadowOpacity={0.2}
+          shadowRadius={6}
+          onPress={handleCreateSlot}
+        >
+          <AppIcon name="plus" size={22} color="$accentText" />
+        </Button>
+      ) : null}
       {/* Bottom sheet действий со слотом */}
       <SlotActionsSheet
         open={sheetOpen}

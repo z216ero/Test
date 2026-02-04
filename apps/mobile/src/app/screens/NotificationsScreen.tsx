@@ -23,6 +23,7 @@ import {
   type NotificationEvent,
 } from '@shared/notifications/eventStore';
 import { onSettingsChanged } from '@notifications/orchestrator';
+import { setPushTokenEnabled } from '@notifications/pushRegistration';
 import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Notifications'>;
@@ -108,6 +109,9 @@ export function NotificationsScreen({ navigation }: Props) {
       if (__DEV__) {
         console.warn('notifications: reschedule failed', err);
       }
+    }
+    if (typeof partial.inAppBookingEventsEnabled === 'boolean') {
+      await setPushTokenEnabled(partial.inAppBookingEventsEnabled);
     }
   };
 

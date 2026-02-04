@@ -89,7 +89,8 @@ export function SlotActionsSheet({
   const canShowNoShow = !!slot && canMarkAttendance && canMarkNoShow(slot, nowTs);
   const canShowComplete = !!slot && canMarkAttendance && canMarkCompleted(slot, nowTs);
   const canCancelAvailable = !!slot && canCancelSlot(slot, nowTs);
-  const canCancelBooked = !!slot && canCancelBookedSlot(slot, nowTs);
+  const canCancelBooked =
+    !!slot && statusType !== 'needs_attention' && canCancelBookedSlot(slot, nowTs);
   const isPastFreeSlot = !!slot && isFreeSlotPast(slot, nowTs);
   const isFinalAttendance = !!slot && statusType ? isUiSlotStatusFinal(statusType) : false;
   const startTs = slot ? getSlotStartTimestamp(slot) : null;

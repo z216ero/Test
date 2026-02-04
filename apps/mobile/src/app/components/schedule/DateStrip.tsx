@@ -1,4 +1,5 @@
 import { ScrollView } from '@tamagui/scroll-view';
+import { useEffect, useRef } from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
@@ -42,9 +43,29 @@ export function DateStrip({
   onSelectDate,
   onOpenCalendar,
 }: DateStripProps) {
+  const scrollRef = useRef<ScrollView>(null);
+  const itemLayouts = useRef<Record<string, { x: number; width: number }>>({});
+  const didInitialScroll = useRef(false);
+  const selectedKey = buildDateKey(selectedDate);
+
+  const scrollToSelected = (animated: boolean) => {
+    const layout = itemLayouts.current[selectedKey];
+    if (!layout || !scrollRef.current) {
+      return;
+    }
+    const targetX = Math.max(0, layout.x - 16);
+    scrollRef.current.scrollTo({ x: targetX, animated });
+  };
+
+  useEffect(() => {
+    scrollToSelected(didInitialScroll.current);
+    didInitialScroll.current = true;
+  }, [selectedKey, dates.length]);
+
   return (
     <XStack alignItems="center" gap="$2">
       <ScrollView
+        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
       >
@@ -69,6 +90,13 @@ export function DateStrip({
                 borderColor={isSelected ? '$accent' : '$border'}
                 borderRadius="$4"
                 onPress={() => onSelectDate(date)}
+                onLayout={(event) => {
+                  const { x, width } = event.nativeEvent.layout;
+                  itemLayouts.current[key] = { x, width };
+                  if (key === selectedKey && !didInitialScroll.current) {
+                    scrollToSelected(false);
+                  }
+                }}
               >
                 <YStack alignItems="center" gap="$1">
                   <Text
