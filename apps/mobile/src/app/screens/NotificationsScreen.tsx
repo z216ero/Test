@@ -17,17 +17,30 @@ import {
 } from '@notifications/settings';
 import {
   clearEvents,
-  InAppEvent,
   listEvents,
-} from '@notifications/inAppLog';
+  markAllEventsRead,
+  markEventRead,
+  type NotificationEvent,
+} from '@shared/notifications/eventStore';
 import { onSettingsChanged } from '@notifications/orchestrator';
 import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Notifications'>;
 
+const isSameLocalDay = (left: Date, right: Date) =>
+  left.getFullYear() === right.getFullYear()
+  && left.getMonth() === right.getMonth()
+  && left.getDate() === right.getDate();
+
 const formatEventTime = (iso: string): string => {
-  const dateLabel = formatDateRu(iso);
-  const timeLabel = formatTimeRangeRu(iso, iso);
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const now = new Date();
+  const dateLabel = isSameLocalDay(date, now) ? 'сегодня' : formatDateRu(date);
+  const timeLabel = formatTimeRangeRu(date, date);
   if (!dateLabel && !timeLabel) {
     return '';
   }
@@ -36,7 +49,7 @@ const formatEventTime = (iso: string): string => {
 
 export function NotificationsScreen({ navigation }: Props) {
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
-  const [events, setEvents] = useState<InAppEvent[]>([]);
+  const [events, setEvents] = useState<NotificationEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   const meQuery = useAppQuery({
@@ -53,6 +66,7 @@ export function NotificationsScreen({ navigation }: Props) {
     setSettings(nextSettings);
     setEvents(nextEvents);
     setLoading(false);
+    return nextEvents;
   }, []);
 
   useEffect(() => {
@@ -61,7 +75,26 @@ export function NotificationsScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      let active = true;
+
+      const run = async () => {
+        const nextEvents = await load();
+        if (!active) {
+          return;
+        }
+        if (nextEvents.some((event) => !event.isRead)) {
+          const updated = await markAllEventsRead();
+          if (active) {
+            setEvents(updated);
+          }
+        }
+      };
+
+      run();
+
+      return () => {
+        active = false;
+      };
     }, [load])
   );
 
@@ -81,6 +114,11 @@ export function NotificationsScreen({ navigation }: Props) {
   const handleClearEvents = async () => {
     await clearEvents();
     setEvents([]);
+  };
+
+  const handleEventPress = async (eventId: string) => {
+    const updated = await markEventRead(eventId);
+    setEvents(updated);
   };
 
   const offsetOptions = useMemo(
@@ -302,7 +340,7 @@ export function NotificationsScreen({ navigation }: Props) {
               borderWidth={1}
               borderColor="$border"
               padding="$4"
-              height="170"
+              height="300"
             >
               <ScrollView>
                 <YStack gap="$3">
@@ -312,21 +350,41 @@ export function NotificationsScreen({ navigation }: Props) {
                     </Text>
                   ) : (
                     events.map((event) => (
-                      <XStack key={event.id} gap="$3" alignItems="flex-start">
-                        <AppIcon
-                          name={event.type === 'BOOKED' ? 'calendar' : 'alertCircle'}
-                          size={18}
-                          color="$muted"
-                        />
-                        <YStack flex={1} gap="$1">
-                          <Text fontSize="$3" color="$text">
-                            {event.message}
-                          </Text>
-                          <Text fontSize="$2" color="$muted">
-                            {formatEventTime(event.occurredAtUtcIso)}
-                          </Text>
-                        </YStack>
-                      </XStack>
+                      <Button
+                        key={event.id}
+                        unstyled
+                        onPress={() => handleEventPress(event.id)}
+                      >
+                        <XStack gap="$3" alignItems="flex-start">
+                          <AppIcon
+                            name="calendar"
+                            size={18}
+                            color="$muted"
+                          />
+                          <YStack flex={1} gap="$1">
+                            <XStack alignItems="center" gap="$2">
+                              {event.isRead ? null : (
+                                <YStack
+                                  width="$1"
+                                  height="$1"
+                                  borderRadius="$6"
+                                  backgroundColor="$accent"
+                                  marginTop="$1"
+                                />
+                              )}
+                              <Text fontSize="$3" fontWeight="700" color="$text">
+                                {event.title}
+                              </Text>
+                            </XStack>
+                            <Text fontSize="$3" color="$text" numberOfLines={2}>
+                              {event.description}
+                            </Text>
+                            <Text fontSize="$2" color="$muted">
+                              {formatEventTime(event.occurredAtUtc)}
+                            </Text>
+                          </YStack>
+                        </XStack>
+                      </Button>
                     ))
                   )}
                 </YStack>

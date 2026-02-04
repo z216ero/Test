@@ -1,7 +1,14 @@
 import type { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
 import type { QueryKey } from '@tanstack/react-query';
-import { keys } from '@query/keys';
 import { queryClient } from '@query/queryClient';
+import { keys } from '@query/keys';
+import {
+  markPushEventProcessed,
+  setScheduleBadgeUnread,
+  upsertSlotHighlight,
+  type SlotHighlight,
+} from '@notifications/pushIndicators';
+import { appendEvent } from '../notifications/eventStore';
 
 type PushRoleHint = 'Trainer' | 'Client';
 type PushType =
@@ -16,7 +23,14 @@ type PushPayload = {
   trainerId?: string;
   clientId?: string;
   slotId: string;
-  startsAtUtc?: string;
+  eventId?: string;
+  occurredAtUtc?: string;
+  slotStartsAtUtc?: string;
+  slotDurationMinutes?: number;
+  actorName?: string;
+  actorRole?: PushRoleHint;
+  trainerName?: string;
+  clientName?: string;
 };
 
 const VALID_TYPES = new Set<PushType>([
@@ -53,6 +67,17 @@ const readString = (value: unknown): string | undefined => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
+const readNumber = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && !Number.isNaN(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  }
+  return undefined;
+};
+
 const parsePayload = (
   message: FirebaseMessagingTypes.RemoteMessage
 ): PushPayload | null => {
@@ -67,13 +92,22 @@ const parsePayload = (
     return null;
   }
 
+  const slotStartsAtUtc = readString(data.slotStartsAtUtc ?? data.startsAtUtc);
+
   return {
     type,
     roleHint: normalizeRoleHint(readString(data.roleHint) ?? null),
     trainerId: readString(data.trainerId),
     clientId: readString(data.clientId),
     slotId,
-    startsAtUtc: readString(data.startsAtUtc),
+    eventId: readString(data.eventId),
+    occurredAtUtc: readString(data.occurredAtUtc),
+    slotStartsAtUtc,
+    slotDurationMinutes: readNumber(data.slotDurationMinutes),
+    actorName: readString(data.actorName),
+    actorRole: normalizeRoleHint(readString(data.actorRole) ?? null) ?? undefined,
+    trainerName: readString(data.trainerName),
+    clientName: readString(data.clientName),
   };
 };
 
@@ -145,13 +179,84 @@ const buildInvalidationKeys = (payload: PushPayload): QueryKey[] => {
   return list;
 };
 
-export const handlePushMessage = async (
-  message: FirebaseMessagingTypes.RemoteMessage
+const buildTrainerHighlight = (payload: PushPayload): SlotHighlight | null => {
+  if (!payload.eventId) {
+    return null;
+  }
+
+  const parsedOccurredAt = payload.occurredAtUtc
+    ? Date.parse(payload.occurredAtUtc)
+    : Number.NaN;
+  const createdAt = Number.isNaN(parsedOccurredAt) ? Date.now() : parsedOccurredAt;
+
+  if (payload.type === 'booking_created') {
+    return {
+      eventId: payload.eventId,
+      type: 'booking_created',
+      color: 'success',
+      chipText: 'NEW',
+      createdAt,
+      seen: false,
+    };
+  }
+
+  if (payload.type === 'booking_cancelled') {
+    return {
+      eventId: payload.eventId,
+      type: 'booking_cancelled',
+      color: 'destructive',
+      chipText: 'Отмена',
+      createdAt,
+      seen: false,
+    };
+  }
+
+  return null;
+};
+
+export type RemoteMessageSource = 'foreground' | 'background' | 'initial' | 'opened';
+
+export const handleRemoteMessage = async (
+  message: FirebaseMessagingTypes.RemoteMessage,
+  _context?: { source: RemoteMessageSource }
 ): Promise<void> => {
   const payload = parsePayload(message);
   if (!payload) {
     return;
   }
+
+  if (payload.eventId) {
+    const alreadyProcessed = await markPushEventProcessed(payload.eventId);
+    if (alreadyProcessed) {
+      return;
+    }
+  }
+
+  const isTrainerTarget = payload.roleHint === 'Trainer' || payload.roleHint === null;
+
+  if (
+    isTrainerTarget
+    && (payload.type === 'booking_created' || payload.type === 'booking_cancelled')
+  ) {
+    await setScheduleBadgeUnread();
+    const highlight = buildTrainerHighlight(payload);
+    if (highlight) {
+      await upsertSlotHighlight(payload.slotId, highlight);
+    }
+  }
+
+  await appendEvent({
+    id: payload.eventId,
+    type: payload.type,
+    occurredAtUtc: payload.occurredAtUtc,
+    slotId: payload.slotId,
+    slotStartsAtUtc: payload.slotStartsAtUtc,
+    slotDurationMinutes: payload.slotDurationMinutes,
+    actorName: payload.actorName,
+    actorRole: payload.actorRole,
+    trainerName: payload.trainerName,
+    clientName: payload.clientName,
+  });
 
   const keysToInvalidate = buildInvalidationKeys(payload);
   if (keysToInvalidate.length === 0) {

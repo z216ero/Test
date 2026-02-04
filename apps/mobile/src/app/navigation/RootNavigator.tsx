@@ -31,6 +31,7 @@ import { Text, YStack } from 'tamagui';
 import { config } from '../../../tamagui.config.cjs';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
+import { usePushIndicators } from '@notifications/pushIndicators';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -121,6 +122,26 @@ const makeTabIcon = (name: Parameters<typeof AppIcon>[0]['name']) => ({ color }:
   <AppIcon name={name} color={color} size={22} />
 );
 
+const ScheduleTabIcon = ({ color }: { color: string }) => {
+  const { scheduleBadge } = usePushIndicators();
+  return (
+    <YStack position="relative" alignItems="center" justifyContent="center">
+      <AppIcon name="calendar" color={color} size={22} />
+      {scheduleBadge.hasUnread ? (
+        <YStack
+          position="absolute"
+          top={0}
+          right={0}
+          width="$1"
+          height="$1"
+          borderRadius="$6"
+          backgroundColor="$accent"
+        />
+      ) : null}
+    </YStack>
+  );
+};
+
 const ClientTabsNavigator = () => (
   <ClientTabs.Navigator screenOptions={tabBarScreenOptions}>
     <ClientTabs.Screen
@@ -156,7 +177,7 @@ const TrainerTabsNavigator = () => (
     <TrainerTabs.Screen
       name="Schedule"
       component={ScheduleStackNavigator}
-      options={{ title: t('tabs.schedule'), tabBarIcon: makeTabIcon('calendar') }}
+      options={{ title: t('tabs.schedule'), tabBarIcon: ScheduleTabIcon }}
     />
     <TrainerTabs.Screen
       name="CreateSlot"

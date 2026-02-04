@@ -1,4 +1,9 @@
-import messaging from '@react-native-firebase/messaging';
+import { getApp } from '@react-native-firebase/app';
+import {
+  getMessaging,
+  getToken,
+  onTokenRefresh,
+} from '@react-native-firebase/messaging';
 import { PermissionsAndroid, Platform } from 'react-native';
 import { getAccessToken } from '@auth/tokenStorage';
 import { registerPushToken } from '@api/pushApi';
@@ -50,7 +55,7 @@ export const registerPushTokenIfPossible = async (): Promise<void> => {
   }
 
   try {
-    const token = await messaging().getToken();
+    const token = await getToken(getMessaging(getApp()));
     if (!token) {
       return;
     }
@@ -63,7 +68,8 @@ export const registerPushTokenIfPossible = async (): Promise<void> => {
 };
 
 export const registerPushTokenRefreshListener = (): (() => void) => {
-  return messaging().onTokenRefresh(async (token) => {
+  const messaging = getMessaging(getApp());
+  return onTokenRefresh(messaging, async (token) => {
     try {
       await registerTokenWithBackend(token);
     } catch (err) {

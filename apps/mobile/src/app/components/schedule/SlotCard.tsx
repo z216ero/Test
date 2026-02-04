@@ -32,9 +32,19 @@ type SlotCardProps = {
   nowTs: number;
   onPress?: () => void;
   variant?: 'default' | 'muted';
+  highlight?: {
+    color: 'success' | 'destructive';
+    chipText: string;
+  } | null;
 };
 
-export function SlotCard({ slot, nowTs, onPress, variant = 'default' }: SlotCardProps) {
+export function SlotCard({
+  slot,
+  nowTs,
+  onPress,
+  variant = 'default',
+  highlight = null,
+}: SlotCardProps) {
   const [avatarToken, setAvatarToken] = useState<string | null>(null);
   const statusType = getUiSlotStatus(slot, nowTs);
   const status = uiSlotStatusMeta[statusType];
@@ -68,6 +78,7 @@ export function SlotCard({ slot, nowTs, onPress, variant = 'default' }: SlotCard
 
   const isMuted = variant === 'muted';
   const isNeedsAttention = statusType === 'needs_attention';
+  const resolvedHighlight = isNeedsAttention ? null : highlight;
   const titleColor = isMuted ? '$muted' : '$text';
   const statusColor = status.dotColor;
   const labelColor = status.labelColor;
@@ -79,6 +90,17 @@ export function SlotCard({ slot, nowTs, onPress, variant = 'default' }: SlotCard
     ? status.borderColor
     : '$border';
   const borderWidth = isNeedsAttention ? 2 : 1;
+  const highlightBorderColor = resolvedHighlight
+    ? resolvedHighlight.color === 'success'
+      ? '$accent'
+      : '$danger'
+    : borderColor;
+  const highlightBorderWidth = resolvedHighlight ? 2 : borderWidth;
+  const highlightChipColor = resolvedHighlight
+    ? resolvedHighlight.color === 'success'
+      ? '$accent'
+      : '$danger'
+    : '$accent';
 
   return (
     <Button
@@ -87,13 +109,14 @@ export function SlotCard({ slot, nowTs, onPress, variant = 'default' }: SlotCard
       unstyled
       backgroundColor={cardBackground}
       borderRadius="$5"
-      borderWidth={borderWidth}
-      borderColor={borderColor}
+      borderWidth={highlightBorderWidth}
+      borderColor={highlightBorderColor}
       padding="$4"
       alignItems="stretch"
       justifyContent="flex-start"
       minHeight="$11"
       width="100%"
+      position="relative"
     >
       <YStack gap="$3">
         <XStack alignItems="center" justifyContent="space-between" width="100%">
@@ -101,6 +124,20 @@ export function SlotCard({ slot, nowTs, onPress, variant = 'default' }: SlotCard
             {timeLabel || t('common.empty')}
           </Text>
           <XStack alignItems="center" gap="$2">
+            {resolvedHighlight ? (
+              <XStack
+                paddingHorizontal="$2"
+                paddingVertical="$1"
+                borderRadius="$3"
+                borderWidth={1}
+                borderColor={highlightChipColor}
+                backgroundColor="$surfaceMuted"
+              >
+                <Text fontSize="$2" fontWeight="700" color={highlightChipColor}>
+                  {resolvedHighlight.chipText}
+                </Text>
+              </XStack>
+            ) : null}
             <YStack
               width="$1"
               height="$1"

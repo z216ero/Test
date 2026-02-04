@@ -14,6 +14,7 @@ const moduleResolverPlugin = [
       '@i18n': './src/i18n',
       '@notifications': './src/notifications',
       '@query': './src/query',
+      '@shared': './src/shared',
       '@ui': './src/ui',
       '@utils': './src/utils',
       '@userRole': './src/app/utils/userRole',

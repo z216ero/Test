@@ -40,6 +40,11 @@ import {
   shouldShowInCompletedToday,
 } from '@app/components/schedule/slotHelpers';
 import { type QueryKey, useQueryClient } from '@tanstack/react-query';
+import {
+  clearScheduleBadge,
+  markSlotHighlightSeen,
+  usePushIndicators,
+} from '@notifications/pushIndicators';
 
 const DATE_RANGE_DAYS = 14;
 const NOW_REFRESH_INTERVAL_MS = 30 * 1000;
@@ -78,6 +83,7 @@ type CompletedSectionProps = {
   slots: SlotDto[];
   nowTs: number;
   onToggle: () => void;
+  getHighlight?: (slot: SlotDto) => { color: 'success' | 'destructive'; chipText: string } | null;
 };
 
 const ScheduleSkeleton = () => (
@@ -112,6 +118,7 @@ const CompletedTodaySection = ({
   slots,
   nowTs,
   onToggle,
+  getHighlight,
 }: CompletedSectionProps) => {
   if (count === 0) {
     return null;
@@ -150,6 +157,7 @@ const CompletedTodaySection = ({
               nowTs={nowTs}
               onPress={undefined}
               variant="muted"
+              highlight={getHighlight ? getHighlight(slot) : null}
             />
           ))}
         </YStack>
@@ -162,6 +170,7 @@ export function ScheduleScreen({ navigation }: Props) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { contentBottomPadding } = useTabBarPadding();
+  const { slotHighlights } = usePushIndicators();
 
   const [selectedDate, setSelectedDate] = useState(() => startOfLocalDay(new Date()));
   const [todayDate, setTodayDate] = useState(() => startOfLocalDay(new Date()));
@@ -223,6 +232,12 @@ export function ScheduleScreen({ navigation }: Props) {
         refetch();
       }
     }, [isLoading, isStale, refetch])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      clearScheduleBadge().catch(() => {});
+    }, [])
   );
 
   useFocusEffect(
@@ -351,10 +366,22 @@ export function ScheduleScreen({ navigation }: Props) {
     });
   };
 
+  const getHighlightForSlot = useCallback((slot: SlotDto) => {
+    if (!slot.id) {
+      return null;
+    }
+    const highlight = slotHighlights[slot.id];
+    if (!highlight || highlight.seen) {
+      return null;
+    }
+    return { color: highlight.color, chipText: highlight.chipText };
+  }, [slotHighlights]);
+
   const openSlot = (slot: SlotDto) => {
     if (!slot.id) {
       return;
     }
+    markSlotHighlightSeen(slot.id).catch(() => {});
     setActiveSlot(slot);
     setSheetOpen(true);
   };
@@ -590,6 +617,7 @@ export function ScheduleScreen({ navigation }: Props) {
             slot={slot}
             nowTs={nowTs}
             onPress={slot.id ? () => openSlot(slot) : undefined}
+            highlight={getHighlightForSlot(slot)}
           />
         ))}
         {isSelectedToday ? (
@@ -599,6 +627,7 @@ export function ScheduleScreen({ navigation }: Props) {
             slots={completedTodaySlots}
             nowTs={nowTs}
             onToggle={() => setCompletedExpanded((prev) => !prev)}
+            getHighlight={getHighlightForSlot}
           />
         ) : null}
       </YStack>

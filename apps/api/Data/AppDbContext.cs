@@ -15,6 +15,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<UserAvatar> UserAvatars => Set<UserAvatar>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
+    public DbSet<PushEventDedup> PushEventDedups => Set<PushEventDedup>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -181,6 +182,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithMany(x => x.DeviceTokens)
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PushEventDedup>(entity =>
+        {
+            entity.ToTable("push_event_dedup");
+            entity.HasKey(x => x.KeyHash);
+            entity.Property(x => x.KeyHash)
+                .HasMaxLength(64)
+                .IsRequired();
+            entity.Property(x => x.LastSentAtUtc)
+                .IsRequired();
+            entity.Property(x => x.CreatedAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
         });
     }
 }
