@@ -46,20 +46,28 @@ export function DateStrip({
   const scrollRef = useRef<ScrollView>(null);
   const itemLayouts = useRef<Record<string, { x: number; width: number }>>({});
   const didInitialScroll = useRef(false);
+  const contentReady = useRef(false);
   const selectedKey = buildDateKey(selectedDate);
 
   const scrollToSelected = (animated: boolean) => {
     const layout = itemLayouts.current[selectedKey];
-    if (!layout || !scrollRef.current) {
+    const scrollView = scrollRef.current as unknown as { scrollTo?: (opts: { x: number; animated?: boolean }) => void } | null;
+    if (!layout || !scrollView?.scrollTo) {
       return;
     }
     const targetX = Math.max(0, layout.x - 16);
-    scrollRef.current.scrollTo({ x: targetX, animated });
+    scrollView.scrollTo({ x: targetX, animated });
   };
 
   useEffect(() => {
-    scrollToSelected(didInitialScroll.current);
-    didInitialScroll.current = true;
+    if (contentReady.current && !didInitialScroll.current) {
+      scrollToSelected(true);
+      didInitialScroll.current = true;
+      return;
+    }
+    if (didInitialScroll.current) {
+      scrollToSelected(true);
+    }
   }, [selectedKey, dates.length]);
 
   return (
@@ -68,6 +76,12 @@ export function DateStrip({
         ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
+        onContentSizeChange={() => {
+          contentReady.current = true;
+          if (!didInitialScroll.current) {
+            requestAnimationFrame(() => scrollToSelected(true));
+          }
+        }}
       >
         <XStack gap="$2" paddingRight="$2">
           {dates.map((date) => {
@@ -93,8 +107,8 @@ export function DateStrip({
                 onLayout={(event) => {
                   const { x, width } = event.nativeEvent.layout;
                   itemLayouts.current[key] = { x, width };
-                  if (key === selectedKey && !didInitialScroll.current) {
-                    scrollToSelected(false);
+                  if (key === selectedKey && contentReady.current && !didInitialScroll.current) {
+                    requestAnimationFrame(() => scrollToSelected(true));
                   }
                 }}
               >

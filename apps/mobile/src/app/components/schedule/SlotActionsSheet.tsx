@@ -296,6 +296,19 @@ export function SlotActionsSheet({
                     </Text>
                   </XStack>
                 ) : null}
+                {statusType === 'needs_attention' ? (
+                  <XStack
+                    padding="$4"
+                    borderRadius="$4"
+                    backgroundColor="$surfaceMuted"
+                    borderWidth={1}
+                    borderColor="$border"
+                  >
+                    <Text fontSize="$3" color="$muted">
+                      {t('schedule.sheet.attendanceRequired')}
+                    </Text>
+                  </XStack>
+                ) : null}
                 {canCancelBooked ? (
                   <Button
                     backgroundColor="$background"

@@ -148,6 +148,7 @@
   'schedule.sheet.bookedInfo': 'Действия по записи пока недоступны.',
   'schedule.sheet.cancelledInfo': 'Этот слот уже отменён.',
   'schedule.sheet.completeAfterStart': 'Можно отметить после начала.',
+  'schedule.sheet.attendanceRequired': 'Нужно отметить статус: проведена или неявка.',
   'schedule.actions.cancelSlot': 'Отменить слот',
   'schedule.actions.cancelTraining': 'Отменить тренировку',
   'schedule.actions.cancelSlotConfirmTitle': 'Отменить слот?',
