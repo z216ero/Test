@@ -1,10 +1,10 @@
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Text, XStack, YStack, Button } from 'tamagui';
-import type { SlotDto } from '../../generated/api';
-import { t } from '../../i18n';
-import { AppIcon } from '../../ui/AppIcon';
-import { Banner } from '../../ui/feedback/Banner';
-import { SLOT_DURATION_MINUTES } from '../../utils/slotTimeGrid';
+import type { SlotDto } from '@generated/api';
+import { t } from '@i18n';
+import { AppIcon } from '@ui/AppIcon';
+import { Banner } from '@ui/feedback/Banner';
+import { SLOT_DURATION_MINUTES } from '@utils/slotTimeGrid';
 
 type CreateSlotTimeSectionProps = {
   selectedRangeLabel: string | null;
@@ -130,3 +130,5 @@ export function CreateSlotTimeSection({
     </YStack>
   );
 }
+
+

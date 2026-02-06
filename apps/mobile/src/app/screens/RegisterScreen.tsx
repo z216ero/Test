@@ -1,14 +1,14 @@
-﻿import type {
+import type {
   NativeStackNavigationProp,
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { me, register } from '../../api/authApi';
-import { presentApiError } from '../../api/ApiErrorPresenter';
-import { ApiError } from '../../api/core';
-import { t } from '../../i18n';
-import type { TranslationKey } from '../../i18n';
+import { me, register } from '@api/authApi';
+import { presentApiError } from '@api/ApiErrorPresenter';
+import { ApiError } from '@api/core';
+import { getGenderLookups, getRoleLookups, getSpecializationLookups } from '@api/lookupsApi';
+import { t } from '@i18n';
 import {
   AuthCard,
   AuthError,
@@ -17,34 +17,100 @@ import {
   AuthHeader,
   AuthPrimaryButton,
   AuthScreen,
-} from '../../ui/authUi';
-import type { AuthStackParamList, RootStackParamList } from '../navigation/types';
-import { getUserRole } from '../utils/userRole';
-import { useAppMutation } from '../../query/hooks';
-
-const SPECIALIZATIONS: Array<{ value: string; labelKey: TranslationKey }> = [
-  { value: 'Strength', labelKey: 'auth.register.specializationStrength' },
-  { value: 'Mobility', labelKey: 'auth.register.specializationMobility' },
-  { value: 'Yoga', labelKey: 'auth.register.specializationYoga' },
-  { value: 'Pilates', labelKey: 'auth.register.specializationPilates' },
-  { value: 'HIIT', labelKey: 'auth.register.specializationHiit' },
-];
-
-type Role = 'Trainer' | 'Client';
+} from '@ui/authUi';
+import type { AuthStackParamList, RootStackParamList } from '@app/navigation/types';
+import { getUserRole } from '@userRole';
+import { useAppMutation, useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
+import { registerPushTokenIfPossible } from '@notifications/pushRegistration';
+import { getDefaultLookupCode } from '@app/utils/lookups';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
-export function RegisterScreen({ navigation }: Props) {
+export function RegisterScreen({ navigation, route }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState<Role>('Client');
-  const [specialization, setSpecialization] = useState(SPECIALIZATIONS[0].value);
+  const [cityName, setCityName] = useState('');
+  const [districtName, setDistrictName] = useState('');
+  const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
+  const [role, setRole] = useState('');
+  const [gender, setGender] = useState('');
+  const [specialization, setSpecialization] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const isTrainer = role === 'Trainer';
+  const rolesQuery = useAppQuery({
+    queryKey: keys.lookups.roles(),
+    queryFn: ({ signal }) => getRoleLookups({ signal }),
+  });
+
+  const gendersQuery = useAppQuery({
+    queryKey: keys.lookups.genders(),
+    queryFn: ({ signal }) => getGenderLookups({ signal }),
+  });
+
+  const specializationsQuery = useAppQuery({
+    queryKey: keys.lookups.specializations(),
+    queryFn: ({ signal }) => getSpecializationLookups({ signal }),
+  });
+
+
+  const roleOptions = rolesQuery.data ?? [];
+  const genderOptionsAll = gendersQuery.data ?? [];
+  const genderOptions = useMemo(
+    () => genderOptionsAll.filter((item) => !item.isAny),
+    [genderOptionsAll]
+  );
+  const specializationOptions = specializationsQuery.data ?? [];
+
+  const defaultRole = useMemo(() => getDefaultLookupCode(roleOptions), [roleOptions]);
+  const defaultGender = useMemo(() => getDefaultLookupCode(genderOptions), [genderOptions]);
+  const defaultSpecialization = useMemo(
+    () => getDefaultLookupCode(specializationOptions),
+    [specializationOptions]
+  );
+
+  useEffect(() => {
+    if (!role && defaultRole) {
+      setRole(defaultRole);
+    }
+  }, [defaultRole, role]);
+
+  useEffect(() => {
+    if (!gender && defaultGender) {
+      setGender(defaultGender);
+    }
+  }, [defaultGender, gender]);
+
+  useEffect(() => {
+    if (!specialization && defaultSpecialization) {
+      setSpecialization(defaultSpecialization);
+    }
+  }, [defaultSpecialization, specialization]);
+
+  useEffect(() => {
+    const selection = route.params?.locationSelection;
+    if (!selection) {
+      return;
+    }
+    if (selection.cityName) {
+      setCityName(selection.cityName ?? '');
+      setSelectedCityId(typeof selection.cityId === 'number' ? selection.cityId : null);
+      setDistrictName('');
+    }
+    if (selection.districtName) {
+      setDistrictName(selection.districtName ?? '');
+    }
+    navigation.setParams({ locationSelection: undefined });
+  }, [navigation, route.params?.locationSelection]);
+
+  const isTrainer = useMemo(
+    () => roleOptions.find((option) => option.code === role)?.isTrainerRole ?? false,
+    [roleOptions, role]
+  );
+
   const specializationValue = useMemo(
-    () => (isTrainer ? specialization : undefined),
+    () => (isTrainer && specialization ? [specialization] : undefined),
     [isTrainer, specialization]
   );
 
@@ -53,15 +119,21 @@ export function RegisterScreen({ navigation }: Props) {
       email: string;
       password: string;
       name: string;
-      role: Role;
-      specialization?: string;
+      cityName: string;
+      districtName?: string | null;
+      role: string;
+      gender: string;
+      specializations?: string[];
     }) => {
       const response = await register({
         email: payload.email,
         password: payload.password,
         name: payload.name,
+        cityName: payload.cityName,
+        districtName: payload.districtName ?? null,
         role: payload.role,
-        specialization: payload.specialization,
+        gender: payload.gender,
+        specializations: payload.specializations,
       });
 
       if (!response.accessToken) {
@@ -72,6 +144,12 @@ export function RegisterScreen({ navigation }: Props) {
       const resolvedRole = roleFromResponse ?? getUserRole((await me()).role);
       if (!resolvedRole) {
         throw new ApiError(t('auth.errorMissingRole'));
+      }
+
+      try {
+        await registerPushTokenIfPossible();
+      } catch {
+        // non-blocking
       }
 
       return resolvedRole;
@@ -90,8 +168,13 @@ export function RegisterScreen({ navigation }: Props) {
   });
 
   const handleRegister = async () => {
-    if (!email.trim() || !password || !name.trim()) {
+    if (!email.trim() || !password || !name.trim() || !cityName.trim()) {
       setError(t('auth.register.validationRequired'));
+      return;
+    }
+
+    if (!role || !gender) {
+      setError(t('errors.generic'));
       return;
     }
 
@@ -102,8 +185,11 @@ export function RegisterScreen({ navigation }: Props) {
         email: email.trim(),
         password,
         name: name.trim(),
+        cityName: cityName.trim(),
+        districtName: districtName.trim() || null,
         role,
-        specialization: specializationValue,
+        gender,
+        specializations: specializationValue,
       });
     } catch {
       // handled in mutation callbacks
@@ -141,14 +227,65 @@ export function RegisterScreen({ navigation }: Props) {
         />
         <YStack gap="$2">
           <Text fontSize="$3" color="$muted">
+            {t('auth.register.city')}
+          </Text>
+          <Button
+            backgroundColor="$background"
+            borderRadius="$4"
+            borderWidth={1}
+            borderColor="$border"
+            height={44}
+            paddingHorizontal="$3"
+            justifyContent="flex-start"
+            alignItems="center"
+            onPress={() => navigation.navigate('LocationSearch', { mode: 'city', returnTo: 'Register' })}
+          >
+            <Text color={cityName ? '$text' : '$muted'} width="100%" textAlign="left">
+              {cityName || t('auth.register.cityPlaceholder')}
+            </Text>
+          </Button>
+        </YStack>
+        <YStack gap="$2">
+          <Text fontSize="$3" color="$muted">
+            {t('auth.register.district')}
+          </Text>
+          <Button
+            backgroundColor="$background"
+            borderRadius="$4"
+            borderWidth={1}
+            borderColor="$border"
+            height={44}
+            paddingHorizontal="$3"
+            justifyContent="flex-start"
+            alignItems="center"
+            onPress={() => {
+              if (!selectedCityId) {
+                setError(t('auth.register.selectCityFirst'));
+                return;
+              }
+              navigation.navigate('LocationSearch', {
+                mode: 'district',
+                cityId: selectedCityId,
+                cityName,
+                returnTo: 'Register',
+              });
+            }}
+          >
+            <Text color={districtName ? '$text' : '$muted'} width="100%" textAlign="left">
+              {districtName || t('auth.register.districtPlaceholder')}
+            </Text>
+          </Button>
+        </YStack>
+        <YStack gap="$2">
+          <Text fontSize="$3" color="$muted">
             {t('auth.register.role')}
           </Text>
           <XStack gap="$2" padding="$2" backgroundColor="$backgroundSoft" borderRadius="$3">
-            {(['Client', 'Trainer'] as Role[]).map((item) => {
-              const isSelected = role === item;
+            {roleOptions.map((item) => {
+              const isSelected = role === item.code;
               return (
                 <Button
-                  key={item}
+                  key={item.code}
                   size="$3"
                   backgroundColor={isSelected ? '$background' : '$backgroundSoft'}
                   color="$text"
@@ -156,10 +293,38 @@ export function RegisterScreen({ navigation }: Props) {
                   borderWidth={1}
                   borderColor="$border"
                   borderRadius="$3"
-                  onPress={() => setRole(item)}
+                  onPress={() => setRole(item.code)}
                   flex={1}
+                  minHeight="$10"
                 >
-                  {item === 'Client' ? t('auth.register.roleClient') : t('auth.register.roleTrainer')}
+                  {item.label}
+                </Button>
+              );
+            })}
+          </XStack>
+        </YStack>
+        <YStack gap="$2">
+          <Text fontSize="$3" color="$muted">
+            {t('profile.personal.genderUserLabel')}
+          </Text>
+          <XStack gap="$2" padding="$2" backgroundColor="$backgroundSoft" borderRadius="$3">
+            {genderOptions.map((item) => {
+              const isSelected = gender === item.code;
+              return (
+                <Button
+                  key={item.code}
+                  size="$3"
+                  backgroundColor={isSelected ? '$background' : '$backgroundSoft'}
+                  color="$text"
+                  fontWeight={isSelected ? '700' : '400'}
+                  borderWidth={1}
+                  borderColor="$border"
+                  borderRadius="$3"
+                  onPress={() => setGender(item.code)}
+                  flex={1}
+                  minHeight="$10"
+                >
+                  {item.label}
                 </Button>
               );
             })}
@@ -171,11 +336,11 @@ export function RegisterScreen({ navigation }: Props) {
               {t('auth.register.specialization')}
             </Text>
             <XStack gap="$2" flexWrap="wrap">
-              {SPECIALIZATIONS.map((item) => {
-                const isSelected = specialization === item.value;
+              {specializationOptions.map((item) => {
+                const isSelected = specialization === item.code;
                 return (
                   <Button
-                    key={item.value}
+                    key={item.code}
                     size="$3"
                     backgroundColor={isSelected ? '$background' : '$surfaceMuted'}
                     color="$text"
@@ -183,9 +348,10 @@ export function RegisterScreen({ navigation }: Props) {
                     borderWidth={1}
                     borderColor="$border"
                     borderRadius="$3"
-                    onPress={() => setSpecialization(item.value)}
+                    onPress={() => setSpecialization(item.code)}
+                    minHeight="$9"
                   >
-                    {t(item.labelKey)}
+                    {item.label}
                   </Button>
                 );
               })}

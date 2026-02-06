@@ -5,7 +5,10 @@ public sealed record RegisterRequest(
     string Password,
     string Role,
     string Name,
-    string? Specialization);
+    string CityName,
+    string? DistrictName,
+    string? Gender,
+    IReadOnlyList<string>? Specializations);
 
 public sealed record LoginRequest(string Email, string Password);
 
@@ -14,12 +17,20 @@ public sealed record AuthUserDto(
     string Email,
     string Role,
     string Name,
-    string? Specialization,
+    string Gender,
+    int? CityId,
+    string? CityName,
+    int? DistrictId,
+    string? DistrictName,
     string? GymName,
     string? About,
     IReadOnlyList<string> TrainingTypes,
-    string? ClientGenderPreference,
+    IReadOnlyList<string> Specializations,
+    string? WorksWithGender,
     int? PricePerSession,
+    string? PreferredTrainerGender,
+    string? ClientLevel,
+    IReadOnlyList<string> ClientGoals,
     double? TrainerRating,
     int? TrainerRatingCount,
     bool HasAvatar,

@@ -60,6 +60,13 @@ namespace Api.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("Gender")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasDefaultValue("Male");
+
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
 
@@ -147,9 +154,74 @@ namespace Api.Migrations
                     b.ToTable("bookings", (string)null);
                 });
 
+            modelBuilder.Entity("Api.Data.City", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("cities", (string)null);
+                });
+
             modelBuilder.Entity("Api.Data.ClientProfile", b =>
                 {
                     b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("CityId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now() at time zone 'utc'");
+
+                    b.Property<int?>("DistrictId")
+                        .HasColumnType("integer");
+
+                    b.PrimitiveCollection<string[]>("Goals")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Beginner");
+
+                    b.Property<string>("PreferredTrainerGender")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasDefaultValue("Any");
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("CityId");
+
+                    b.HasIndex("DistrictId");
+
+                    b.ToTable("client_profiles", (string)null);
+                });
+
+            modelBuilder.Entity("Api.Data.DeviceToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -157,9 +229,80 @@ namespace Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now() at time zone 'utc'");
 
-                    b.HasKey("UserId");
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
-                    b.ToTable("client_profiles", (string)null);
+                    b.Property<DateTime>("LastSeenAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now() at time zone 'utc'");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "Platform");
+
+                    b.ToTable("device_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("Api.Data.District", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CityId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CityId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("districts", (string)null);
+                });
+
+            modelBuilder.Entity("Api.Data.PushEventDedup", b =>
+                {
+                    b.Property<string>("KeyHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now() at time zone 'utc'");
+
+                    b.Property<DateTime>("LastSentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("KeyHash");
+
+                    b.ToTable("push_event_dedup", (string)null);
                 });
 
             modelBuilder.Entity("Api.Data.RefreshToken", b =>
@@ -207,17 +350,16 @@ namespace Api.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)");
 
-                    b.Property<string>("ClientGenderPreference")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(12)
-                        .HasColumnType("character varying(12)")
-                        .HasDefaultValue("All");
+                    b.Property<int?>("CityId")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now() at time zone 'utc'");
+
+                    b.Property<int?>("DistrictId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("GymName")
                         .HasMaxLength(120)
@@ -226,8 +368,9 @@ namespace Api.Migrations
                     b.Property<int?>("PricePerSession")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Specialization")
-                        .HasColumnType("text");
+                    b.PrimitiveCollection<string[]>("Specializations")
+                        .IsRequired()
+                        .HasColumnType("text[]");
 
                     b.PrimitiveCollection<string[]>("TrainingTypes")
                         .IsRequired()
@@ -236,7 +379,18 @@ namespace Api.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("WorksWithGender")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasDefaultValue("Any");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("CityId");
+
+                    b.HasIndex("DistrictId");
 
                     b.HasIndex("UserId")
                         .IsUnique();
@@ -443,13 +597,49 @@ namespace Api.Migrations
 
             modelBuilder.Entity("Api.Data.ClientProfile", b =>
                 {
+                    b.HasOne("Api.Data.City", "City")
+                        .WithMany()
+                        .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Api.Data.District", "District")
+                        .WithMany()
+                        .HasForeignKey("DistrictId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Api.Data.AppUser", "User")
                         .WithOne()
                         .HasForeignKey("Api.Data.ClientProfile", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("City");
+
+                    b.Navigation("District");
+
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Api.Data.DeviceToken", b =>
+                {
+                    b.HasOne("Api.Data.AppUser", "User")
+                        .WithMany("DeviceTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Api.Data.District", b =>
+                {
+                    b.HasOne("Api.Data.City", "City")
+                        .WithMany("Districts")
+                        .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("City");
                 });
 
             modelBuilder.Entity("Api.Data.RefreshToken", b =>
@@ -465,11 +655,25 @@ namespace Api.Migrations
 
             modelBuilder.Entity("Api.Data.TrainerProfile", b =>
                 {
+                    b.HasOne("Api.Data.City", "City")
+                        .WithMany()
+                        .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Api.Data.District", "District")
+                        .WithMany()
+                        .HasForeignKey("DistrictId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Api.Data.AppUser", "User")
                         .WithOne()
                         .HasForeignKey("Api.Data.TrainerProfile", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("City");
+
+                    b.Navigation("District");
 
                     b.Navigation("User");
                 });
@@ -551,7 +755,14 @@ namespace Api.Migrations
                 {
                     b.Navigation("Avatar");
 
+                    b.Navigation("DeviceTokens");
+
                     b.Navigation("RefreshTokens");
+                });
+
+            modelBuilder.Entity("Api.Data.City", b =>
+                {
+                    b.Navigation("Districts");
                 });
 
             modelBuilder.Entity("Api.Data.TrainerProfile", b =>

@@ -1,5 +1,5 @@
 import { Button, Text, XStack } from 'tamagui';
-import { AppIcon } from '../../ui/AppIcon';
+import { AppIcon } from '@ui/AppIcon';
 
 type CreateSlotHeaderProps = {
   title: string;
@@ -25,3 +25,4 @@ export function CreateSlotHeader({ title, onBack }: CreateSlotHeaderProps) {
     </XStack>
   );
 }
+

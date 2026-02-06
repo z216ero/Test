@@ -1,5 +1,7 @@
-import { createAnimations } from '@tamagui/animations-react-native';
-import { createTamagui } from '@tamagui/core';
+// apps/mobile/tamagui.config.cjs
+
+const { createAnimations } = require('@tamagui/animations-react-native')
+const { createTamagui } = require('@tamagui/core')
 
 const tokens = {
   color: {
@@ -40,7 +42,7 @@ const tokens = {
     9: 40,
     10: 48,
     11: 56,
-    12: 50
+    12: 50,
   },
   radius: {
     0: 0,
@@ -53,11 +55,11 @@ const tokens = {
     7: 28,
     8: 32,
     9: 36,
-    10: 40
+    10: 40,
   },
-};
+}
 
-export const config = createTamagui({
+const config = createTamagui({
   defaultFont: 'body',
   tokens,
   animations: createAnimations({
@@ -108,12 +110,7 @@ export const config = createTamagui({
       },
     },
   },
-});
+})
 
-export type AppConfig = typeof config;
-
-declare module 'tamagui' {
-  interface TamaguiCustomConfig extends AppConfig { }
-}
-
-export default config;
+module.exports = config
+module.exports.config = config

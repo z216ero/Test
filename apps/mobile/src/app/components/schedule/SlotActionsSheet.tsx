@@ -2,12 +2,12 @@ import { Sheet } from '@tamagui/sheet';
 import { useEffect, useMemo, useState } from 'react';
 import { Image } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import type { SlotDto } from '../../../generated/api';
-import { t } from '../../../i18n';
-import { formatTimeRangeRu } from '../../../utils/datetime';
-import { getAccessToken } from '../../../auth/tokenStorage';
-import { AppIcon } from '../../../ui/AppIcon';
-import { buildAbsoluteUrl } from '../../../utils/url';
+import type { SlotDto } from '@generated/api';
+import { t } from '@i18n';
+import { formatTimeRangeRu } from '@utils/datetime';
+import { getAccessToken } from '@auth/tokenStorage';
+import { AppIcon } from '@ui/AppIcon';
+import { buildAbsoluteUrl } from '@utils/url';
 import {
   canCancelBookedSlot,
   canCancelSlot,
@@ -89,7 +89,8 @@ export function SlotActionsSheet({
   const canShowNoShow = !!slot && canMarkAttendance && canMarkNoShow(slot, nowTs);
   const canShowComplete = !!slot && canMarkAttendance && canMarkCompleted(slot, nowTs);
   const canCancelAvailable = !!slot && canCancelSlot(slot, nowTs);
-  const canCancelBooked = !!slot && canCancelBookedSlot(slot, nowTs);
+  const canCancelBooked =
+    !!slot && statusType !== 'needs_attention' && canCancelBookedSlot(slot, nowTs);
   const isPastFreeSlot = !!slot && isFreeSlotPast(slot, nowTs);
   const isFinalAttendance = !!slot && statusType ? isUiSlotStatusFinal(statusType) : false;
   const startTs = slot ? getSlotStartTimestamp(slot) : null;
@@ -295,6 +296,19 @@ export function SlotActionsSheet({
                     </Text>
                   </XStack>
                 ) : null}
+                {statusType === 'needs_attention' ? (
+                  <XStack
+                    padding="$4"
+                    borderRadius="$4"
+                    backgroundColor="$surfaceMuted"
+                    borderWidth={1}
+                    borderColor="$border"
+                  >
+                    <Text fontSize="$3" color="$muted">
+                      {t('schedule.sheet.attendanceRequired')}
+                    </Text>
+                  </XStack>
+                ) : null}
                 {canCancelBooked ? (
                   <Button
                     backgroundColor="$background"
@@ -348,3 +362,5 @@ export function SlotActionsSheet({
     </Sheet>
   );
 }
+
+

@@ -1,6 +1,6 @@
 import { Button, Switch, Text, XStack, YStack } from 'tamagui';
-import { t } from '../../i18n';
-import { SLOT_DURATION_MINUTES } from '../../utils/slotTimeGrid';
+import { t } from '@i18n';
+import { SLOT_DURATION_MINUTES } from '@utils/slotTimeGrid';
 import { MULTI_COUNTS } from './useCreateSlotFormState';
 
 type CreateSlotMultiSectionProps = {
@@ -71,3 +71,5 @@ export function CreateSlotMultiSection({
     </YStack>
   );
 }
+
+

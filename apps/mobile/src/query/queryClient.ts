@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/core';
-import { ApiHttpError, ApiTimeoutError } from '../api/fetcher';
+import { ApiError } from '@api/core';
+import { ApiHttpError, ApiTimeoutError } from '@api/fetcher';
 
 const MAX_RETRIES = 2;
 
@@ -64,3 +64,4 @@ export const queryClient = new QueryClient({
     },
   },
 });
+

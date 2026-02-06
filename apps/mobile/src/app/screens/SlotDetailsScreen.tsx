@@ -1,17 +1,17 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { Button, Text, YStack } from 'tamagui';
-import { apiClient } from '../../api/client';
-import { presentApiError } from '../../api/ApiErrorPresenter';
-import { unwrap } from '../../api/core';
-import { useAppMutation } from '../../query/hooks';
-import { keys } from '../../query/keys';
-import { t } from '../../i18n';
-import { primaryButtonProps, secondaryButtonProps } from '../../ui/formDefaults';
-import { useToast } from '../../ui/feedback/useToast';
-import { formatUtcRange } from '../../utils/time';
-import { formatPrice } from '../../utils/price';
-import type { AppStackParamList } from '../navigation/types';
+import { apiClient } from '@api/client';
+import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
+import { unwrap } from '@api/core';
+import { useAppMutation } from '@query/hooks';
+import { keys } from '@query/keys';
+import { t } from '@i18n';
+import { primaryButtonProps, secondaryButtonProps } from '@ui/formDefaults';
+import { useToast } from '@ui/feedback/useToast';
+import { formatUtcRange } from '@utils/time';
+import { formatPrice } from '@utils/price';
+import type { AppStackParamList } from '@app/navigation/types';
 import { useQueryClient } from '@tanstack/react-query';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'SlotDetails'>;
@@ -44,16 +44,17 @@ export function SlotDetailsScreen({ route, navigation }: Props) {
       }
       queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
       setSuccess('Slot booked successfully.');
-      showToast({ type: 'success', title: 'Slot booked successfully.' });
     },
     onError: (err) => {
       const presented = presentApiError(err);
       setError(presented.message);
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message: presented.message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
     },
   });
 
@@ -140,3 +141,6 @@ export function SlotDetailsScreen({ route, navigation }: Props) {
     </YStack>
   );
 }
+
+
+

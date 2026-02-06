@@ -1,5 +1,5 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
-import type { SlotDto } from '../../generated/api';
+import type { AvailableSlotTrainerDto, SlotDto } from '@generated/api';
 
 export type ScheduleStackParamList = {
   ScheduleHome: undefined;
@@ -11,25 +11,42 @@ export type BookingsStackParamList = {
   BookingDetails: {
     slot: SlotDto;
     trainerName?: string | null;
-    trainerSpecialization?: string | null;
+    trainerSpecializations?: string[] | null;
+    trainerTrainingTypes?: string[] | null;
+    trainerCityName?: string | null;
+    trainerDistrictName?: string | null;
     trainerAvatarUrl?: string | null;
   };
 };
 
+export type LocationSelection = {
+  cityId?: number | null;
+  cityName?: string | null;
+  districtId?: number | null;
+  districtName?: string | null;
+};
+
+export type LocationSearchParams = {
+  mode: 'city' | 'district';
+  cityId?: number | null;
+  cityName?: string | null;
+  returnTo: 'Register' | 'PersonalInfo';
+};
+
 export type ProfileStackParamList = {
   ProfileHome: undefined;
-  PersonalInfo: undefined;
+  PersonalInfo: { locationSelection?: LocationSelection } | undefined;
   Notifications: undefined;
+  LocationSearch: LocationSearchParams;
 };
 
 export type UserRole = 'Client' | 'Trainer';
 
 export type SlotsStackParamList = {
   SlotsList: undefined;
-  BookingConfirm: {
+  ClientSlotDetails: {
     slot: SlotDto;
-    trainerName?: string | null;
-    trainerSpecialization?: string | null;
+    trainer: AvailableSlotTrainerDto;
   };
 };
 
@@ -51,7 +68,8 @@ export type AppTabsParamList = ClientTabsParamList & TrainerTabsParamList;
 
 export type AuthStackParamList = {
   Login: undefined;
-  Register: undefined;
+  Register: { locationSelection?: LocationSelection } | undefined;
+  LocationSearch: LocationSearchParams;
 };
 
 export type AppStackParamList = {
@@ -77,3 +95,4 @@ export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
   App: { role: UserRole } | undefined;
 };
+

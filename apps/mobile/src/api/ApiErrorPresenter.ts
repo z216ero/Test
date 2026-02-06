@@ -20,6 +20,13 @@ export type PresentedError = {
   status?: number;
 };
 
+export const shouldShowErrorToast = (presented: PresentedError): boolean => (
+  presented.kind === 'server'
+  || presented.kind === 'network'
+  || presented.kind === 'timeout'
+  || presented.kind === 'unknown'
+);
+
 const getStatus = (error: unknown): number | undefined => {
   if (error instanceof ApiHttpError || error instanceof ApiError) {
     return error.status;

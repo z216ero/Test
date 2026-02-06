@@ -2,19 +2,19 @@ import type {
   AuthUserDto,
   SlotDto,
   TrainerDto,
-} from '../generated/api';
+} from '@generated/api';
 import {
   getAuthMe,
   getTrainersMe,
   getTrainersTrainerIdSlots,
-} from '../generated/api';
+} from '@generated/api';
 import { unwrap } from './core';
 import { getClientUpcomingBookings } from './bookingsApi';
 
 export type UpcomingSession = {
   slot: SlotDto;
   trainerName?: string | null;
-  specialization?: string | null;
+  trainerSpecializations?: string[] | null;
   trainerAvatarUrl?: string | null;
 };
 
@@ -43,7 +43,7 @@ const sortByStart = (a: SlotDto, b: SlotDto) => {
 };
 
 export const getUpcomingForTrainer = async (
-  specialization?: string | null,
+  trainerSpecializations?: string[] | null,
   options?: RequestInit
 ): Promise<UpcomingSession | null> => {
   const trainerResponse = await getTrainersMe(options);
@@ -74,7 +74,7 @@ export const getUpcomingForTrainer = async (
   return {
     slot: upcoming,
     trainerName: trainer.displayName,
-    specialization,
+    trainerSpecializations,
   };
 };
 
@@ -103,7 +103,8 @@ export const getUpcomingForClient = async (
   return {
     slot: upcoming.slot,
     trainerName: upcoming.trainerName,
-    specialization: upcoming.trainerSpecialization,
+    trainerSpecializations: upcoming.trainerSpecializations,
     trainerAvatarUrl: upcoming.trainerAvatarUrl,
   };
 };
+

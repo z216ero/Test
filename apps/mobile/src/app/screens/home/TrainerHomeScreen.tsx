@@ -1,26 +1,26 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
 import { type QueryKey, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Image, RefreshControl } from 'react-native';
-import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   attendanceActionsAvailable,
   getMyTrainerSlots,
   markSlotCompleted,
   markSlotNoShow,
-} from '../../../api/trainerSlotsApi';
-import { presentApiError } from '../../../api/ApiErrorPresenter';
-import { getAccessToken } from '../../../auth/tokenStorage';
-import type { SlotDto } from '../../../generated/api';
-import { t } from '../../../i18n';
-import { useAppMutation, useAppQuery } from '../../../query/hooks';
-import { keys } from '../../../query/keys';
-import { AppIcon } from '../../../ui/AppIcon';
-import { useToast } from '../../../ui/feedback/useToast';
-import { formatTimeRangeRu } from '../../../utils/datetime';
-import { buildAbsoluteUrl } from '../../../utils/url';
+} from '@api/trainerSlotsApi';
+import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
+import { getAccessToken } from '@auth/tokenStorage';
+import type { SlotDto } from '@generated/api';
+import { t } from '@i18n';
+import { useAppMutation, useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
+import { AppIcon } from '@ui/AppIcon';
+import { useToast } from '@ui/feedback/useToast';
+import { useTabBarPadding } from '@ui/layout/useTabBarPadding';
+import { TabScrollView } from '@ui/layout/TabScrollView';
+import { formatTimeRangeRu } from '@utils/datetime';
+import { buildAbsoluteUrl } from '@utils/url';
 import {
   canMarkCompleted,
   canMarkNoShow,
@@ -30,7 +30,7 @@ import {
   getSlotTimes,
   isFreeSlotPast,
   getUiSlotStatus,
-} from '../../components/schedule/slotHelpers';
+} from '@app/components/schedule/slotHelpers';
 import type { HomeMeState, HomeNavigation, HomeUser } from './types';
 
 const NOW_REFRESH_INTERVAL_MS = 30 * 1000;
@@ -74,7 +74,7 @@ type TrainerHomeScreenProps = {
 export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreenProps) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-  const tabBarHeight = useBottomTabBarHeight();
+  const { tabBarHeight } = useTabBarPadding();
   const {
     isLoading: isMeLoading,
     isFetching: isMeFetching,
@@ -287,18 +287,19 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
-      showToast({ type: 'success', title: t('status.completed') });
     },
     onError: (error, _variables, context) => {
       if (context?.snapshot) {
         rollbackSlotsCache(context.snapshot);
       }
       const presented = presentApiError(error);
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message: presented.message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
     },
   });
 
@@ -315,18 +316,19 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
-      showToast({ type: 'success', title: t('status.noShow') });
     },
     onError: (error, _variables, context) => {
       if (context?.snapshot) {
         rollbackSlotsCache(context.snapshot);
       }
       const presented = presentApiError(error);
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message: presented.message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
     },
   });
 
@@ -563,7 +565,7 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
 
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
-      <ScrollView
+      <TabScrollView
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -572,8 +574,8 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
         }
         contentContainerStyle={{
           padding: 24,
-          paddingBottom: tabBarHeight + 120,
         }}
+        extraBottom={96}
       >
         <YStack gap="$4">
           <XStack alignItems="center" justifyContent="space-between">
@@ -636,7 +638,7 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
             </YStack>
           ) : null}
         </YStack>
-      </ScrollView>
+      </TabScrollView>
       <Button
         position="absolute"
         left="$6"
@@ -658,3 +660,6 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     </YStack>
   );
 }
+
+
+

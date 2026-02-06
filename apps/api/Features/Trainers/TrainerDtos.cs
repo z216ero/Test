@@ -1,6 +1,10 @@
 namespace Api.Features.Trainers;
 
-public sealed record CreateTrainerRequest(string DisplayName, string? GymName);
+public sealed record CreateTrainerRequest(
+    string DisplayName,
+    string? GymName,
+    string CityName,
+    string? DistrictName);
 
 public sealed record TrainerDto(
     Guid Id,

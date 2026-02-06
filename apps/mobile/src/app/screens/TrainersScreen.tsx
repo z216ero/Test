@@ -1,16 +1,16 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { JSX } from 'react';
 import { Button, Text, YStack } from 'tamagui';
-import { apiClient } from '../../api/client';
-import { unwrap } from '../../api/core';
-import { secondaryButtonProps } from '../../ui/formDefaults';
-import type { TrainerDto } from '../../generated/api';
-import { useAppQuery } from '../../query/hooks';
-import { keys } from '../../query/keys';
-import { EmptyState } from '../../ui/states/EmptyState';
-import { ErrorState } from '../../ui/states/ErrorState';
-import { LoadingState } from '../../ui/states/LoadingState';
-import type { AppStackParamList } from '../navigation/types';
+import { apiClient } from '@api/client';
+import { unwrap } from '@api/core';
+import { secondaryButtonProps } from '@ui/formDefaults';
+import type { TrainerDto } from '@generated/api';
+import { useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
+import { EmptyState } from '@ui/states/EmptyState';
+import { ErrorState } from '@ui/states/ErrorState';
+import { LoadingState } from '@ui/states/LoadingState';
+import type { AppStackParamList } from '@app/navigation/types';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Trainers'>;
 
@@ -125,3 +125,5 @@ export function TrainersScreen({ route, navigation }: Props) {
     </YStack>
   );
 }
+
+

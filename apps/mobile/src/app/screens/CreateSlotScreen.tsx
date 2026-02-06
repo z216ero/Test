@@ -1,11 +1,11 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../../api/client';
-import { unwrap } from '../../api/core';
-import { t } from '../../i18n';
-import { keys } from '../../query/keys';
+import { apiClient } from '@api/client';
+import { unwrap } from '@api/core';
+import { t } from '@i18n';
+import { keys } from '@query/keys';
 import { CreateSlotForm } from './CreateSlotForm';
-import type { AppStackParamList } from '../navigation/types';
+import type { AppStackParamList } from '@app/navigation/types';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'CreateSlot'>;
 
@@ -47,3 +47,6 @@ export function CreateSlotScreen({ route, navigation }: Props) {
     />
   );
 }
+
+
+

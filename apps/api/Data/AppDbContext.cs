@@ -14,6 +14,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<UserAvatar> UserAvatars => Set<UserAvatar>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
+    public DbSet<PushEventDedup> PushEventDedups => Set<PushEventDedup>();
+    public DbSet<City> Cities => Set<City>();
+    public DbSet<District> Districts => Set<District>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -26,6 +30,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsRequired();
             entity.Property(x => x.Role)
                 .HasMaxLength(20)
+                .IsRequired();
+            entity.Property(x => x.Gender)
+                .HasConversion<string>()
+                .HasMaxLength(12)
+                .HasDefaultValue(Gender.Male)
                 .IsRequired();
         });
 
@@ -41,27 +50,42 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             entity.ToTable("trainer_profiles");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.CityId);
+            entity.Property(x => x.DistrictId);
             entity.Property(x => x.GymName)
                 .HasMaxLength(120);
             entity.Property(x => x.About)
                 .HasMaxLength(250);
+            entity.Property(x => x.Specializations)
+                .HasColumnType("text[]")
+                .IsRequired();
             entity.Property(x => x.TrainingTypes)
                 .HasColumnType("text[]")
                 .IsRequired();
-            entity.Property(x => x.ClientGenderPreference)
+            entity.Property(x => x.WorksWithGender)
                 .HasConversion<string>()
                 .HasMaxLength(12)
-                .HasDefaultValue(ClientGenderPreference.All);
+                .HasDefaultValue(Gender.Any);
             entity.Property(x => x.UserId)
                 .IsRequired();
             entity.Property(x => x.CreatedAtUtc)
                 .HasDefaultValueSql("now() at time zone 'utc'");
             entity.HasIndex(x => x.UserId)
                 .IsUnique();
+            entity.HasIndex(x => x.CityId);
+            entity.HasIndex(x => x.DistrictId);
             entity.HasOne(x => x.User)
                 .WithOne()
                 .HasForeignKey<TrainerProfile>(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.City)
+                .WithMany()
+                .HasForeignKey(x => x.CityId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.District)
+                .WithMany()
+                .HasForeignKey(x => x.DistrictId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ClientProfile>(entity =>
@@ -70,12 +94,35 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(x => x.UserId);
             entity.Property(x => x.UserId)
                 .IsRequired();
+            entity.Property(x => x.CityId);
+            entity.Property(x => x.DistrictId);
+            entity.Property(x => x.PreferredTrainerGender)
+                .HasConversion<string>()
+                .HasMaxLength(12)
+                .HasDefaultValue(Gender.Any);
+            entity.Property(x => x.Level)
+                .HasConversion<string>()
+                .HasMaxLength(16)
+                .HasDefaultValue(ClientLevel.Beginner);
+            entity.Property(x => x.Goals)
+                .HasColumnType("text[]")
+                .IsRequired();
             entity.Property(x => x.CreatedAtUtc)
                 .HasDefaultValueSql("now() at time zone 'utc'");
             entity.HasOne(x => x.User)
                 .WithOne()
                 .HasForeignKey<ClientProfile>(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.CityId);
+            entity.HasIndex(x => x.DistrictId);
+            entity.HasOne(x => x.City)
+                .WithMany()
+                .HasForeignKey(x => x.CityId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.District)
+                .WithMany()
+                .HasForeignKey(x => x.DistrictId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<TrainingSlot>(entity =>
@@ -154,6 +201,70 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasOne(x => x.User)
                 .WithMany(x => x.RefreshTokens)
                 .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DeviceToken>(entity =>
+        {
+            entity.ToTable("device_tokens");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Platform)
+                .HasMaxLength(12)
+                .IsRequired();
+            entity.Property(x => x.Token)
+                .HasMaxLength(512)
+                .IsRequired();
+            entity.Property(x => x.CreatedAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.Property(x => x.LastSeenAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.Property(x => x.IsEnabled)
+                .HasDefaultValue(true);
+            entity.HasIndex(x => x.Token)
+                .IsUnique();
+            entity.HasIndex(x => new { x.UserId, x.Platform });
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.DeviceTokens)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PushEventDedup>(entity =>
+        {
+            entity.ToTable("push_event_dedup");
+            entity.HasKey(x => x.KeyHash);
+            entity.Property(x => x.KeyHash)
+                .HasMaxLength(64)
+                .IsRequired();
+            entity.Property(x => x.LastSentAtUtc)
+                .IsRequired();
+            entity.Property(x => x.CreatedAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+        });
+
+        modelBuilder.Entity<City>(entity =>
+        {
+            entity.ToTable("cities");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name)
+                .HasMaxLength(120)
+                .IsRequired();
+            entity.HasIndex(x => x.Name)
+                .IsUnique();
+        });
+
+        modelBuilder.Entity<District>(entity =>
+        {
+            entity.ToTable("districts");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name)
+                .HasMaxLength(120)
+                .IsRequired();
+            entity.HasIndex(x => new { x.CityId, x.Name })
+                .IsUnique();
+            entity.HasOne(x => x.City)
+                .WithMany(x => x.Districts)
+                .HasForeignKey(x => x.CityId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

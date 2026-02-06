@@ -55,6 +55,13 @@ const mutation = useAppMutation({
 - Use `presentApiError(err)` for human-readable messages.
 - Do not swallow errors silently.
 
+## Push tokens
+- Register device tokens after login/boot using the generated client:
+  - `postPushTokens({ token, platform: 'android' })`
+- When disabling notifications/logging out, call:
+  - `postPushTokensDisable({ token })`
+- Tokens are tied to the current authenticated user; always ensure the access token is set.
+
 ## Timeouts and retries
 - Requests use the shared fetcher with a 15s timeout.
 - Retries are handled by React Query (max 2) per `queryClient` defaults.

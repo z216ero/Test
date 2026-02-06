@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image } from 'react-native';
 import { YStack, Text } from 'tamagui';
-import { getAccessToken } from '../../../auth/tokenStorage';
-import { t } from '../../../i18n';
-import { buildAbsoluteUrl } from '../../../utils/url';
+import { getAccessToken } from '@auth/tokenStorage';
+import { t } from '@i18n';
+import { buildAbsoluteUrl } from '@utils/url';
 
 type TrainerAvatarProps = {
   name?: string | null;
@@ -74,3 +74,5 @@ export function TrainerAvatar({ name, avatarUrl, size = '$9' }: TrainerAvatarPro
     </YStack>
   );
 }
+
+

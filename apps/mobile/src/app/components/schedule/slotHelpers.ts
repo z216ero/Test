@@ -1,5 +1,5 @@
-import type { SlotDto } from '../../../generated/api';
-import type { TranslationKey } from '../../../i18n';
+import type { SlotDto } from '@generated/api';
+import type { TranslationKey } from '@i18n';
 
 export type UiSlotStatus =
   | 'available'
@@ -268,3 +268,5 @@ export const shouldShowInCompletedToday = (slot: SlotDto): boolean => {
   }
   return false;
 };
+
+

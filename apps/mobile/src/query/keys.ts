@@ -1,4 +1,4 @@
-import type { GetTrainersTrainerIdSlotsParams } from '../generated/api';
+import type { GetSlotsAvailableParams, GetTrainersTrainerIdSlotsParams } from '@generated/api';
 
 export const keys = {
   auth: {
@@ -27,9 +27,32 @@ export const keys = {
     history: () => ['bookings', 'history'] as const,
   },
   slots: {
-    available: (params?: GetTrainersTrainerIdSlotsParams) =>
+    available: (params?: GetSlotsAvailableParams) =>
       params
         ? (['slots', 'available', params] as const)
         : (['slots', 'available'] as const),
   },
+  lookups: {
+    roles: () => ['lookups', 'roles'] as const,
+    genders: () => ['lookups', 'genders'] as const,
+    levels: () => ['lookups', 'levels'] as const,
+    goals: () => ['lookups', 'goals'] as const,
+    specializations: () => ['lookups', 'specializations'] as const,
+    trainingTypes: () => ['lookups', 'training-types'] as const,
+    slotStatuses: () => ['lookups', 'slot-statuses'] as const,
+    bookingStatuses: () => ['lookups', 'booking-statuses'] as const,
+    paymentStatuses: () => ['lookups', 'payment-statuses'] as const,
+    paymentMethods: () => ['lookups', 'payment-methods'] as const,
+    dateFilters: () => ['lookups', 'date-filters'] as const,
+    sortOptions: () => ['lookups', 'sort-options'] as const,
+    cities: (query?: string) =>
+      query
+        ? (['lookups', 'cities', query] as const)
+        : (['lookups', 'cities'] as const),
+    districts: (cityId?: number, query?: string) =>
+      cityId !== undefined || query
+        ? (['lookups', 'districts', cityId ?? null, query ?? null] as const)
+        : (['lookups', 'districts'] as const),
+  },
 };
+

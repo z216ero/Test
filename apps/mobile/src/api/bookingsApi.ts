@@ -1,10 +1,10 @@
-import type { AuthUserDto, BookingDto, SlotDto, UpcomingSessionDto } from '../generated/api';
+import type { AuthUserDto, BookingDto, SlotDto, UpcomingSessionDto } from '@generated/api';
 import {
   getAuthMe,
   postSlotsSlotIdBook,
   postSlotsSlotIdCancel,
-} from '../generated/api';
-import { t } from '../i18n';
+} from '@generated/api';
+import { t } from '@i18n';
 import { ApiError, unwrap } from './core';
 import { ApiTimeoutError } from './fetcher';
 import { customFetch } from './custom-fetch';
@@ -12,12 +12,28 @@ import { customFetch } from './custom-fetch';
 export type ClientBooking = {
   slot: SlotDto;
   trainerName?: string | null;
-  trainerSpecialization?: string | null;
+  trainerCityName?: string | null;
+  trainerDistrictName?: string | null;
+  trainerSpecializations?: string[] | null;
+  trainerTrainingTypes?: string[] | null;
   trainerAvatarUrl?: string | null;
 };
 
 export class BookingConflictError extends ApiError {}
+export class BookingTimeConflictError extends ApiError {}
 export class BookingNotFoundError extends ApiError {}
+
+const isTimeConflict = (details: unknown): boolean => {
+  if (!details || typeof details !== 'object') {
+    return false;
+  }
+
+  const problem = details as { title?: string | null; detail?: string | null };
+  const title = problem.title?.toLowerCase() ?? '';
+  const detail = problem.detail?.toLowerCase() ?? '';
+
+  return title.includes('time conflict') || detail.includes('overlap');
+};
 
 const mapBookingError = (error: unknown): Error => {
   if (error instanceof ApiTimeoutError) {
@@ -30,6 +46,14 @@ const mapBookingError = (error: unknown): Error => {
 
   if (error instanceof ApiError) {
     if (error.status === 409) {
+      if (isTimeConflict(error.details)) {
+        return new BookingTimeConflictError(
+          t('errors.slotTimeConflict'),
+          error.status,
+          error.details
+        );
+      }
+
       return new BookingConflictError(
         t('errors.slotTaken'),
         error.status,
@@ -100,7 +124,10 @@ const mapSessionToBooking = (session: UpcomingSessionDto): ClientBooking | null 
   return {
     slot: session.slot,
     trainerName: session.trainerName,
-    trainerSpecialization: session.trainerSpecialization,
+    trainerCityName: session.trainerCityName,
+    trainerDistrictName: session.trainerDistrictName,
+    trainerSpecializations: session.trainerSpecializations,
+    trainerTrainingTypes: session.trainerTrainingTypes,
     trainerAvatarUrl: session.trainerAvatarUrl,
   };
 };
@@ -136,3 +163,5 @@ export const getClientBookingHistory = async (
     .map(mapSessionToBooking)
     .filter((item): item is ClientBooking => item !== null);
 };
+
+

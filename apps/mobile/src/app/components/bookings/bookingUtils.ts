@@ -1,5 +1,5 @@
-import type { SlotDto } from '../../../generated/api';
-import type { TranslationKey } from '../../../i18n';
+import type { SlotDto } from '@generated/api';
+import type { TranslationKey } from '@i18n';
 
 export type BookingStatusType =
   | 'booked'
@@ -113,3 +113,5 @@ export const canCancelBooking = (slot: SlotDto, nowTs: number): boolean => {
   }
   return nowTs < startTs;
 };
+
+

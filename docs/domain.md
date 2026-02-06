@@ -1,4 +1,4 @@
-# Domain (MVP)
+﻿# Domain (MVP)
 
 This document is the single source of truth for business rules.
 If requirements are unclear or missing in code, ALWAYS follow this document.
@@ -49,22 +49,39 @@ A user can have ONLY ONE role in MVP.
 ### User
 - id
 - role: Trainer | Client
+- gender: Male | Female | Any (default Male)
 - name
 - avatar (optional): user profile photo
 - phone or email (auth identifier)
 
 ### TrainerProfile
 - userId
+- cityId
+- districtId (optional)
 - pricePerSession
-- specialization (string, optional)
+- specializations (string[], optional; predefined list from product requirements)
 - gymName (string, optional)
 - about (string, optional, max 250)
 - trainingTypes (string[], optional; predefined list from product requirements)
-- clientGenderPreference: Men | Women | All (default All)
+- worksWithGender: Male | Female | Any (default Any)
 - rating (computed for UI; based on last 5–10 completed trainings)
 
 ### ClientProfile
 - userId
+- cityId
+- districtId (optional)
+- preferredTrainerGender: Male | Female | Any (default Any)
+- level: Beginner | Intermediate | Advanced (default Beginner)
+- goals (string[], optional; predefined list from product requirements)
+
+### City
+- id
+- name
+
+### District
+- id
+- cityId (optional)
+- name
 
 ### RefreshToken
 - id
@@ -73,6 +90,15 @@ A user can have ONLY ONE role in MVP.
 - expiresAt (UTC)
 - createdAt (UTC)
 - revokedAt (UTC, optional)
+
+### DeviceToken
+- id
+- userId
+- platform: android | ios
+- token (unique)
+- createdAt (UTC)
+- lastSeenAt (UTC)
+- isEnabled (bool)
 
 ### TrainingSlot
 - id
@@ -112,6 +138,26 @@ No integrations with banks.
 
 ---
 
+## Lookups (source of truth via API)
+
+Enums / lookup lists:
+- Role: Trainer, Client
+- Gender: Male, Female, Any
+- Level: Beginner, Intermediate, Advanced
+- Goal: WeightLoss, MuscleGain, Strength, Rehab, GeneralFitness
+- Specialization: StrengthTraining, Crossfit, Functional, Rehab, WeightLoss, Yoga, Pilates
+- TrainingType: Individual, Group
+- SlotStatus: Open, Booked, Cancelled
+- BookingStatus: Booked, Cancelled, Completed, NoShow
+- PaymentStatus: Pending, Paid, Refunded
+- PaymentMethod: Cash, Transfer, SBP
+- DateFilter: Today, Tomorrow, ThisWeek, CustomDate
+- SortOption: ByRating, ByPrice, ByDistance
+
+Lookups are returned via `GET /lookups/*` and are the only source of truth for UI options.
+
+---
+
 ## Time rules
 
 - All time in API and database is stored in UTC.
@@ -136,3 +182,18 @@ No integrations with banks.
 - Booking must be atomic (no double booking).
 - When booked:
   - slot.
+---
+
+## Location rules
+
+- City is REQUIRED on registration and profile update for both Trainer and Client.
+- District is OPTIONAL on registration.
+- City/District are stored on profiles (TrainerProfile, ClientProfile).
+- Cities and districts are stored in City and District tables.
+- On registration:
+  - if city does not exist, create it (normalize name: trim, normalize spaces, capitalize).
+  - if district is provided and does not exist in the selected city, create it (normalize name).
+- Trainer discovery for clients:
+  - Trainers are shown ONLY when trainer city matches client city.
+  - Optional client filter: "from my district" shows only trainers in the same district.
+

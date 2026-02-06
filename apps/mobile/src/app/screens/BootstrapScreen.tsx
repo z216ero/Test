@@ -1,18 +1,19 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Text, YStack } from 'tamagui';
-import { clearSession, getAccessToken } from '../../auth/tokenStorage';
-import { me } from '../../api/authApi';
-import { ApiError } from '../../api/core';
-import { ApiHttpError } from '../../api/fetcher';
-import { presentApiError } from '../../api/ApiErrorPresenter';
-import { t } from '../../i18n';
-import { useAppQuery } from '../../query/hooks';
-import { keys } from '../../query/keys';
-import { ErrorState } from '../../ui/states/ErrorState';
-import { LoadingState } from '../../ui/states/LoadingState';
-import { getUserRole } from '../utils/userRole';
-import type { RootStackParamList } from '../navigation/types';
+import { clearSession, getAccessToken } from '@auth/tokenStorage';
+import { me } from '@api/authApi';
+import { ApiError } from '@api/core';
+import { ApiHttpError } from '@api/fetcher';
+import { presentApiError } from '@api/ApiErrorPresenter';
+import { t } from '@i18n';
+import { useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
+import { ErrorState } from '@ui/states/ErrorState';
+import { LoadingState } from '@ui/states/LoadingState';
+import { getUserRole } from '@userRole';
+import { registerPushTokenIfPossible } from '@notifications/pushRegistration';
+import type { RootStackParamList } from '@app/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Bootstrap'>;
 
@@ -42,6 +43,7 @@ export function BootstrapScreen({ navigation }: Props) {
         if (!role) {
           return { target: 'unknown' as const };
         }
+        registerPushTokenIfPossible().catch(() => {});
         return { target: 'app' as const, role };
       } catch (err) {
         if (
@@ -112,3 +114,6 @@ export function BootstrapScreen({ navigation }: Props) {
     </YStack>
   );
 }
+
+
+

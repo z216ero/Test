@@ -3,9 +3,9 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 import { Platform } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { t } from '../../i18n';
-import { AppIcon } from '../../ui/AppIcon';
-import { formatDateRu } from '../../utils/datetime';
+import { t } from '@i18n';
+import { AppIcon } from '@ui/AppIcon';
+import { formatDateRu } from '@utils/datetime';
 import { formatWeekdayDate } from './useCreateSlotFormState';
 
 type CreateSlotDateSectionProps = {
@@ -139,3 +139,5 @@ export function CreateSlotDateSection({
     </YStack>
   );
 }
+
+

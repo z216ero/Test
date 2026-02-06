@@ -1,6 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
@@ -8,7 +7,6 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, RefreshControl } from 'react-native';
-import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   attendanceActionsAvailable,
@@ -16,34 +14,40 @@ import {
   getMyTrainerSlots,
   markSlotCompleted,
   markSlotNoShow,
-} from '../../api/trainerSlotsApi';
-import { presentApiError } from '../../api/ApiErrorPresenter';
-import type { SlotDto } from '../../generated/api';
-import { t } from '../../i18n';
-import { useAppMutation, useAppQuery } from '../../query/hooks';
-import { keys } from '../../query/keys';
-import { useToast } from '../../ui/feedback/useToast';
-import { AppIcon } from '../../ui/AppIcon';
-import { EmptyState } from '../../ui/states/EmptyState';
-import { ErrorState } from '../../ui/states/ErrorState';
-import { LoadingState } from '../../ui/states/LoadingState';
-import type { ScheduleStackParamList } from '../navigation/types';
-import { DateStrip } from '../components/schedule/DateStrip';
-import { SlotActionsSheet } from '../components/schedule/SlotActionsSheet';
-import { SlotCard } from '../components/schedule/SlotCard';
+} from '@api/trainerSlotsApi';
+import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
+import type { SlotDto } from '@generated/api';
+import { t } from '@i18n';
+import { useAppMutation, useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
+import { useToast } from '@ui/feedback/useToast';
+import { useTabBarPadding } from '@ui/layout/useTabBarPadding';
+import { TabScrollView } from '@ui/layout/TabScrollView';
+import { AppIcon } from '@ui/AppIcon';
+import { EmptyState } from '@ui/states/EmptyState';
+import { ErrorState } from '@ui/states/ErrorState';
+import type { ScheduleStackParamList } from '@app/navigation/types';
+import { DateStrip } from '@app/components/schedule/DateStrip';
+import { SlotActionsSheet } from '@app/components/schedule/SlotActionsSheet';
+import { SlotCard } from '@app/components/schedule/SlotCard';
 import {
   canMarkNoShow,
   canMarkCompleted,
   isActiveSlotForMainList,
   isAttendanceFinalStatus,
-  isFreeSlotPast,
   CANCEL_FORBIDDEN_WITHIN_MS,
   getUiSlotStatus,
   shouldShowInCompletedToday,
-} from '../components/schedule/slotHelpers';
+} from '@app/components/schedule/slotHelpers';
 import { type QueryKey, useQueryClient } from '@tanstack/react-query';
+import {
+  clearScheduleBadge,
+  markSlotHighlightSeen,
+  usePushIndicators,
+} from '@notifications/pushIndicators';
 
-const DATE_RANGE_DAYS = 14;
+const FUTURE_DATE_RANGE_DAYS = 14;
+const PAST_DATE_RANGE_DAYS = 14;
 const NOW_REFRESH_INTERVAL_MS = 30 * 1000;
 
 const startOfLocalDay = (value: Date) =>
@@ -74,10 +78,100 @@ const sortByStart = (a: SlotDto, b: SlotDto) => {
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, 'ScheduleHome'>;
 
+type CompletedSectionProps = {
+  open: boolean;
+  count: number;
+  slots: SlotDto[];
+  nowTs: number;
+  onToggle: () => void;
+  getHighlight?: (slot: SlotDto) => { color: 'success' | 'destructive'; chipText: string } | null;
+};
+
+const ScheduleSkeleton = () => (
+  <YStack gap="$4">
+    {Array.from({ length: 3 }).map((_, index) => (
+      <YStack
+        key={`skeleton-${index}`}
+        gap="$3"
+        padding="$4"
+        backgroundColor="$background"
+        borderRadius="$5"
+        borderWidth={1}
+        borderColor="$border"
+      >
+        <YStack height={16} width="60%" backgroundColor="$surfaceMuted" borderRadius="$3" />
+        <YStack height={12} width="40%" backgroundColor="$surfaceMuted" borderRadius="$3" />
+        <XStack gap="$3" alignItems="center">
+          <YStack width="$10" height="$10" borderRadius="$6" backgroundColor="$surfaceMuted" />
+          <YStack gap="$2" flex={1}>
+            <YStack height={14} width="70%" backgroundColor="$surfaceMuted" borderRadius="$3" />
+            <YStack height={12} width="50%" backgroundColor="$surfaceMuted" borderRadius="$3" />
+          </YStack>
+        </XStack>
+      </YStack>
+    ))}
+  </YStack>
+);
+
+const CompletedTodaySection = ({
+  open,
+  count,
+  slots,
+  nowTs,
+  onToggle,
+  getHighlight,
+}: CompletedSectionProps) => {
+  if (count === 0) {
+    return null;
+  }
+
+  return (
+    <YStack gap="$3">
+      <Button
+        unstyled
+        backgroundColor="$surfaceMuted"
+        borderWidth={1}
+        borderColor="$border"
+        borderRadius="$4"
+        padding="$3"
+        onPress={onToggle}
+      >
+        <XStack alignItems="center" justifyContent="space-between">
+          <Text fontSize="$3" fontWeight="600" color="$text">
+            {t('schedule.completedTodayTitle', { count })}
+          </Text>
+          <YStack
+            style={{
+              transform: [{ rotate: open ? '90deg' : '0deg' }],
+            }}
+          >
+            <AppIcon name="chevronRight" size={18} color="$muted" />
+          </YStack>
+        </XStack>
+      </Button>
+      {open ? (
+        <YStack gap="$3">
+          {slots.map((slot) => (
+            <SlotCard
+              key={slot.id ?? `${slot.startsAtUtc ?? 'slot'}`}
+              slot={slot}
+              nowTs={nowTs}
+              onPress={undefined}
+              variant="muted"
+              highlight={getHighlight ? getHighlight(slot) : null}
+            />
+          ))}
+        </YStack>
+      ) : null}
+    </YStack>
+  );
+};
+
 export function ScheduleScreen({ navigation }: Props) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-  const tabBarHeight = useBottomTabBarHeight();
+  const { contentBottomPadding } = useTabBarPadding();
+  const { slotHighlights } = usePushIndicators();
 
   const [selectedDate, setSelectedDate] = useState(() => startOfLocalDay(new Date()));
   const [todayDate, setTodayDate] = useState(() => startOfLocalDay(new Date()));
@@ -115,6 +209,7 @@ export function ScheduleScreen({ navigation }: Props) {
     data: slots = [],
     isLoading,
     isFetching,
+    isStale,
     error,
     refetch,
   } = useAppQuery({
@@ -134,10 +229,16 @@ export function ScheduleScreen({ navigation }: Props) {
       setSelectedDate((current) =>
         isSameLocalDay(current, todayRef.current) ? nextToday : current
       );
-      if (!isLoading) {
+      if (!isLoading && isStale) {
         refetch();
       }
-    }, [isLoading, refetch])
+    }, [isLoading, isStale, refetch])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      clearScheduleBadge().catch(() => {});
+    }, [])
   );
 
   useFocusEffect(
@@ -165,13 +266,14 @@ export function ScheduleScreen({ navigation }: Props) {
     setCompletedExpanded(false);
   }, [selectedKey]);
 
-  const visibleDates = useMemo(() =>
-    Array.from({ length: DATE_RANGE_DAYS }).map((_, index) =>
-      addDays(todayDate, index)
-    ), [todayDate]
-  );
+  const minDate = useMemo(() => addDays(todayDate, -PAST_DATE_RANGE_DAYS), [todayDate]);
+  const maxDate = useMemo(() => addDays(todayDate, FUTURE_DATE_RANGE_DAYS), [todayDate]);
 
-  const maxDate = useMemo(() => addDays(todayDate, DATE_RANGE_DAYS - 1), [todayDate]);
+  const visibleDates = useMemo(() =>
+    Array.from({ length: PAST_DATE_RANGE_DAYS + FUTURE_DATE_RANGE_DAYS + 1 }).map((_, index) =>
+      addDays(minDate, index)
+    ), [minDate]
+  );
 
   const sortedSlots = useMemo(() => slots.slice().sort(sortByStart), [slots]);
 
@@ -181,6 +283,8 @@ export function ScheduleScreen({ navigation }: Props) {
   );
 
   const isSelectedToday = isSameLocalDay(selectedDate, todayDate);
+  const isPastDay = selectedDate.getTime() < todayDate.getTime();
+  const canCreateSlot = selectedDate.getTime() >= todayDate.getTime();
 
   const completedTodaySlots = useMemo(() => {
     if (!isSelectedToday) {
@@ -208,7 +312,7 @@ export function ScheduleScreen({ navigation }: Props) {
       booked,
       active: available + booked,
     };
-  }, [activeSlots]);
+  }, [activeSlots, nowTs]);
 
   const summaryLabel = counts.active
     ? isSelectedToday
@@ -222,8 +326,15 @@ export function ScheduleScreen({ navigation }: Props) {
       })
     : null;
 
-  const handleRefresh = () => {
-    refetch();
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsManualRefreshing(false);
+    }
   };
 
   const handleSelectDate = (value: Date) => {
@@ -244,7 +355,7 @@ export function ScheduleScreen({ navigation }: Props) {
       DateTimePickerAndroid.open({
         value: selectedDate,
         mode: 'date',
-        minimumDate: todayDate,
+        minimumDate: minDate,
         maximumDate: maxDate,
         onChange: handleDateChange,
       });
@@ -254,15 +365,30 @@ export function ScheduleScreen({ navigation }: Props) {
   };
 
   const handleCreateSlot = () => {
+    if (!canCreateSlot) {
+      return;
+    }
     navigation.getParent()?.navigate('CreateSlot', {
       initialDateIsoLocal: selectedDate.toISOString(),
     });
   };
 
+  const getHighlightForSlot = useCallback((slot: SlotDto) => {
+    if (!slot.id) {
+      return null;
+    }
+    const highlight = slotHighlights[slot.id];
+    if (!highlight || highlight.seen) {
+      return null;
+    }
+    return { color: highlight.color, chipText: highlight.chipText };
+  }, [slotHighlights]);
+
   const openSlot = (slot: SlotDto) => {
     if (!slot.id) {
       return;
     }
+    markSlotHighlightSeen(slot.id).catch(() => {});
     setActiveSlot(slot);
     setSheetOpen(true);
   };
@@ -323,7 +449,6 @@ export function ScheduleScreen({ navigation }: Props) {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
       refetch();
-      showToast({ type: 'success', title: t('schedule.toast.cancelled') });
       closeSheet();
     },
     onError: (err, _variables, context) => {
@@ -340,11 +465,13 @@ export function ScheduleScreen({ navigation }: Props) {
           : presented.kind === 'network' || presented.kind === 'timeout'
             ? t('schedule.errorNetwork')
             : presented.message;
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message,
+        });
+      }
     },
   });
 
@@ -369,7 +496,6 @@ export function ScheduleScreen({ navigation }: Props) {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
       refetch();
-      showToast({ type: 'success', title: t('status.completed') });
       closeSheet();
     },
     onError: (err, _variables, context) => {
@@ -380,11 +506,13 @@ export function ScheduleScreen({ navigation }: Props) {
         setActiveSlot(context.activeSlot);
       }
       const presented = presentApiError(err);
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message: presented.message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
     },
   });
 
@@ -409,7 +537,6 @@ export function ScheduleScreen({ navigation }: Props) {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
       refetch();
-      showToast({ type: 'success', title: t('status.noShow') });
       closeSheet();
     },
     onError: (err, _variables, context) => {
@@ -420,11 +547,13 @@ export function ScheduleScreen({ navigation }: Props) {
         setActiveSlot(context.activeSlot);
       }
       const presented = presentApiError(err);
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message: presented.message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
     },
   });
 
@@ -473,71 +602,47 @@ export function ScheduleScreen({ navigation }: Props) {
 
   const renderContent = () => {
     if (isLoading) {
-      return <LoadingState />;
+      return <ScheduleSkeleton />;
     }
 
     if (error) {
       return <ErrorState error={error} onRetry={refetch} />;
     }
 
-    if (sortedSlots.length === 0) {
+    const visibleSlots = isPastDay
+      ? sortedSlots.filter((slot) => getUiSlotStatus(slot, nowTs) !== 'available')
+      : activeSlots;
+
+    if (visibleSlots.length === 0) {
       return (
         <EmptyState
           title={t('schedule.emptyDay')}
-          ctaLabel={t('schedule.createCta')}
-          onCtaPress={handleCreateSlot}
+          ctaLabel={canCreateSlot ? t('schedule.createCta') : undefined}
+          onCtaPress={canCreateSlot ? handleCreateSlot : undefined}
         />
       );
     }
 
     return (
       <YStack gap="$4">
-        {activeSlots.map((slot) => (
+        {visibleSlots.map((slot) => (
           <SlotCard
             key={slot.id ?? `${slot.startsAtUtc ?? 'slot'}`}
             slot={slot}
             nowTs={nowTs}
             onPress={slot.id ? () => openSlot(slot) : undefined}
+            highlight={getHighlightForSlot(slot)}
           />
         ))}
-        {isSelectedToday && completedTodaySlots.length > 0 ? (
-          <YStack gap="$3">
-            <Button
-              unstyled
-              backgroundColor="$surfaceMuted"
-              borderWidth={1}
-              borderColor="$border"
-              borderRadius="$4"
-              padding="$3"
-              onPress={() => setCompletedExpanded((prev) => !prev)}
-            >
-              <XStack alignItems="center" justifyContent="space-between">
-                <Text fontSize="$3" fontWeight="600" color="$text">
-                  {t('schedule.completedTodayTitle', { count: completedTodaySlots.length })}
-                </Text>
-                <YStack
-                  style={{
-                    transform: [{ rotate: completedExpanded ? '90deg' : '0deg' }],
-                  }}
-                >
-                  <AppIcon name="chevronRight" size={18} color="$muted" />
-                </YStack>
-              </XStack>
-            </Button>
-            {completedExpanded ? (
-              <YStack gap="$3">
-                {completedTodaySlots.map((slot) => (
-                  <SlotCard
-                    key={slot.id ?? `${slot.startsAtUtc ?? 'slot'}`}
-                    slot={slot}
-                    nowTs={nowTs}
-                    onPress={undefined}
-                    variant="muted"
-                  />
-                ))}
-              </YStack>
-            ) : null}
-          </YStack>
+        {isSelectedToday ? (
+          <CompletedTodaySection
+            open={completedExpanded}
+            count={completedTodaySlots.length}
+            slots={completedTodaySlots}
+            nowTs={nowTs}
+            onToggle={() => setCompletedExpanded((prev) => !prev)}
+            getHighlight={getHighlightForSlot}
+          />
         ) : null}
       </YStack>
     );
@@ -545,22 +650,24 @@ export function ScheduleScreen({ navigation }: Props) {
 
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
-      <ScrollView
+      <TabScrollView
         refreshControl={
           <RefreshControl
-            refreshing={isFetching && !isLoading}
+            refreshing={isManualRefreshing && isFetching}
             onRefresh={handleRefresh}
           />
         }
         contentContainerStyle={{
           padding: 24,
-          paddingBottom: tabBarHeight + 96,
         }}
+        extraBottom={72}
       >
         <YStack gap="$4">
+          {/* Заголовок экрана */}
           <Text fontSize="$8" fontWeight="700" color="$text">
             {t('schedule.title')}
           </Text>
+          {/* Лента дат и календарь */}
           <DateStrip
             dates={visibleDates}
             selectedDate={selectedDate}
@@ -570,6 +677,7 @@ export function ScheduleScreen({ navigation }: Props) {
             onSelectDate={handleSelectDate}
             onOpenCalendar={openDatePicker}
           />
+          {/* iOS-пикер даты */}
           {pickerVisible && Platform.OS === 'ios' ? (
             <YStack
               padding="$4"
@@ -583,7 +691,7 @@ export function ScheduleScreen({ navigation }: Props) {
                 value={selectedDate}
                 mode="date"
                 display="inline"
-                minimumDate={todayDate}
+                minimumDate={minDate}
                 maximumDate={maxDate}
                 onChange={handleDateChange}
               />
@@ -597,30 +705,36 @@ export function ScheduleScreen({ navigation }: Props) {
               </Button>
             </YStack>
           ) : null}
+          {/* Сводка по дню */}
           {summaryLabel ? (
             <Text fontSize="$4" fontWeight="600" color="$text">
               {summaryLabel}
             </Text>
           ) : null}
+          {/* Основной список слотов */}
           {renderContent()}
         </YStack>
-      </ScrollView>
-      <Button
-        position="absolute"
-        right="$6"
-        bottom={tabBarHeight + 24}
-        width="$10"
-        height="$10"
-        borderRadius="$6"
-        backgroundColor="$accent"
-        elevation={2}
-        shadowColor="$border"
-        shadowOpacity={0.2}
-        shadowRadius={6}
-        onPress={handleCreateSlot}
-      >
-        <AppIcon name="plus" size={22} color="$accentText" />
-      </Button>
+      </TabScrollView>
+      {/* FAB: создание слота */}
+      {canCreateSlot ? (
+        <Button
+          position="absolute"
+          right="$6"
+          bottom={contentBottomPadding}
+          width="$10"
+          height="$10"
+          borderRadius="$6"
+          backgroundColor="$accent"
+          elevation={2}
+          shadowColor="$border"
+          shadowOpacity={0.2}
+          shadowRadius={6}
+          onPress={handleCreateSlot}
+        >
+          <AppIcon name="plus" size={22} color="$accentText" />
+        </Button>
+      ) : null}
+      {/* Bottom sheet действий со слотом */}
       <SlotActionsSheet
         open={sheetOpen}
         slot={activeSlot}
@@ -670,3 +784,6 @@ export function ScheduleScreen({ navigation }: Props) {
     </YStack>
   );
 }
+
+
+

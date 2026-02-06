@@ -1,11 +1,11 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { t } from '../../i18n';
-import { createSlot, getMyTrainerSlots } from '../../api/trainerSlotsApi';
-import { keys } from '../../query/keys';
+import { t } from '@i18n';
+import { createSlot, getMyTrainerSlots } from '@api/trainerSlotsApi';
+import { keys } from '@query/keys';
 import { CreateSlotForm } from './CreateSlotForm';
-import type { TrainerTabsParamList } from '../navigation/types';
+import type { TrainerTabsParamList } from '@app/navigation/types';
 
 type Props = BottomTabScreenProps<TrainerTabsParamList, 'CreateSlot'>;
 
@@ -45,3 +45,6 @@ export function CreateSlotTabScreen({ navigation, route }: Props) {
     />
   );
 }
+
+
+

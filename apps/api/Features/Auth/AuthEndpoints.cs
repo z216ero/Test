@@ -1,5 +1,6 @@
 using Api.Data;
 using Api.Features.Common;
+using Api.Features.Lookups;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Api.Features.Auth;
@@ -38,9 +39,36 @@ public static class AuthEndpoints
                 errors["name"] = new[] { "Name is required." };
             }
 
-            if (!UserRoles.IsValid(request.Role))
+            if (string.IsNullOrWhiteSpace(request.CityName))
+            {
+                errors["cityName"] = new[] { "CityName is required." };
+            }
+            else if (request.CityName.Length > 120)
+            {
+                errors["cityName"] = new[] { "CityName must be at most 120 characters." };
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.DistrictName)
+                && request.DistrictName.Length > 120)
+            {
+                errors["districtName"] = new[] { "DistrictName must be at most 120 characters." };
+            }
+
+            if (!LookupCatalog.IsValidRole(request.Role))
             {
                 errors["role"] = new[] { "Role must be Trainer or Client." };
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Gender)
+                && !LookupCatalog.IsValidGender(request.Gender))
+            {
+                errors["gender"] = new[] { "Gender is invalid." };
+            }
+
+            if (request.Specializations is not null
+                && request.Specializations.Any(code => !LookupCatalog.IsValidSpecialization(code)))
+            {
+                errors["specializations"] = new[] { "Specializations contain invalid values." };
             }
 
             if (errors.Count > 0)
@@ -51,7 +79,11 @@ public static class AuthEndpoints
             var normalized = request with
             {
                 Email = request.Email.Trim(),
-                Name = request.Name.Trim()
+                Name = request.Name.Trim(),
+                CityName = request.CityName.Trim(),
+                DistrictName = string.IsNullOrWhiteSpace(request.DistrictName)
+                    ? null
+                    : request.DistrictName.Trim()
             };
 
             var result = await service.RegisterAsync(normalized, cancellationToken);

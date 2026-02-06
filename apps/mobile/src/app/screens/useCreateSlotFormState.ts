@@ -9,14 +9,14 @@ import type {
   CreateSlotRequest,
   GetTrainersTrainerIdSlotsParams,
   SlotDto,
-} from '../../generated/api';
-import { ApiError } from '../../api/core';
-import { ApiTimeoutError } from '../../api/fetcher';
-import { TrainerSlotsOverlapError } from '../../api/trainerSlotsApi';
-import { t } from '../../i18n';
-import { useAppMutation, useAppQuery } from '../../query/hooks';
-import { useToast } from '../../ui/feedback/useToast';
-import { formatTimeRangeRu } from '../../utils/datetime';
+} from '@generated/api';
+import { ApiError } from '@api/core';
+import { ApiTimeoutError } from '@api/fetcher';
+import { TrainerSlotsOverlapError } from '@api/trainerSlotsApi';
+import { t } from '@i18n';
+import { useAppMutation, useAppQuery } from '@query/hooks';
+import { useToast } from '@ui/feedback/useToast';
+import { formatTimeRangeRu } from '@utils/datetime';
 import {
   buildTimeGrid,
   computeRange,
@@ -27,8 +27,8 @@ import {
   WORKDAY_END_HOUR,
   WORKDAY_START_HOUR,
   type LocalSlotRange,
-} from '../../utils/slotTimeGrid';
-import { presentApiError } from '../../api/ApiErrorPresenter';
+} from '@utils/slotTimeGrid';
+import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
 import { useFocusEffect } from '@react-navigation/native';
 
 export type UseCreateSlotFormStateArgs = {
@@ -392,9 +392,6 @@ export const useCreateSlotFormState = ({
       return created;
     },
     onSuccess: (count) => {
-      const title =
-        count > 1 ? t('createSlot.successMulti', { count }) : t('createSlot.success');
-      showToast({ type: 'success', title });
       setApiError(null);
       setSelectedStart(null);
       onAfterSuccess(count);
@@ -405,31 +402,31 @@ export const useCreateSlotFormState = ({
         || (error instanceof ApiError && error.status === 409)
       ) {
         setApiError(t('createSlot.errorOverlap'));
-        showToast({
-          type: 'error',
-          title: t('createSlot.errorTitle'),
-          message: t('createSlot.errorOverlap'),
-        });
         return;
       }
 
       if (error instanceof ApiTimeoutError || error.name === 'TypeError') {
         setApiError(t('createSlot.errorNetwork'));
-        showToast({
-          type: 'error',
-          title: t('createSlot.errorTitle'),
-          message: t('createSlot.errorNetwork'),
-        });
+        const presented = presentApiError(error);
+        if (shouldShowErrorToast(presented)) {
+          showToast({
+            type: 'error',
+            title: t('createSlot.errorTitle'),
+            message: t('createSlot.errorNetwork'),
+          });
+        }
         return;
       }
 
       const presented = presentApiError(error);
       setApiError(presented.message);
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message: presented.message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
     },
   });
 
@@ -481,3 +478,5 @@ export const useCreateSlotFormState = ({
     isCreating: createMutation.isPending,
   };
 };
+
+

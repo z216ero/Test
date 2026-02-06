@@ -1,5 +1,5 @@
-import { t } from '../i18n';
-import { formatDateRu, formatTimeRangeRu } from '../utils/datetime';
+import { t } from '@i18n';
+import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
 import { appendEvent } from './inAppLog';
 import {
   cancelTrainingReminder,
@@ -153,3 +153,5 @@ export const onSettingsChanged = async (
     )
   );
 };
+
+

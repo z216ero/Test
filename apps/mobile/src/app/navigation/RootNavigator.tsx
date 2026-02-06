@@ -3,20 +3,21 @@ import type { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { TextStyle } from 'react-native';
-import { BootstrapScreen } from '../screens/BootstrapScreen';
-import { BookingConfirmScreen } from '../screens/BookingConfirmScreen';
-import { BookingDetailsScreen } from '../screens/BookingDetailsScreen';
-import { BookingsScreen } from '../screens/BookingsScreen';
-import { CreateSlotTabScreen } from '../screens/CreateSlotTabScreen';
-import { HomeScreen } from '../screens/HomeScreen';
-import { LoginScreen } from '../screens/LoginScreen';
-import { NotificationsScreen } from '../screens/NotificationsScreen';
-import { PersonalInfoScreen } from '../screens/PersonalInfoScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
-import { RegisterScreen } from '../screens/RegisterScreen';
-import { ScheduleScreen } from '../screens/ScheduleScreen';
-import { SlotsScreen } from '../screens/SlotsScreen';
-import { TrainerSlotDetailsScreen } from '../screens/TrainerSlotDetailsScreen';
+import { BootstrapScreen } from '@app/screens/BootstrapScreen';
+import { ClientSlotDetailsScreen } from '@app/screens/ClientSlotDetailsScreen';
+import { BookingDetailsScreen } from '@app/screens/BookingDetailsScreen';
+import { BookingsScreen } from '@app/screens/BookingsScreen';
+import { CreateSlotTabScreen } from '@app/screens/CreateSlotTabScreen';
+import { HomeScreen } from '@app/screens/HomeScreen';
+import { LoginScreen } from '@app/screens/LoginScreen';
+import { LocationSearchScreen } from '@app/screens/LocationSearchScreen';
+import { NotificationsScreen } from '@app/screens/NotificationsScreen';
+import { PersonalInfoScreen } from '@app/screens/PersonalInfoScreen';
+import { ProfileScreen } from '@app/screens/ProfileScreen';
+import { RegisterScreen } from '@app/screens/RegisterScreen';
+import { ScheduleScreen } from '@app/screens/ScheduleScreen';
+import { SlotsScreen } from '@app/screens/SlotsScreen';
+import { TrainerSlotDetailsScreen } from '@app/screens/TrainerSlotDetailsScreen';
 import type {
   ClientTabsParamList,
   AuthStackParamList,
@@ -28,9 +29,10 @@ import type {
   TrainerTabsParamList,
 } from './types';
 import { Text, YStack } from 'tamagui';
-import { config } from '../../../tamagui.config';
-import { t } from '../../i18n';
-import { AppIcon } from '../../ui/AppIcon';
+import { config } from '../../../tamagui.config.cjs';
+import { t } from '@i18n';
+import { AppIcon } from '@ui/AppIcon';
+import { usePushIndicators } from '@notifications/pushIndicators';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -45,6 +47,7 @@ const AuthStackNavigator = () => (
   <AuthStack.Navigator>
     <AuthStack.Screen name="Login" component={LoginScreen} options={{ title: t('auth.login.title') }} />
     <AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: t('auth.register.title') }} />
+    <AuthStack.Screen name="LocationSearch" component={LocationSearchScreen} options={{ headerShown: false }} />
   </AuthStack.Navigator>
 );
 
@@ -53,13 +56,14 @@ const ProfileStackNavigator = () => (
     <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} />
     <ProfileStack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
     <ProfileStack.Screen name="Notifications" component={NotificationsScreen} />
+    <ProfileStack.Screen name="LocationSearch" component={LocationSearchScreen} />
   </ProfileStack.Navigator>
 );
 
 const SlotsStackNavigator = () => (
   <SlotsStack.Navigator screenOptions={{ headerShown: false }}>
     <SlotsStack.Screen name="SlotsList" component={SlotsScreen} />
-    <SlotsStack.Screen name="BookingConfirm" component={BookingConfirmScreen} />
+    <SlotsStack.Screen name="ClientSlotDetails" component={ClientSlotDetailsScreen} />
   </SlotsStack.Navigator>
 );
 
@@ -121,6 +125,26 @@ const makeTabIcon = (name: Parameters<typeof AppIcon>[0]['name']) => ({ color }:
   <AppIcon name={name} color={color} size={22} />
 );
 
+const ScheduleTabIcon = ({ color }: { color: string }) => {
+  const { scheduleBadge } = usePushIndicators();
+  return (
+    <YStack position="relative" alignItems="center" justifyContent="center">
+      <AppIcon name="calendar" color={color} size={22} />
+      {scheduleBadge.hasUnread ? (
+        <YStack
+          position="absolute"
+          top={0}
+          right={0}
+          width="$1"
+          height="$1"
+          borderRadius="$6"
+          backgroundColor="$accent"
+        />
+      ) : null}
+    </YStack>
+  );
+};
+
 const ClientTabsNavigator = () => (
   <ClientTabs.Navigator screenOptions={tabBarScreenOptions}>
     <ClientTabs.Screen
@@ -156,7 +180,7 @@ const TrainerTabsNavigator = () => (
     <TrainerTabs.Screen
       name="Schedule"
       component={ScheduleStackNavigator}
-      options={{ title: t('tabs.schedule'), tabBarIcon: makeTabIcon('calendar') }}
+      options={{ title: t('tabs.schedule'), tabBarIcon: ScheduleTabIcon }}
     />
     <TrainerTabs.Screen
       name="CreateSlot"
@@ -208,3 +232,6 @@ export function RootNavigator() {
     </RootStack.Navigator>
   );
 }
+
+
+

@@ -1,5 +1,5 @@
 import { Button } from 'tamagui';
-import { t } from '../../i18n';
+import { t } from '@i18n';
 
 type CreateSlotFooterProps = {
   canSubmit: boolean;
@@ -36,3 +36,4 @@ export function CreateSlotFooter({
     </Button>
   );
 }
+

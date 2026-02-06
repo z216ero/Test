@@ -1,30 +1,34 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useCallback, useMemo, useState } from 'react';
-import { getTokens } from '@tamagui/core';
-import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { cancelBooking, type ClientBooking } from '../../api/bookingsApi';
-import { ApiError } from '../../api/core';
-import { presentApiError, type PresentedError } from '../../api/ApiErrorPresenter';
-import { t } from '../../i18n';
-import { onBookingCancelled } from '../../notifications/orchestrator';
-import { useAppMutation } from '../../query/hooks';
-import { keys } from '../../query/keys';
-import { useToast } from '../../ui/feedback/useToast';
-import { Banner } from '../../ui/feedback/Banner';
-import { AppIcon } from '../../ui/AppIcon';
-import { formatDateWithWeekdayRu, formatTimeRangeRu } from '../../utils/datetime';
+import { cancelBooking, type ClientBooking } from '@api/bookingsApi';
+import { ApiError } from '@api/core';
+import {
+  presentApiError,
+  shouldShowErrorToast,
+  type PresentedError,
+} from '@api/ApiErrorPresenter';
+import { getTrainingTypeLookups } from '@api/lookupsApi';
+import { t } from '@i18n';
+import { onBookingCancelled } from '@notifications/orchestrator';
+import { useAppMutation, useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
+import { useToast } from '@ui/feedback/useToast';
+import { Banner } from '@ui/feedback/Banner';
+import { AppIcon } from '@ui/AppIcon';
+import { TabScrollView } from '@ui/layout/TabScrollView';
+import { formatDateWithWeekdayRu, formatTimeRangeRu } from '@utils/datetime';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   bookingStatusMeta,
   canCancelBooking,
   getBookingStatusType,
   getSlotTimes,
-} from '../components/bookings/bookingUtils';
-import { TrainerAvatar } from '../components/bookings/TrainerAvatar';
-import type { BookingsStackParamList } from '../navigation/types';
+} from '@app/components/bookings/bookingUtils';
+import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
+import type { BookingsStackParamList } from '@app/navigation/types';
+import { buildLookupMap } from '@app/utils/lookups';
 
 type Props = NativeStackScreenProps<BookingsStackParamList, 'BookingDetails'>;
 
@@ -36,13 +40,57 @@ type CancelContext = {
 const NOW_REFRESH_INTERVAL_MS = 60 * 1000;
 
 export function BookingDetailsScreen({ navigation, route }: Props) {
-  const { slot, trainerName, trainerSpecialization, trainerAvatarUrl } = route.params;
-  const tabBarHeight = useBottomTabBarHeight();
-  const tokens = getTokens();
+  const {
+    slot,
+    trainerName,
+    trainerTrainingTypes,
+    trainerCityName,
+    trainerDistrictName,
+    trainerAvatarUrl,
+  } = route.params;
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [networkError, setNetworkError] = useState<PresentedError | null>(null);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+
+  const trainingTypesQuery = useAppQuery({
+    queryKey: keys.lookups.trainingTypes(),
+    queryFn: ({ signal }) => getTrainingTypeLookups({ signal }),
+  });
+
+  const trainingTypeOptions = trainingTypesQuery.data ?? [];
+  const trainingTypeLabels = useMemo(
+    () => buildLookupMap(trainingTypeOptions),
+    [trainingTypeOptions]
+  );
+  const trainingTypeOrder = useMemo(
+    () => new Map(trainingTypeOptions.map((item, index) => [item.code, index])),
+    [trainingTypeOptions]
+  );
+  const trainingTypeCode = useMemo(() => {
+    const types = trainerTrainingTypes ?? [];
+    if (types.length === 0) {
+      return null;
+    }
+    return types
+      .slice()
+      .sort((left, right) => {
+        const leftIndex = trainingTypeOrder.get(left) ?? Number.MAX_SAFE_INTEGER;
+        const rightIndex = trainingTypeOrder.get(right) ?? Number.MAX_SAFE_INTEGER;
+        return leftIndex - rightIndex;
+      })[0] ?? null;
+  }, [trainerTrainingTypes, trainingTypeOrder]);
+  const isGroupTraining = trainingTypeCode === 'Group';
+  const trainingTypeLabel = trainingTypeCode
+    ? t(isGroupTraining ? 'bookings.trainingTypeGroup' : 'bookings.trainingTypeIndividual')
+    : null;
+  const trainingTypeIcon = isGroupTraining ? 'users' : 'user';
+  const locationLabel = useMemo(() => {
+    const parts = [trainerCityName, trainerDistrictName].filter(
+      (value): value is string => !!value && value.trim().length > 0
+    );
+    return parts.length > 0 ? parts.join(', ') : null;
+  }, [trainerCityName, trainerDistrictName]);
 
   useFocusEffect(
     useCallback(() => {
@@ -62,6 +110,15 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
   const statusLabel = t(statusMeta.labelKey);
 
   const canCancel = Boolean(slot.id) && canCancelBooking(slot, nowTs);
+
+  const handleBack = () => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('Bookings', { screen: 'BookingsHome' });
+      return;
+    }
+    navigation.navigate('BookingsHome');
+  };
 
   const cancelMutation = useAppMutation<void, unknown, string, CancelContext>({
     mutationFn: (slotId: string) => cancelBooking(slotId),
@@ -92,8 +149,7 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
       queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Client') });
 
-      showToast({ type: 'success', title: t('bookings.detailsCancelled') });
-      navigation.goBack();
+      handleBack();
     },
     onError: (err, _slotId, context) => {
       if (context?.upcomingSnapshot) {
@@ -110,11 +166,13 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
       }
 
       const message = err instanceof ApiError ? err.message : presented.message;
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message,
+        });
+      }
 
       queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
       queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
@@ -130,13 +188,9 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
 
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
-      <ScrollView
-        contentContainerStyle={{
-          paddingBottom: tabBarHeight + (tokens.space[6]?.val ?? 24),
-        }}
-      >
+      <TabScrollView>
         <YStack gap="$4" padding="$6">
-          <Button unstyled onPress={() => navigation.goBack()}>
+          <Button unstyled onPress={handleBack}>
             <XStack alignItems="center" gap="$2">
               <AppIcon name="chevronLeft" size={18} color="$muted" />
               <Text fontSize="$3" color="$muted">
@@ -193,10 +247,18 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
                 <Text fontSize="$4" fontWeight="700" color="$text">
                   {trainerName?.trim() || t('common.empty')}
                 </Text>
-                {trainerSpecialization ? (
+                {locationLabel ? (
                   <Text fontSize="$3" color="$muted">
-                    {trainerSpecialization}
+                    {locationLabel}
                   </Text>
+                ) : null}
+                {trainingTypeLabel ? (
+                  <XStack alignItems="center" gap="$2">
+                    <AppIcon name={trainingTypeIcon} size={14} color="$muted" />
+                    <Text fontSize="$3" color="$muted">
+                      {trainingTypeLabel}
+                    </Text>
+                  </XStack>
                 ) : null}
               </YStack>
             </XStack>
@@ -218,7 +280,10 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
             </Button>
           ) : null}
         </YStack>
-      </ScrollView>
+      </TabScrollView>
     </YStack>
   );
 }
+
+
+

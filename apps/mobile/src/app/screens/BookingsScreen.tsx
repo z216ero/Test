@@ -1,28 +1,27 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl } from 'react-native';
-import { getTokens } from '@tamagui/core';
-import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   cancelBooking,
   getClientBookingHistory,
   getClientUpcomingBookings,
   type ClientBooking,
-} from '../../api/bookingsApi';
-import { ApiError } from '../../api/core';
-import { presentApiError } from '../../api/ApiErrorPresenter';
-import { t } from '../../i18n';
-import { onBookingCancelled } from '../../notifications/orchestrator';
-import { useAppMutation, useAppQuery } from '../../query/hooks';
-import { keys } from '../../query/keys';
-import { useToast } from '../../ui/feedback/useToast';
-import { Banner } from '../../ui/feedback/Banner';
-import { ErrorState } from '../../ui/states/ErrorState';
-import { LoadingState } from '../../ui/states/LoadingState';
-import { formatDateRu, formatTimeRangeRu } from '../../utils/datetime';
+} from '@api/bookingsApi';
+import { ApiError } from '@api/core';
+import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
+import { getTrainingTypeLookups } from '@api/lookupsApi';
+import { t } from '@i18n';
+import { onBookingCancelled } from '@notifications/orchestrator';
+import { useAppMutation, useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
+import { useToast } from '@ui/feedback/useToast';
+import { Banner } from '@ui/feedback/Banner';
+import { ErrorState } from '@ui/states/ErrorState';
+import { LoadingState } from '@ui/states/LoadingState';
+import { TabScrollView } from '@ui/layout/TabScrollView';
+import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   bookingStatusMeta,
@@ -31,9 +30,11 @@ import {
   getSlotTimes,
   isHistoryBooking,
   isUpcomingBooking,
-} from '../components/bookings/bookingUtils';
-import { TrainerAvatar } from '../components/bookings/TrainerAvatar';
-import type { BookingsStackParamList } from '../navigation/types';
+} from '@app/components/bookings/bookingUtils';
+import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
+import type { BookingsStackParamList } from '@app/navigation/types';
+import { buildLookupMap } from '@app/utils/lookups';
+import { AppIcon } from '@ui/AppIcon';
 
 type Props = NativeStackScreenProps<BookingsStackParamList, 'BookingsHome'>;
 
@@ -60,8 +61,6 @@ const buildDateKey = (value: Date): string => {
 };
 
 export function BookingsScreen({ navigation }: Props) {
-  const tabBarHeight = useBottomTabBarHeight();
-  const tokens = getTokens();
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -72,6 +71,21 @@ export function BookingsScreen({ navigation }: Props) {
     queryKey: keys.bookings.upcoming(),
     queryFn: ({ signal }) => getClientUpcomingBookings({ signal }),
   });
+
+  const trainingTypesQuery = useAppQuery({
+    queryKey: keys.lookups.trainingTypes(),
+    queryFn: ({ signal }) => getTrainingTypeLookups({ signal }),
+  });
+
+  const trainingTypeOptions = trainingTypesQuery.data ?? [];
+  const trainingTypeLabels = useMemo(
+    () => buildLookupMap(trainingTypeOptions),
+    [trainingTypeOptions]
+  );
+  const trainingTypeOrder = useMemo(
+    () => new Map(trainingTypeOptions.map((item, index) => [item.code, index])),
+    [trainingTypeOptions]
+  );
 
   const historyQuery = useAppQuery({
     queryKey: keys.bookings.history(),
@@ -88,11 +102,14 @@ export function BookingsScreen({ navigation }: Props) {
     }, [])
   );
 
+  const { refetch: refetchUpcoming } = upcomingQuery;
+  const { refetch: refetchHistory } = historyQuery;
+
   useFocusEffect(
     useCallback(() => {
-      upcomingQuery.refetch();
-      historyQuery.refetch();
-    }, [upcomingQuery.refetch, historyQuery.refetch])
+      refetchUpcoming();
+      refetchHistory();
+    }, [refetchUpcoming, refetchHistory])
   );
 
   const handleRefresh = () => {
@@ -188,8 +205,8 @@ export function BookingsScreen({ navigation }: Props) {
       queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
       queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Client') });
+      queryClient.invalidateQueries({ queryKey: keys.slots.available(), exact: false });
 
-      showToast({ type: 'success', title: t('bookings.detailsCancelled') });
     },
     onError: (err, _slotId, context) => {
       if (context?.upcomingSnapshot) {
@@ -201,14 +218,17 @@ export function BookingsScreen({ navigation }: Props) {
 
       const presented = presentApiError(err);
       const message = err instanceof ApiError ? err.message : presented.message;
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message,
+        });
+      }
 
       queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
       queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
+      queryClient.invalidateQueries({ queryKey: keys.slots.available(), exact: false });
     },
   });
 
@@ -217,8 +237,20 @@ export function BookingsScreen({ navigation }: Props) {
     showActions: boolean,
     key: string
   ) => {
+    const trainingTypes = booking.trainerTrainingTypes ?? [];
+    const trainingTypeCode = trainingTypes
+      .slice()
+      .sort((left, right) => {
+        const leftIndex = trainingTypeOrder.get(left) ?? Number.MAX_SAFE_INTEGER;
+        const rightIndex = trainingTypeOrder.get(right) ?? Number.MAX_SAFE_INTEGER;
+        return leftIndex - rightIndex;
+      })[0];
+    const isGroupTraining = trainingTypeCode === 'Group';
+    const trainingTypeLabel = trainingTypeCode
+      ? t(isGroupTraining ? 'bookings.trainingTypeGroup' : 'bookings.trainingTypeIndividual')
+      : null;
+    const trainingTypeIcon = isGroupTraining ? 'users' : 'user';
     const times = getSlotTimes(booking.slot);
-    const dateLabel = times ? formatDateRu(times.start) : t('common.empty');
     const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : t('common.empty');
     const statusType = getBookingStatusType(booking.slot);
     const statusMeta = bookingStatusMeta[statusType];
@@ -266,10 +298,13 @@ export function BookingsScreen({ navigation }: Props) {
             <Text fontSize="$4" fontWeight="700" color="$text">
               {booking.trainerName?.trim() || t('common.empty')}
             </Text>
-            {booking.trainerSpecialization ? (
-              <Text fontSize="$3" color="$muted">
-                {booking.trainerSpecialization}
-              </Text>
+            {trainingTypeLabel ? (
+              <XStack alignItems="center" gap="$2">
+                <AppIcon name={trainingTypeIcon} size={14} color="$muted" />
+                <Text fontSize="$3" color="$muted">
+                  {trainingTypeLabel}
+                </Text>
+              </XStack>
             ) : null}
           </YStack>
         </XStack>
@@ -302,7 +337,10 @@ export function BookingsScreen({ navigation }: Props) {
                 navigation.navigate('BookingDetails', {
                   slot: booking.slot,
                   trainerName: booking.trainerName,
-                  trainerSpecialization: booking.trainerSpecialization,
+                  trainerSpecializations: booking.trainerSpecializations,
+                  trainerTrainingTypes: booking.trainerTrainingTypes,
+                  trainerCityName: booking.trainerCityName,
+                  trainerDistrictName: booking.trainerDistrictName,
                   trainerAvatarUrl: booking.trainerAvatarUrl,
                 });
               }}
@@ -333,7 +371,10 @@ export function BookingsScreen({ navigation }: Props) {
                 navigation.navigate('BookingDetails', {
                   slot: booking.slot,
                   trainerName: booking.trainerName,
-                  trainerSpecialization: booking.trainerSpecialization,
+                  trainerSpecializations: booking.trainerSpecializations,
+                  trainerTrainingTypes: booking.trainerTrainingTypes,
+                  trainerCityName: booking.trainerCityName,
+                  trainerDistrictName: booking.trainerDistrictName,
                   trainerAvatarUrl: booking.trainerAvatarUrl,
                 });
               }}
@@ -410,16 +451,13 @@ export function BookingsScreen({ navigation }: Props) {
 
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
-      <ScrollView
+      <TabScrollView
         refreshControl={
           <RefreshControl
             refreshing={activeFetching && !activeLoading}
             onRefresh={handleRefresh}
           />
         }
-        contentContainerStyle={{
-          paddingBottom: tabBarHeight + (tokens.space[6]?.val ?? 24),
-        }}
       >
         <YStack gap="$4" padding="$6">
           <Text fontSize="$8" fontWeight="700" color="$text">
@@ -471,7 +509,10 @@ export function BookingsScreen({ navigation }: Props) {
           ) : null}
           {renderContent()}
         </YStack>
-      </ScrollView>
+      </TabScrollView>
     </YStack>
   );
 }
+
+
+

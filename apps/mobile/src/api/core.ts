@@ -1,4 +1,4 @@
-import type { ProblemDetails } from '../generated/api';
+import type { ProblemDetails } from '@generated/api';
 
 const firstProblemError = (errors: unknown): string | null => {
   if (!errors || typeof errors !== 'object') {
@@ -88,3 +88,4 @@ export const getUiErrorMessage = (error: unknown): string => {
 
   return 'Something went wrong. Please try again.';
 };
+

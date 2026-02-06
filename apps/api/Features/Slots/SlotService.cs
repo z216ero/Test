@@ -193,6 +193,196 @@ public sealed class SlotService(AppDbContext db)
         return ServiceResult<IReadOnlyList<SlotDto>>.Success(dtos);
     }
 
+    public async Task<ServiceResult<IReadOnlyList<AvailableSlotGroupDto>>> GetAvailableSlotsAsync(
+        DateTime? fromUtc,
+        DateTime? toUtc,
+        IReadOnlyList<string>? specializations,
+        Gender? preferredTrainerGender,
+        Gender? clientGender,
+        int? clientCityId,
+        int? clientDistrictId,
+        bool districtOnly,
+        CancellationToken cancellationToken)
+    {
+        if (fromUtc.HasValue && fromUtc.Value.Kind != DateTimeKind.Utc)
+        {
+            return ServiceResult<IReadOnlyList<AvailableSlotGroupDto>>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid fromUtc",
+                "fromUtc must be in UTC.");
+        }
+
+        if (toUtc.HasValue && toUtc.Value.Kind != DateTimeKind.Utc)
+        {
+            return ServiceResult<IReadOnlyList<AvailableSlotGroupDto>>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid toUtc",
+                "toUtc must be in UTC.");
+        }
+
+        var normalizedFrom = fromUtc ?? DateTime.UtcNow;
+        var normalizedTo = toUtc ?? normalizedFrom.AddDays(30);
+
+        if (normalizedFrom > normalizedTo)
+        {
+            return ServiceResult<IReadOnlyList<AvailableSlotGroupDto>>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid range",
+                "fromUtc must be earlier than or equal to toUtc.");
+        }
+
+        var nowUtc = DateTime.UtcNow;
+
+        if (districtOnly && !clientDistrictId.HasValue)
+        {
+            return ServiceResult<IReadOnlyList<AvailableSlotGroupDto>>.Success([]);
+        }
+
+        var query = db.TrainingSlots
+            .AsNoTracking()
+            .Include(s => s.TrainerProfile!)
+            .ThenInclude(t => t.City)
+            .Include(s => s.TrainerProfile!)
+            .ThenInclude(t => t.District)
+            .Include(s => s.TrainerProfile!)
+            .ThenInclude(t => t.User)
+            .Where(s => s.Status == TrainingSlotStatus.Open
+                && s.StartsAtUtc >= normalizedFrom
+                && s.StartsAtUtc <= normalizedTo
+                && s.StartsAtUtc >= nowUtc);
+
+        if (clientCityId.HasValue)
+        {
+            query = query.Where(s => s.TrainerProfile != null && s.TrainerProfile.CityId == clientCityId.Value);
+        }
+
+        if (districtOnly && clientDistrictId.HasValue)
+        {
+            query = query.Where(s => s.TrainerProfile != null && s.TrainerProfile.DistrictId == clientDistrictId.Value);
+        }
+
+        var slots = await query
+            .OrderBy(s => s.StartsAtUtc)
+            .ToListAsync(cancellationToken);
+
+        if (slots.Count == 0)
+        {
+            return ServiceResult<IReadOnlyList<AvailableSlotGroupDto>>.Success([]);
+        }
+
+        var trainerUserIds = slots
+            .Select(slot => slot.TrainerProfile?.UserId)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+
+        var trainerAvatarIds = trainerUserIds.Count == 0
+            ? new HashSet<Guid>()
+            : await db.UserAvatars
+                .AsNoTracking()
+                .Where(avatar => trainerUserIds.Contains(avatar.UserId))
+                .Select(avatar => avatar.UserId)
+                .ToHashSetAsync(cancellationToken);
+
+        var specializationSet = new HashSet<string>(
+            specializations
+                ?.Select(value => value?.Trim())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!)
+                ?? Array.Empty<string>(),
+            StringComparer.OrdinalIgnoreCase);
+
+        var results = new List<AvailableSlotGroupDto>();
+
+        foreach (var group in slots
+            .Where(slot => slot.TrainerProfile is not null && slot.TrainerProfile.User is not null)
+            .GroupBy(slot => slot.TrainerProfile!.Id))
+        {
+            var trainer = group.First().TrainerProfile!;
+
+            if (!MatchesGenderFilter(trainer, preferredTrainerGender, clientGender))
+            {
+                continue;
+            }
+
+            if (!MatchesSpecializationFilter(trainer, specializationSet))
+            {
+                continue;
+            }
+
+            var trainerUserId = trainer.UserId;
+            var avatarUrl = trainerAvatarIds.Contains(trainerUserId)
+                ? $"/users/{trainerUserId}/avatar"
+                : null;
+
+            var trainerDto = new AvailableSlotTrainerDto(
+                trainer.Id,
+                trainer.User!.Name,
+                avatarUrl,
+                trainer.PricePerSession,
+                trainer.TrainingTypes ?? Array.Empty<string>(),
+                trainer.WorksWithGender.ToString(),
+                trainer.User!.Gender.ToString(),
+                null,
+                trainer.City?.Name,
+                trainer.District?.Name);
+
+            var slotDtos = group
+                .OrderBy(slot => slot.StartsAtUtc)
+                .Select(slot => ToDto(slot, null, null, trainer.PricePerSession))
+                .ToList();
+
+            results.Add(new AvailableSlotGroupDto(trainerDto, slotDtos));
+        }
+
+        var sorted = results
+            .OrderBy(group =>
+                group.Slots.Min(slot => slot.StartsAtUtc))
+            .ToList();
+
+        return ServiceResult<IReadOnlyList<AvailableSlotGroupDto>>.Success(sorted);
+    }
+
+    private static bool MatchesGenderFilter(
+        TrainerProfile trainer,
+        Gender? preferredTrainerGender,
+        Gender? clientGender)
+    {
+        if (clientGender.HasValue && clientGender != Gender.Any)
+        {
+            if (trainer.WorksWithGender != Gender.Any && trainer.WorksWithGender != clientGender)
+            {
+                return false;
+            }
+        }
+
+        if (!preferredTrainerGender.HasValue || preferredTrainerGender == Gender.Any)
+        {
+            return true;
+        }
+
+        return trainer.User?.Gender == preferredTrainerGender;
+    }
+
+    private static bool MatchesSpecializationFilter(
+        TrainerProfile trainer,
+        HashSet<string> specializationSet)
+    {
+        if (specializationSet.Count == 0)
+        {
+            return true;
+        }
+
+        var trainingTypes = trainer.Specializations ?? Array.Empty<string>();
+        if (trainingTypes.Any(type => specializationSet.Contains(type)))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     private static bool Overlaps(DateTime newStart, DateTime newEnd, TrainingSlot existing)
     {
         var existingStart = existing.StartsAtUtc.Kind == DateTimeKind.Utc
