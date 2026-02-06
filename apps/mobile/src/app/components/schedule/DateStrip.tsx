@@ -31,7 +31,7 @@ type DateStripProps = {
   tomorrowDate: Date;
   markers?: Record<string, boolean>;
   onSelectDate: (date: Date) => void;
-  onOpenCalendar: () => void;
+  onOpenCalendar?: () => void;
 };
 
 export function DateStrip({
@@ -140,17 +140,19 @@ export function DateStrip({
           })}
         </XStack>
       </ScrollView>
-      <Button
-        height="$11"
-        width="$11"
-        backgroundColor="$background"
-        borderWidth={1}
-        borderColor="$border"
-        borderRadius="$4"
-        onPress={onOpenCalendar}
-      >
-        <AppIcon name="calendar" size={18} color="$muted" />
-      </Button>
+      {onOpenCalendar ? (
+        <Button
+          height="$11"
+          width="$11"
+          backgroundColor="$background"
+          borderWidth={1}
+          borderColor="$border"
+          borderRadius="$4"
+          onPress={onOpenCalendar}
+        >
+          <AppIcon name="calendar" size={18} color="$muted" />
+        </Button>
+      ) : null}
     </XStack>
   );
 }

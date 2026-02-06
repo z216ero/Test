@@ -145,6 +145,24 @@ export interface SlotDto {
   trainerPricePerSession?: number | null;
 }
 
+export interface AvailableSlotTrainerDto {
+  id?: string;
+  name?: string;
+  /** @nullable */
+  avatarUrl?: string | null;
+  /** @nullable */
+  pricePerSession?: number | null;
+  trainingTypes?: string[];
+  clientGenderPreference?: string;
+  /** @nullable */
+  rating?: number | null;
+}
+
+export interface AvailableSlotGroupDto {
+  trainer?: AvailableSlotTrainerDto;
+  slots?: SlotDto[];
+}
+
 export interface StringFAnonymousType1 {
   /** @nullable */
   status?: string | null;
@@ -193,6 +211,13 @@ toUtc?: string;
 
 export type PutUsersMeAvatarBody = {
   file?: Blob;
+};
+
+export type GetSlotsAvailableParams = {
+fromUtc?: string;
+toUtc?: string;
+specializations?: string[];
+gender?: string;
 };
 
 export type postAuthRegisterResponse200 = {
@@ -1321,6 +1346,66 @@ export const postPushTokens = async (registerPushTokenRequest: RegisterPushToken
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
       registerPushTokenRequest,)
+  }
+);}
+
+
+
+export type getSlotsAvailableResponse200 = {
+  data: AvailableSlotGroupDto[]
+  status: 200
+}
+
+export type getSlotsAvailableResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type getSlotsAvailableResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+    
+export type getSlotsAvailableResponseSuccess = (getSlotsAvailableResponse200) & {
+  headers: Headers;
+};
+export type getSlotsAvailableResponseError = (getSlotsAvailableResponse400 | getSlotsAvailableResponse401) & {
+  headers: Headers;
+};
+
+export type getSlotsAvailableResponse = (getSlotsAvailableResponseSuccess | getSlotsAvailableResponseError)
+
+export const getGetSlotsAvailableUrl = (params?: GetSlotsAvailableParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["specializations"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : v.toString());
+      });
+      return;
+    }
+      
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/slots/available?${stringifiedParams}` : `/slots/available`
+}
+
+export const getSlotsAvailable = async (params?: GetSlotsAvailableParams, options?: RequestInit): Promise<getSlotsAvailableResponse> => {
+  
+  return customFetch<getSlotsAvailableResponse>(getGetSlotsAvailableUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
   }
 );}
 

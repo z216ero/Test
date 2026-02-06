@@ -4,7 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { TextStyle } from 'react-native';
 import { BootstrapScreen } from '@app/screens/BootstrapScreen';
-import { BookingConfirmScreen } from '@app/screens/BookingConfirmScreen';
+import { ClientSlotDetailsScreen } from '@app/screens/ClientSlotDetailsScreen';
 import { BookingDetailsScreen } from '@app/screens/BookingDetailsScreen';
 import { BookingsScreen } from '@app/screens/BookingsScreen';
 import { CreateSlotTabScreen } from '@app/screens/CreateSlotTabScreen';
@@ -60,7 +60,7 @@ const ProfileStackNavigator = () => (
 const SlotsStackNavigator = () => (
   <SlotsStack.Navigator screenOptions={{ headerShown: false }}>
     <SlotsStack.Screen name="SlotsList" component={SlotsScreen} />
-    <SlotsStack.Screen name="BookingConfirm" component={BookingConfirmScreen} />
+    <SlotsStack.Screen name="ClientSlotDetails" component={ClientSlotDetailsScreen} />
   </SlotsStack.Navigator>
 );
 

@@ -187,6 +187,7 @@ export function BookingsScreen({ navigation }: Props) {
       queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
       queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Client') });
+      queryClient.invalidateQueries({ queryKey: keys.slots.available(), exact: false });
 
       showToast({ type: 'success', title: t('bookings.detailsCancelled') });
     },
@@ -208,6 +209,7 @@ export function BookingsScreen({ navigation }: Props) {
 
       queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
       queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
+      queryClient.invalidateQueries({ queryKey: keys.slots.available(), exact: false });
     },
   });
 

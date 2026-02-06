@@ -1,5 +1,5 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
-import type { SlotDto } from '@generated/api';
+import type { AvailableSlotTrainerDto, SlotDto } from '@generated/api';
 
 export type ScheduleStackParamList = {
   ScheduleHome: undefined;
@@ -26,10 +26,9 @@ export type UserRole = 'Client' | 'Trainer';
 
 export type SlotsStackParamList = {
   SlotsList: undefined;
-  BookingConfirm: {
+  ClientSlotDetails: {
     slot: SlotDto;
-    trainerName?: string | null;
-    trainerSpecialization?: string | null;
+    trainer: AvailableSlotTrainerDto;
   };
 };
 

@@ -13,3 +13,16 @@ public sealed record SlotDto(
     string? ClientName,
     string? ClientAvatarUrl,
     int? TrainerPricePerSession);
+
+public sealed record AvailableSlotTrainerDto(
+    Guid Id,
+    string Name,
+    string? AvatarUrl,
+    int? PricePerSession,
+    IReadOnlyList<string> TrainingTypes,
+    string ClientGenderPreference,
+    double? Rating);
+
+public sealed record AvailableSlotGroupDto(
+    AvailableSlotTrainerDto Trainer,
+    IReadOnlyList<SlotDto> Slots);

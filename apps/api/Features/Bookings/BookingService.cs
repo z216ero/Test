@@ -57,6 +57,30 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                     "Slot already has a booking.");
             }
 
+            var slotStart = slot.StartsAtUtc;
+            var slotEnd = slotStart.AddMinutes(slot.DurationMinutes);
+            var nowUtc = DateTime.UtcNow;
+
+            var hasTimeConflict = await db.Bookings
+                .Include(b => b.Slot)
+                .AnyAsync(b => b.ClientId == request.ClientId
+                    && b.Status == BookingStatus.Booked
+                    && b.Slot != null
+                    && b.Slot.Status == TrainingSlotStatus.Booked
+                    && b.SlotId != slotId
+                    && b.Slot.StartsAtUtc.AddMinutes(b.Slot.DurationMinutes) > nowUtc
+                    && b.Slot.StartsAtUtc < slotEnd
+                    && b.Slot.StartsAtUtc.AddMinutes(b.Slot.DurationMinutes) > slotStart,
+                    cancellationToken);
+
+            if (hasTimeConflict)
+            {
+                return ServiceResult<BookingDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Time conflict",
+                    "Client already has a booking that overlaps with this time.");
+            }
+
             var booking = new Booking
             {
                 Id = Guid.NewGuid(),
