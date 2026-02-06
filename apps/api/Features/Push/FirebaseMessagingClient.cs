@@ -2,6 +2,7 @@ using FirebaseAdmin;
 using FirebaseAdmin.Messaging;
 using Google.Apis.Auth.OAuth2;
 using Microsoft.Extensions.Options;
+using System.Text;
 
 namespace Api.Features.Push;
 
@@ -92,6 +93,14 @@ public sealed class FirebaseMessagingClient
 
     private GoogleCredential? BuildCredential()
     {
+        if (!string.IsNullOrWhiteSpace(options.FirebaseCredentialsJsonBase64))
+        {
+            var json = Encoding.UTF8.GetString(Convert.FromBase64String(options.FirebaseCredentialsJsonBase64));
+            json = json.Replace("\\n", "\n");
+
+            return GoogleCredential.FromJson(json);
+        }
+
         if (!string.IsNullOrWhiteSpace(options.FirebaseCredentialsJson))
         {
             return GoogleCredential.FromJson(options.FirebaseCredentialsJson);
