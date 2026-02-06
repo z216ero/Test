@@ -16,6 +16,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
     public DbSet<PushEventDedup> PushEventDedups => Set<PushEventDedup>();
+    public DbSet<City> Cities => Set<City>();
+    public DbSet<District> Districts => Set<District>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,6 +30,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsRequired();
             entity.Property(x => x.Role)
                 .HasMaxLength(20)
+                .IsRequired();
+            entity.Property(x => x.Gender)
+                .HasConversion<string>()
+                .HasMaxLength(12)
+                .HasDefaultValue(Gender.Male)
                 .IsRequired();
         });
 
@@ -47,13 +54,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasMaxLength(120);
             entity.Property(x => x.About)
                 .HasMaxLength(250);
+            entity.Property(x => x.Specializations)
+                .HasColumnType("text[]")
+                .IsRequired();
             entity.Property(x => x.TrainingTypes)
                 .HasColumnType("text[]")
                 .IsRequired();
-            entity.Property(x => x.ClientGenderPreference)
+            entity.Property(x => x.WorksWithGender)
                 .HasConversion<string>()
                 .HasMaxLength(12)
-                .HasDefaultValue(ClientGenderPreference.All);
+                .HasDefaultValue(Gender.Any);
             entity.Property(x => x.UserId)
                 .IsRequired();
             entity.Property(x => x.CreatedAtUtc)
@@ -71,6 +81,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.ToTable("client_profiles");
             entity.HasKey(x => x.UserId);
             entity.Property(x => x.UserId)
+                .IsRequired();
+            entity.Property(x => x.PreferredTrainerGender)
+                .HasConversion<string>()
+                .HasMaxLength(12)
+                .HasDefaultValue(Gender.Any);
+            entity.Property(x => x.Level)
+                .HasConversion<string>()
+                .HasMaxLength(16)
+                .HasDefaultValue(ClientLevel.Beginner);
+            entity.Property(x => x.Goals)
+                .HasColumnType("text[]")
                 .IsRequired();
             entity.Property(x => x.CreatedAtUtc)
                 .HasDefaultValueSql("now() at time zone 'utc'");
@@ -195,6 +216,32 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsRequired();
             entity.Property(x => x.CreatedAtUtc)
                 .HasDefaultValueSql("now() at time zone 'utc'");
+        });
+
+        modelBuilder.Entity<City>(entity =>
+        {
+            entity.ToTable("cities");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name)
+                .HasMaxLength(120)
+                .IsRequired();
+            entity.HasIndex(x => x.Name)
+                .IsUnique();
+        });
+
+        modelBuilder.Entity<District>(entity =>
+        {
+            entity.ToTable("districts");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name)
+                .HasMaxLength(120)
+                .IsRequired();
+            entity.HasIndex(x => new { x.CityId, x.Name })
+                .IsUnique();
+            entity.HasOne(x => x.City)
+                .WithMany(x => x.Districts)
+                .HasForeignKey(x => x.CityId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

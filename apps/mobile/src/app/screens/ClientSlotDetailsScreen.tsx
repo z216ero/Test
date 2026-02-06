@@ -8,7 +8,7 @@ import {
   createBooking,
   getClientUpcomingBookings,
 } from '@api/bookingsApi';
-import { presentApiError } from '@api/ApiErrorPresenter';
+import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
 import { t } from '@i18n';
 import { onBookingCreated } from '@notifications/orchestrator';
 import { useAppMutation, useAppQuery } from '@query/hooks';
@@ -71,6 +71,7 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
   });
 
   const bookings = bookingsQuery.data ?? [];
+  const canCheckConflicts = bookingsQuery.isSuccess && !bookingsQuery.isFetching;
 
   const times = useMemo(() => {
     if (!slot.startsAtUtc) {
@@ -90,7 +91,7 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
   const dateLabel = times ? formatDateWithWeekdayRu(times.start) : t('common.empty');
   const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : t('common.empty');
   const priceLabel = formatPrice(slot.trainerPricePerSession ?? trainer.pricePerSession);
-  const conflict = hasTimeConflict(slot, bookings);
+  const conflict = canCheckConflicts && hasTimeConflict(slot, bookings);
   const startTs = times?.start.getTime() ?? null;
   const isPast = startTs !== null && startTs <= Date.now();
   const open = isSlotOpen(slot);
@@ -118,7 +119,6 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
         }
       }
 
-      showToast({ type: 'success', title: t('notifications.event.booked') });
       navigation.popToTop();
       navigation.getParent()?.navigate('Bookings', { screen: 'BookingsHome' });
     },
@@ -132,11 +132,13 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
         setActionError(presented.message);
       }
 
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message: presented.message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
 
       if (err instanceof BookingTimeConflictError || err instanceof BookingConflictError) {
         queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });

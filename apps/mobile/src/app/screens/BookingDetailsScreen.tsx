@@ -4,10 +4,15 @@ import { useCallback, useMemo, useState } from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { cancelBooking, type ClientBooking } from '@api/bookingsApi';
 import { ApiError } from '@api/core';
-import { presentApiError, type PresentedError } from '@api/ApiErrorPresenter';
+import {
+  presentApiError,
+  shouldShowErrorToast,
+  type PresentedError,
+} from '@api/ApiErrorPresenter';
+import { getTrainingTypeLookups } from '@api/lookupsApi';
 import { t } from '@i18n';
 import { onBookingCancelled } from '@notifications/orchestrator';
-import { useAppMutation } from '@query/hooks';
+import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
 import { useToast } from '@ui/feedback/useToast';
 import { Banner } from '@ui/feedback/Banner';
@@ -23,6 +28,7 @@ import {
 } from '@app/components/bookings/bookingUtils';
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 import type { BookingsStackParamList } from '@app/navigation/types';
+import { buildLookupMap } from '@app/utils/lookups';
 
 type Props = NativeStackScreenProps<BookingsStackParamList, 'BookingDetails'>;
 
@@ -34,11 +40,43 @@ type CancelContext = {
 const NOW_REFRESH_INTERVAL_MS = 60 * 1000;
 
 export function BookingDetailsScreen({ navigation, route }: Props) {
-  const { slot, trainerName, trainerSpecialization, trainerAvatarUrl } = route.params;
+  const { slot, trainerName, trainerTrainingTypes, trainerAvatarUrl } = route.params;
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [networkError, setNetworkError] = useState<PresentedError | null>(null);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+
+  const trainingTypesQuery = useAppQuery({
+    queryKey: keys.lookups.trainingTypes(),
+    queryFn: ({ signal }) => getTrainingTypeLookups({ signal }),
+  });
+
+  const trainingTypeOptions = trainingTypesQuery.data ?? [];
+  const trainingTypeLabels = useMemo(
+    () => buildLookupMap(trainingTypeOptions),
+    [trainingTypeOptions]
+  );
+  const trainingTypeOrder = useMemo(
+    () => new Map(trainingTypeOptions.map((item, index) => [item.code, index])),
+    [trainingTypeOptions]
+  );
+  const trainingTypeCode = useMemo(() => {
+    const types = trainerTrainingTypes ?? [];
+    if (types.length === 0) {
+      return null;
+    }
+    return types
+      .slice()
+      .sort((left, right) => {
+        const leftIndex = trainingTypeOrder.get(left) ?? Number.MAX_SAFE_INTEGER;
+        const rightIndex = trainingTypeOrder.get(right) ?? Number.MAX_SAFE_INTEGER;
+        return leftIndex - rightIndex;
+      })[0] ?? null;
+  }, [trainerTrainingTypes, trainingTypeOrder]);
+  const trainingTypeLabel = trainingTypeCode
+    ? (trainingTypeLabels.get(trainingTypeCode) ?? trainingTypeCode)
+    : null;
+  const trainingTypeIcon = trainingTypeCode === 'Group' ? 'users' : 'user';
 
   useFocusEffect(
     useCallback(() => {
@@ -88,7 +126,6 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
       queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Client') });
 
-      showToast({ type: 'success', title: t('bookings.detailsCancelled') });
       navigation.goBack();
     },
     onError: (err, _slotId, context) => {
@@ -106,11 +143,13 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
       }
 
       const message = err instanceof ApiError ? err.message : presented.message;
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message,
+        });
+      }
 
       queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
       queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
@@ -185,10 +224,13 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
                 <Text fontSize="$4" fontWeight="700" color="$text">
                   {trainerName?.trim() || t('common.empty')}
                 </Text>
-                {trainerSpecialization ? (
-                  <Text fontSize="$3" color="$muted">
-                    {trainerSpecialization}
-                  </Text>
+                {trainingTypeLabel ? (
+                  <XStack alignItems="center" gap="$2">
+                    <AppIcon name={trainingTypeIcon} size={14} color="$muted" />
+                    <Text fontSize="$3" color="$muted">
+                      {trainingTypeLabel}
+                    </Text>
+                  </XStack>
                 ) : null}
               </YStack>
             </XStack>

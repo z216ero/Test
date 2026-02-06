@@ -2,7 +2,7 @@
 
 This document is the single source of truth for business rules.
 If requirements are unclear or missing in code, ALWAYS follow this document.
-If something is not described here â€” do NOT invent it.
+If something is not described here — do NOT invent it.
 
 ---
 
@@ -49,6 +49,7 @@ A user can have ONLY ONE role in MVP.
 ### User
 - id
 - role: Trainer | Client
+- gender: Male | Female | Any (default Male)
 - name
 - avatar (optional): user profile photo
 - phone or email (auth identifier)
@@ -56,15 +57,27 @@ A user can have ONLY ONE role in MVP.
 ### TrainerProfile
 - userId
 - pricePerSession
-- specialization (string, optional)
+- specializations (string[], optional; predefined list from product requirements)
 - gymName (string, optional)
 - about (string, optional, max 250)
 - trainingTypes (string[], optional; predefined list from product requirements)
-- clientGenderPreference: Men | Women | All (default All)
-- rating (computed for UI; based on last 5â€“10 completed trainings)
+- worksWithGender: Male | Female | Any (default Any)
+- rating (computed for UI; based on last 5–10 completed trainings)
 
 ### ClientProfile
 - userId
+- preferredTrainerGender: Male | Female | Any (default Any)
+- level: Beginner | Intermediate | Advanced (default Beginner)
+- goals (string[], optional; predefined list from product requirements)
+
+### City
+- id
+- name
+
+### District
+- id
+- cityId
+- name
 
 ### RefreshToken
 - id
@@ -118,6 +131,26 @@ Each slot can have at most ONE booking.
 
 Payments are MANUAL in MVP.
 No integrations with banks.
+
+---
+
+## Lookups (source of truth via API)
+
+Enums / lookup lists:
+- Role: Trainer, Client
+- Gender: Male, Female, Any
+- Level: Beginner, Intermediate, Advanced
+- Goal: WeightLoss, MuscleGain, Strength, Rehab, GeneralFitness
+- Specialization: StrengthTraining, Crossfit, Functional, Rehab, WeightLoss, Yoga, Pilates
+- TrainingType: Individual, Group
+- SlotStatus: Open, Booked, Cancelled
+- BookingStatus: Booked, Cancelled, Completed, NoShow
+- PaymentStatus: Pending, Paid, Refunded
+- PaymentMethod: Cash, Transfer, SBP
+- DateFilter: Today, Tomorrow, ThisWeek, CustomDate
+- SortOption: ByRating, ByPrice, ByDistance
+
+Lookups are returned via `GET /lookups/*` and are the only source of truth for UI options.
 
 ---
 

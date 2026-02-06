@@ -1,9 +1,10 @@
 import { Sheet } from '@tamagui/sheet';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
 import type { ClientGenderFilter, ClientSlotsFilters } from '@app/utils/clientSlotsFilters';
+import type { LookupItem } from '@api/lookupsApi';
+import { t } from '@i18n/index';
 
 const normalizeSelection = (
   options: readonly string[],
@@ -16,7 +17,9 @@ const normalizeSelection = (
 type FilterSheetProps = {
   open: boolean;
   filters: ClientSlotsFilters;
-  specializationOptions: readonly string[];
+  specializationOptions: readonly LookupItem[];
+  genderOptions: readonly LookupItem[];
+  resetGenderCode: string;
   onApply: (filters: ClientSlotsFilters) => void;
   onOpenChange: (open: boolean) => void;
 };
@@ -25,30 +28,36 @@ export function FilterSheet({
   open,
   filters,
   specializationOptions,
+  genderOptions,
+  resetGenderCode,
   onApply,
   onOpenChange,
 }: FilterSheetProps) {
+  const specializationCodes = useMemo(
+    () => specializationOptions.map((item) => item.code),
+    [specializationOptions]
+  );
   const [selectedSpecializations, setSelectedSpecializations] = useState<string[]>(
-    normalizeSelection(specializationOptions, filters.specializations)
+    normalizeSelection(specializationCodes, filters.specializations)
   );
   const [selectedGender, setSelectedGender] = useState<ClientGenderFilter>(
-    filters.gender
+    filters.gender || resetGenderCode
   );
 
   useEffect(() => {
     if (open) {
       setSelectedSpecializations(
-        normalizeSelection(specializationOptions, filters.specializations)
+        normalizeSelection(specializationCodes, filters.specializations)
       );
-      setSelectedGender(filters.gender);
+      setSelectedGender(filters.gender || resetGenderCode);
     }
-  }, [open, filters, specializationOptions]);
-
-  const genderOptions = [
-    { value: 'Men' as const, label: t('profile.personal.genderMen') },
-    { value: 'Women' as const, label: t('profile.personal.genderWomen') },
-    { value: 'All' as const, label: t('profile.personal.genderAll') },
-  ];
+  }, [
+    open,
+    filters.gender,
+    filters.specializations,
+    resetGenderCode,
+    specializationCodes,
+  ]);
 
   const toggleSpecialization = (value: string) => {
     setSelectedSpecializations((prev) =>
@@ -60,12 +69,12 @@ export function FilterSheet({
 
   const handleReset = () => {
     setSelectedSpecializations([]);
-    setSelectedGender('All');
+    setSelectedGender(resetGenderCode);
   };
 
   const handleApply = () => {
     onApply({
-      specializations: normalizeSelection(specializationOptions, selectedSpecializations),
+      specializations: normalizeSelection(specializationCodes, selectedSpecializations),
       gender: selectedGender,
     });
     onOpenChange(false);
@@ -140,10 +149,10 @@ export function FilterSheet({
                 </Text>
                 <XStack flexWrap="wrap" gap="$2">
                   {specializationOptions.map((option) => {
-                    const selected = selectedSpecializations.includes(option);
+                    const selected = selectedSpecializations.includes(option.code);
                     return (
                       <Button
-                        key={option}
+                        key={option.code}
                         unstyled
                         paddingHorizontal="$3"
                         paddingVertical="$2"
@@ -152,7 +161,7 @@ export function FilterSheet({
                         backgroundColor={selected ? '$accent' : '$background'}
                         borderWidth={1}
                         borderColor={selected ? '$accent' : '$border'}
-                        onPress={() => toggleSpecialization(option)}
+                        onPress={() => toggleSpecialization(option.code)}
                       >
                         <XStack alignItems="center" gap="$2">
                           <AppIcon
@@ -164,7 +173,7 @@ export function FilterSheet({
                             fontSize="$3"
                             color={selected ? '$accentText' : '$text'}
                           >
-                            {option}
+                            {option.label}
                           </Text>
                         </XStack>
                       </Button>
@@ -186,10 +195,10 @@ export function FilterSheet({
                 </Text>
                 <YStack gap="$2">
                   {genderOptions.map((option) => {
-                    const selected = selectedGender === option.value;
+                    const selected = selectedGender === option.code;
                     return (
                       <Button
-                        key={option.value}
+                        key={option.code}
                         unstyled
                         backgroundColor="$background"
                         borderRadius="$4"
@@ -199,7 +208,7 @@ export function FilterSheet({
                         minHeight="$10"
                         width="100%"
                         justifyContent="flex-start"
-                        onPress={() => setSelectedGender(option.value)}
+                        onPress={() => setSelectedGender(option.code)}
                       >
                         <XStack alignItems="center" gap="$3" flex={1}>
                           <YStack

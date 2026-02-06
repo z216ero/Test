@@ -22,6 +22,11 @@ public sealed class UserService(AppDbContext db)
         }
 
         user.Name = request.Name.Trim();
+        if (!string.IsNullOrWhiteSpace(request.Gender)
+            && Enum.TryParse<Gender>(request.Gender, true, out var parsedGender))
+        {
+            user.Gender = parsedGender;
+        }
 
         if (string.Equals(user.Role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
         {
@@ -36,29 +41,57 @@ public sealed class UserService(AppDbContext db)
                     "Trainer profile is missing.");
             }
 
-            profile.Specialization = string.IsNullOrWhiteSpace(request.Specialization)
-                ? null
-                : request.Specialization.Trim();
-
             profile.About = string.IsNullOrWhiteSpace(request.About)
                 ? null
                 : request.About.Trim();
+
+            if (request.Specializations is not null)
+            {
+                profile.Specializations = request.Specializations;
+            }
 
             if (request.TrainingTypes is not null)
             {
                 profile.TrainingTypes = request.TrainingTypes;
             }
 
-            if (!string.IsNullOrWhiteSpace(request.ClientGenderPreference)
-                && Enum.TryParse<ClientGenderPreference>(
-                    request.ClientGenderPreference,
-                    true,
-                    out var preference))
+            if (!string.IsNullOrWhiteSpace(request.WorksWithGender)
+                && Enum.TryParse<Gender>(request.WorksWithGender, true, out var preference))
             {
-                profile.ClientGenderPreference = preference;
+                profile.WorksWithGender = preference;
             }
 
             profile.PricePerSession = request.PricePerSession;
+        }
+        else
+        {
+            var profile = await db.ClientProfiles
+                .FirstOrDefaultAsync(t => t.UserId == userId, cancellationToken);
+
+            if (profile is null)
+            {
+                return ServiceResult<bool>.Fail(
+                    StatusCodes.Status404NotFound,
+                    "Client profile not found",
+                    "Client profile is missing.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.PreferredTrainerGender)
+                && Enum.TryParse<Gender>(request.PreferredTrainerGender, true, out var preferred))
+            {
+                profile.PreferredTrainerGender = preferred;
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Level)
+                && Enum.TryParse<ClientLevel>(request.Level, true, out var level))
+            {
+                profile.Level = level;
+            }
+
+            if (request.Goals is not null)
+            {
+                profile.Goals = request.Goals;
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);

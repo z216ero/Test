@@ -1,45 +1,17 @@
-﻿import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export type ClientGenderFilter = 'Men' | 'Women' | 'All';
+export type ClientGenderFilter = string;
 
 export type ClientSlotsFilters = {
   specializations: string[];
   gender: ClientGenderFilter;
 };
 
-export const CLIENT_SLOTS_SPECIALIZATIONS = [
-  'Силовой тренинг',
-  'Функциональный тренинг',
-  'Набор мышечной массы',
-  'Похудение',
-  'Реабилитация/ЛФК',
-  'Стретчинг',
-  'Кроссфит',
-  'Йога',
-  'Пилатес',
-  'Подготовка к соревнованиям',
-] as const;
-
-const SPECIALIZATION_ALIASES: Record<string, string[]> = {
-  'Силовой тренинг': ['Силовая тренировка'],
-  'Функциональный тренинг': ['Функциональная тренировка'],
-  'Набор мышечной массы': ['Набор массы'],
-  'Реабилитация/ЛФК': ['Реабилитация'],
-  'Стретчинг': ['Растяжка / Mobility'],
-};
-
-const STORAGE_KEY = 'clientSlots.filters.v1';
+const STORAGE_KEY = 'clientSlots.filters.v2';
 
 export const DEFAULT_CLIENT_SLOTS_FILTERS: ClientSlotsFilters = {
   specializations: [],
-  gender: 'All',
-};
-
-const normalizeGender = (value?: string | null): ClientGenderFilter => {
-  if (value === 'Men' || value === 'Women' || value === 'All') {
-    return value;
-  }
-  return 'All';
+  gender: '',
 };
 
 const normalizeSpecializations = (value: unknown): string[] => {
@@ -69,7 +41,7 @@ export const loadClientSlotsFilters = async (): Promise<ClientSlotsFilters> => {
 
     return {
       specializations: normalizeSpecializations(parsed.specializations),
-      gender: normalizeGender(parsed.gender ?? null),
+      gender: typeof parsed.gender === 'string' ? parsed.gender : '',
     };
   } catch {
     return DEFAULT_CLIENT_SLOTS_FILTERS;
@@ -84,13 +56,4 @@ export const saveClientSlotsFilters = async (
 
 export const clearClientSlotsFilters = async (): Promise<void> => {
   await AsyncStorage.removeItem(STORAGE_KEY);
-};
-
-export const expandSpecializationsForApi = (values: string[]): string[] => {
-  const expanded = values.flatMap((value) => [
-    value,
-    ...(SPECIALIZATION_ALIASES[value] ?? []),
-  ]);
-
-  return Array.from(new Set(expanded));
 };

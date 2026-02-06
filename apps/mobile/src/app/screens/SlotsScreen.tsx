@@ -12,6 +12,7 @@ import type { ClientBooking } from '@api/bookingsApi';
 import { getClientUpcomingBookings } from '@api/bookingsApi';
 import { getAvailableSlotsForClient } from '@api/slotsApi';
 import { presentApiError } from '@api/ApiErrorPresenter';
+import { getGenderLookups, getSpecializationLookups } from '@api/lookupsApi';
 import { t } from '@i18n';
 import { useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
@@ -23,9 +24,7 @@ import { DateStrip } from '@app/components/schedule/DateStrip';
 import { FilterSheet } from '@app/components/slots/FilterSheet';
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 import {
-  CLIENT_SLOTS_SPECIALIZATIONS,
   DEFAULT_CLIENT_SLOTS_FILTERS,
-  expandSpecializationsForApi,
   loadClientSlotsFilters,
   saveClientSlotsFilters,
   type ClientSlotsFilters,
@@ -48,23 +47,30 @@ const addDays = (value: Date, days: number) => {
   return next;
 };
 
-const sortSpecializations = (values: string[]): string[] => {
-  const order = new Map(
-    CLIENT_SLOTS_SPECIALIZATIONS.map((item, index) => [item, index])
-  );
-  return [...new Set(values)].sort((left, right) => {
+const getDefaultCode = (items: { code: string; isDefault?: boolean }[]) =>
+  items.find((item) => item.isDefault)?.code ?? items[0]?.code ?? '';
+
+const getAnyCode = (items: { code: string; isAny?: boolean }[]) =>
+  items.find((item) => item.isAny)?.code ?? '';
+
+const sortByOrder = (values: string[], order: Map<string, number>): string[] =>
+  [...new Set(values)].sort((left, right) => {
     const leftIndex = order.get(left) ?? Number.MAX_SAFE_INTEGER;
     const rightIndex = order.get(right) ?? Number.MAX_SAFE_INTEGER;
     return leftIndex - rightIndex;
   });
-};
 
-const normalizeFilters = (filters: ClientSlotsFilters): ClientSlotsFilters => {
-  const allowed = new Set(CLIENT_SLOTS_SPECIALIZATIONS);
-  const specializations = filters.specializations.filter((item) => allowed.has(item));
+const normalizeFilters = (
+  filters: ClientSlotsFilters,
+  specializationOrder: Map<string, number>,
+  allowedSpecializations: Set<string>,
+  defaultGender: string
+): ClientSlotsFilters => {
+  const specializations = filters.specializations.filter((item) => allowedSpecializations.has(item));
+  const gender = filters.gender || defaultGender;
   return {
-    gender: filters.gender,
-    specializations: sortSpecializations(specializations),
+    gender,
+    specializations: sortByOrder(specializations, specializationOrder),
   };
 };
 
@@ -149,6 +155,31 @@ export function SlotsScreen({ navigation }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
 
+  const specializationsQuery = useAppQuery({
+    queryKey: keys.lookups.specializations(),
+    queryFn: ({ signal }) => getSpecializationLookups({ signal }),
+  });
+
+  const gendersQuery = useAppQuery({
+    queryKey: keys.lookups.genders(),
+    queryFn: ({ signal }) => getGenderLookups({ signal }),
+  });
+
+  const specializationOptions = specializationsQuery.data ?? [];
+  const genderOptions = gendersQuery.data ?? [];
+  const specializationOrder = useMemo(
+    () => new Map(specializationOptions.map((item, index) => [item.code, index])),
+    [specializationOptions]
+  );
+  const allowedSpecializations = useMemo(
+    () => new Set(specializationOptions.map((item) => item.code)),
+    [specializationOptions]
+  );
+  const anyGenderCode = useMemo(() => getAnyCode(genderOptions), [genderOptions]);
+  const defaultGenderCode = useMemo(() => getDefaultCode(genderOptions), [genderOptions]);
+  const resetGenderCode = anyGenderCode || defaultGenderCode || '';
+  const lookupsReady = !specializationsQuery.isLoading && !gendersQuery.isLoading;
+
   const todayDate = useMemo(() => startOfLocalDay(new Date()), []);
   const tomorrowDate = useMemo(() => addDays(todayDate, 1), [todayDate]);
   const maxDate = useMemo(() => addDays(todayDate, DATE_RANGE_DAYS), [todayDate]);
@@ -159,7 +190,7 @@ export function SlotsScreen({ navigation }: Props) {
       if (!isActive) {
         return;
       }
-      setFilters(normalizeFilters(stored));
+      setFilters(stored);
       setFiltersReady(true);
     });
     return () => {
@@ -176,22 +207,35 @@ export function SlotsScreen({ navigation }: Props) {
   const toUtc = useMemo(() => endOfLocalDay(selectedDate).toISOString(), [selectedDate]);
 
   const slotParams = useMemo(() => {
-    if (!filtersReady) {
+    if (!filtersReady || !lookupsReady) {
       return null;
     }
-    const normalized = normalizeFilters(filters);
-    const apiSpecializations = expandSpecializationsForApi(
-      normalized.specializations
+    const normalized = normalizeFilters(
+      filters,
+      specializationOrder,
+      allowedSpecializations,
+      resetGenderCode
     );
     return {
       fromUtc,
       toUtc,
-      specializations: apiSpecializations.length
-        ? apiSpecializations
+      specializations: normalized.specializations.length
+        ? normalized.specializations
         : undefined,
-      gender: normalized.gender === 'All' ? undefined : normalized.gender,
+      gender: normalized.gender && normalized.gender !== resetGenderCode
+        ? normalized.gender
+        : undefined,
     };
-  }, [filters, filtersReady, fromUtc, toUtc]);
+  }, [
+    filters,
+    filtersReady,
+    lookupsReady,
+    fromUtc,
+    toUtc,
+    specializationOrder,
+    allowedSpecializations,
+    resetGenderCode,
+  ]);
 
   const slotsQuery = useAppQuery({
     queryKey: slotParams ? keys.slots.available(slotParams) : keys.slots.available(),
@@ -206,6 +250,7 @@ export function SlotsScreen({ navigation }: Props) {
   });
 
   const bookings = bookingsQuery.data ?? [];
+  const canCheckConflicts = bookingsQuery.isSuccess && !bookingsQuery.isFetching;
   const nowTs = Date.now();
 
   const groups = useMemo(() => {
@@ -234,18 +279,35 @@ export function SlotsScreen({ navigation }: Props) {
       });
   }, [slotsQuery.data]);
 
+  const normalizedFilters = useMemo(
+    () => normalizeFilters(
+      filters,
+      specializationOrder,
+      allowedSpecializations,
+      resetGenderCode
+    ),
+    [filters, specializationOrder, allowedSpecializations, resetGenderCode]
+  );
+
   const hasActiveFilters =
-    filters.specializations.length > 0 || filters.gender !== 'All';
+    normalizedFilters.specializations.length > 0
+    || (normalizedFilters.gender && normalizedFilters.gender !== resetGenderCode);
 
   const handleApplyFilters = (next: ClientSlotsFilters) => {
-    const normalized = normalizeFilters(next);
+    const normalized = normalizeFilters(
+      next,
+      specializationOrder,
+      allowedSpecializations,
+      resetGenderCode
+    );
     setFilters(normalized);
     saveClientSlotsFilters(normalized).catch(() => undefined);
   };
 
   const handleResetFilters = () => {
-    setFilters(DEFAULT_CLIENT_SLOTS_FILTERS);
-    saveClientSlotsFilters(DEFAULT_CLIENT_SLOTS_FILTERS).catch(() => undefined);
+    const reset = { ...DEFAULT_CLIENT_SLOTS_FILTERS, gender: resetGenderCode };
+    setFilters(reset);
+    saveClientSlotsFilters(reset).catch(() => undefined);
   };
 
   const openDatePicker = () => {
@@ -295,7 +357,7 @@ export function SlotsScreen({ navigation }: Props) {
     const priceLabel = formatPrice(
       slot.trainerPricePerSession ?? trainer.pricePerSession
     );
-    const conflict = hasTimeConflict(slot, bookings);
+    const conflict = canCheckConflicts && hasTimeConflict(slot, bookings);
     const startTs = range?.start.getTime() ?? null;
     const isPast = startTs !== null && startTs <= nowTs;
     const open = isSlotOpen(slot);
@@ -352,7 +414,6 @@ export function SlotsScreen({ navigation }: Props) {
   const renderTrainerCard = (group: SlotGroup, index: number) => {
     const trainer = group.trainer;
     const trainerName = trainer.name ?? t('common.empty');
-    const priceLabel = formatPrice(trainer.pricePerSession);
     const ratingLabel = trainer.rating ? trainer.rating.toFixed(1) : null;
 
     return (
@@ -386,11 +447,6 @@ export function SlotsScreen({ navigation }: Props) {
               ) : null}
             </YStack>
           </XStack>
-          {priceLabel ? (
-            <Text fontSize="$3" color="$text">
-              {priceLabel}
-            </Text>
-          ) : null}
         </XStack>
 
         <YStack gap="$2">
@@ -401,7 +457,7 @@ export function SlotsScreen({ navigation }: Props) {
   };
 
   const renderContent = () => {
-    if (!filtersReady || slotsQuery.isLoading) {
+    if (!filtersReady || !lookupsReady || slotsQuery.isLoading) {
       return <SlotsSkeleton />;
     }
 
@@ -534,7 +590,9 @@ export function SlotsScreen({ navigation }: Props) {
       <FilterSheet
         open={sheetOpen}
         filters={filters}
-        specializationOptions={CLIENT_SLOTS_SPECIALIZATIONS}
+        specializationOptions={specializationOptions}
+        genderOptions={genderOptions}
+        resetGenderCode={resetGenderCode}
         onApply={handleApplyFilters}
         onOpenChange={setSheetOpen}
       />

@@ -22,15 +22,11 @@ export interface AuthUserDto {
   /** @nullable */
   name?: string | null;
   /** @nullable */
-  specialization?: string | null;
-  /** @nullable */
   gymName?: string | null;
   /** @nullable */
   about?: string | null;
   /** @nullable */
   trainingTypes?: string[] | null;
-  /** @nullable */
-  clientGenderPreference?: string | null;
   /** @nullable */
   pricePerSession?: number | null;
   /** @nullable */
@@ -40,6 +36,17 @@ export interface AuthUserDto {
   hasAvatar?: boolean;
   /** @nullable */
   avatarUrl?: string | null;
+  gender?: string;
+  /** @nullable */
+  specializations?: string[] | null;
+  /** @nullable */
+  worksWithGender?: string | null;
+  /** @nullable */
+  preferredTrainerGender?: string | null;
+  /** @nullable */
+  clientLevel?: string | null;
+  /** @nullable */
+  clientGoals?: string[] | null;
 }
 
 export interface BookSlotRequest {
@@ -124,7 +131,9 @@ export interface RegisterRequest {
   /** @nullable */
   name?: string | null;
   /** @nullable */
-  specialization?: string | null;
+  gender?: string | null;
+  /** @nullable */
+  specializations?: string[] | null;
 }
 
 export interface SlotDto {
@@ -153,9 +162,10 @@ export interface AvailableSlotTrainerDto {
   /** @nullable */
   pricePerSession?: number | null;
   trainingTypes?: string[];
-  clientGenderPreference?: string;
   /** @nullable */
   rating?: number | null;
+  worksWithGender?: string;
+  gender?: string;
 }
 
 export interface AvailableSlotGroupDto {
@@ -184,24 +194,62 @@ export interface UpcomingSessionDto {
   /** @nullable */
   trainerName?: string | null;
   /** @nullable */
-  trainerSpecialization?: string | null;
-  /** @nullable */
   trainerAvatarUrl?: string | null;
+  /** @nullable */
+  trainerSpecializations?: string[] | null;
+  /** @nullable */
+  trainerTrainingTypes?: string[] | null;
 }
 
 export interface UpdateUserRequest {
   /** @nullable */
   name?: string | null;
   /** @nullable */
-  specialization?: string | null;
-  /** @nullable */
   about?: string | null;
   /** @nullable */
   trainingTypes?: string[] | null;
   /** @nullable */
-  clientGenderPreference?: string | null;
-  /** @nullable */
   pricePerSession?: number | null;
+  /** @nullable */
+  gender?: string | null;
+  /** @nullable */
+  specializations?: string[] | null;
+  /** @nullable */
+  worksWithGender?: string | null;
+  /** @nullable */
+  preferredTrainerGender?: string | null;
+  /** @nullable */
+  level?: string | null;
+  /** @nullable */
+  goals?: string[] | null;
+}
+
+export interface LookupItem {
+  code?: string;
+  label?: string;
+  isDefault?: boolean;
+  isAny?: boolean;
+  /** @nullable */
+  isTrainerRole?: boolean | null;
+  /** @nullable */
+  isClientRole?: boolean | null;
+}
+
+export interface LookupResponse {
+  items?: LookupItem[];
+}
+
+export interface CityDto {
+  id?: number;
+  /** @nullable */
+  name?: string | null;
+}
+
+export interface DistrictDto {
+  id?: number;
+  cityId?: number;
+  /** @nullable */
+  name?: string | null;
 }
 
 export type GetTrainersTrainerIdSlotsParams = {
@@ -218,6 +266,61 @@ fromUtc?: string;
 toUtc?: string;
 specializations?: string[];
 gender?: string;
+};
+
+export type GetLookupsRolesParams = {
+lang?: string;
+};
+
+export type GetLookupsGendersParams = {
+lang?: string;
+};
+
+export type GetLookupsLevelsParams = {
+lang?: string;
+};
+
+export type GetLookupsGoalsParams = {
+lang?: string;
+};
+
+export type GetLookupsSpecializationsParams = {
+lang?: string;
+};
+
+export type GetLookupsTrainingTypesParams = {
+lang?: string;
+};
+
+export type GetLookupsSlotStatusesParams = {
+lang?: string;
+};
+
+export type GetLookupsBookingStatusesParams = {
+lang?: string;
+};
+
+export type GetLookupsPaymentStatusesParams = {
+lang?: string;
+};
+
+export type GetLookupsPaymentMethodsParams = {
+lang?: string;
+};
+
+export type GetLookupsDateFiltersParams = {
+lang?: string;
+};
+
+export type GetLookupsSortOptionsParams = {
+lang?: string;
+};
+
+export type GetLookupsDistrictsParams = {
+/**
+ * @nullable
+ */
+cityId?: number | null;
 };
 
 export type postAuthRegisterResponse200 = {
@@ -1452,5 +1555,558 @@ export const postPushTokensDisable = async (disablePushTokenRequest: DisablePush
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
       disablePushTokenRequest,)
+  }
+);}
+
+
+
+export type getLookupsRolesResponse200 = {
+  data: LookupResponse
+  status: 200
+}
+    
+export type getLookupsRolesResponseSuccess = (getLookupsRolesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsRolesResponse = (getLookupsRolesResponseSuccess)
+
+export const getGetLookupsRolesUrl = (params?: GetLookupsRolesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/lookups/roles?${stringifiedParams}` : `/lookups/roles`
+}
+
+export const getLookupsRoles = async (params?: GetLookupsRolesParams, options?: RequestInit): Promise<getLookupsRolesResponse> => {
+  
+  return customFetch<getLookupsRolesResponse>(getGetLookupsRolesUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getLookupsGendersResponse200 = {
+  data: LookupResponse
+  status: 200
+}
+    
+export type getLookupsGendersResponseSuccess = (getLookupsGendersResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsGendersResponse = (getLookupsGendersResponseSuccess)
+
+export const getGetLookupsGendersUrl = (params?: GetLookupsGendersParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/lookups/genders?${stringifiedParams}` : `/lookups/genders`
+}
+
+export const getLookupsGenders = async (params?: GetLookupsGendersParams, options?: RequestInit): Promise<getLookupsGendersResponse> => {
+  
+  return customFetch<getLookupsGendersResponse>(getGetLookupsGendersUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getLookupsLevelsResponse200 = {
+  data: LookupResponse
+  status: 200
+}
+    
+export type getLookupsLevelsResponseSuccess = (getLookupsLevelsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsLevelsResponse = (getLookupsLevelsResponseSuccess)
+
+export const getGetLookupsLevelsUrl = (params?: GetLookupsLevelsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/lookups/levels?${stringifiedParams}` : `/lookups/levels`
+}
+
+export const getLookupsLevels = async (params?: GetLookupsLevelsParams, options?: RequestInit): Promise<getLookupsLevelsResponse> => {
+  
+  return customFetch<getLookupsLevelsResponse>(getGetLookupsLevelsUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getLookupsGoalsResponse200 = {
+  data: LookupResponse
+  status: 200
+}
+    
+export type getLookupsGoalsResponseSuccess = (getLookupsGoalsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsGoalsResponse = (getLookupsGoalsResponseSuccess)
+
+export const getGetLookupsGoalsUrl = (params?: GetLookupsGoalsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/lookups/goals?${stringifiedParams}` : `/lookups/goals`
+}
+
+export const getLookupsGoals = async (params?: GetLookupsGoalsParams, options?: RequestInit): Promise<getLookupsGoalsResponse> => {
+  
+  return customFetch<getLookupsGoalsResponse>(getGetLookupsGoalsUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getLookupsSpecializationsResponse200 = {
+  data: LookupResponse
+  status: 200
+}
+    
+export type getLookupsSpecializationsResponseSuccess = (getLookupsSpecializationsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsSpecializationsResponse = (getLookupsSpecializationsResponseSuccess)
+
+export const getGetLookupsSpecializationsUrl = (params?: GetLookupsSpecializationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/lookups/specializations?${stringifiedParams}` : `/lookups/specializations`
+}
+
+export const getLookupsSpecializations = async (params?: GetLookupsSpecializationsParams, options?: RequestInit): Promise<getLookupsSpecializationsResponse> => {
+  
+  return customFetch<getLookupsSpecializationsResponse>(getGetLookupsSpecializationsUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getLookupsTrainingTypesResponse200 = {
+  data: LookupResponse
+  status: 200
+}
+    
+export type getLookupsTrainingTypesResponseSuccess = (getLookupsTrainingTypesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsTrainingTypesResponse = (getLookupsTrainingTypesResponseSuccess)
+
+export const getGetLookupsTrainingTypesUrl = (params?: GetLookupsTrainingTypesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/lookups/training-types?${stringifiedParams}` : `/lookups/training-types`
+}
+
+export const getLookupsTrainingTypes = async (params?: GetLookupsTrainingTypesParams, options?: RequestInit): Promise<getLookupsTrainingTypesResponse> => {
+  
+  return customFetch<getLookupsTrainingTypesResponse>(getGetLookupsTrainingTypesUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getLookupsSlotStatusesResponse200 = {
+  data: LookupResponse
+  status: 200
+}
+    
+export type getLookupsSlotStatusesResponseSuccess = (getLookupsSlotStatusesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsSlotStatusesResponse = (getLookupsSlotStatusesResponseSuccess)
+
+export const getGetLookupsSlotStatusesUrl = (params?: GetLookupsSlotStatusesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/lookups/slot-statuses?${stringifiedParams}` : `/lookups/slot-statuses`
+}
+
+export const getLookupsSlotStatuses = async (params?: GetLookupsSlotStatusesParams, options?: RequestInit): Promise<getLookupsSlotStatusesResponse> => {
+  
+  return customFetch<getLookupsSlotStatusesResponse>(getGetLookupsSlotStatusesUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getLookupsBookingStatusesResponse200 = {
+  data: LookupResponse
+  status: 200
+}
+    
+export type getLookupsBookingStatusesResponseSuccess = (getLookupsBookingStatusesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsBookingStatusesResponse = (getLookupsBookingStatusesResponseSuccess)
+
+export const getGetLookupsBookingStatusesUrl = (params?: GetLookupsBookingStatusesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/lookups/booking-statuses?${stringifiedParams}` : `/lookups/booking-statuses`
+}
+
+export const getLookupsBookingStatuses = async (params?: GetLookupsBookingStatusesParams, options?: RequestInit): Promise<getLookupsBookingStatusesResponse> => {
+  
+  return customFetch<getLookupsBookingStatusesResponse>(getGetLookupsBookingStatusesUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getLookupsPaymentStatusesResponse200 = {
+  data: LookupResponse
+  status: 200
+}
+    
+export type getLookupsPaymentStatusesResponseSuccess = (getLookupsPaymentStatusesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsPaymentStatusesResponse = (getLookupsPaymentStatusesResponseSuccess)
+
+export const getGetLookupsPaymentStatusesUrl = (params?: GetLookupsPaymentStatusesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/lookups/payment-statuses?${stringifiedParams}` : `/lookups/payment-statuses`
+}
+
+export const getLookupsPaymentStatuses = async (params?: GetLookupsPaymentStatusesParams, options?: RequestInit): Promise<getLookupsPaymentStatusesResponse> => {
+  
+  return customFetch<getLookupsPaymentStatusesResponse>(getGetLookupsPaymentStatusesUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getLookupsPaymentMethodsResponse200 = {
+  data: LookupResponse
+  status: 200
+}
+    
+export type getLookupsPaymentMethodsResponseSuccess = (getLookupsPaymentMethodsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsPaymentMethodsResponse = (getLookupsPaymentMethodsResponseSuccess)
+
+export const getGetLookupsPaymentMethodsUrl = (params?: GetLookupsPaymentMethodsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/lookups/payment-methods?${stringifiedParams}` : `/lookups/payment-methods`
+}
+
+export const getLookupsPaymentMethods = async (params?: GetLookupsPaymentMethodsParams, options?: RequestInit): Promise<getLookupsPaymentMethodsResponse> => {
+  
+  return customFetch<getLookupsPaymentMethodsResponse>(getGetLookupsPaymentMethodsUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getLookupsDateFiltersResponse200 = {
+  data: LookupResponse
+  status: 200
+}
+    
+export type getLookupsDateFiltersResponseSuccess = (getLookupsDateFiltersResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsDateFiltersResponse = (getLookupsDateFiltersResponseSuccess)
+
+export const getGetLookupsDateFiltersUrl = (params?: GetLookupsDateFiltersParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/lookups/date-filters?${stringifiedParams}` : `/lookups/date-filters`
+}
+
+export const getLookupsDateFilters = async (params?: GetLookupsDateFiltersParams, options?: RequestInit): Promise<getLookupsDateFiltersResponse> => {
+  
+  return customFetch<getLookupsDateFiltersResponse>(getGetLookupsDateFiltersUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getLookupsSortOptionsResponse200 = {
+  data: LookupResponse
+  status: 200
+}
+    
+export type getLookupsSortOptionsResponseSuccess = (getLookupsSortOptionsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsSortOptionsResponse = (getLookupsSortOptionsResponseSuccess)
+
+export const getGetLookupsSortOptionsUrl = (params?: GetLookupsSortOptionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/lookups/sort-options?${stringifiedParams}` : `/lookups/sort-options`
+}
+
+export const getLookupsSortOptions = async (params?: GetLookupsSortOptionsParams, options?: RequestInit): Promise<getLookupsSortOptionsResponse> => {
+  
+  return customFetch<getLookupsSortOptionsResponse>(getGetLookupsSortOptionsUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getLookupsCitiesResponse200 = {
+  data: CityDto[]
+  status: 200
+}
+    
+export type getLookupsCitiesResponseSuccess = (getLookupsCitiesResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsCitiesResponse = (getLookupsCitiesResponseSuccess)
+
+export const getGetLookupsCitiesUrl = () => {
+
+
+  
+
+  return `/lookups/cities`
+}
+
+export const getLookupsCities = async ( options?: RequestInit): Promise<getLookupsCitiesResponse> => {
+  
+  return customFetch<getLookupsCitiesResponse>(getGetLookupsCitiesUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getLookupsDistrictsResponse200 = {
+  data: DistrictDto[]
+  status: 200
+}
+    
+export type getLookupsDistrictsResponseSuccess = (getLookupsDistrictsResponse200) & {
+  headers: Headers;
+};
+;
+
+export type getLookupsDistrictsResponse = (getLookupsDistrictsResponseSuccess)
+
+export const getGetLookupsDistrictsUrl = (params?: GetLookupsDistrictsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/lookups/districts?${stringifiedParams}` : `/lookups/districts`
+}
+
+export const getLookupsDistricts = async (params?: GetLookupsDistrictsParams, options?: RequestInit): Promise<getLookupsDistrictsResponse> => {
+  
+  return customFetch<getLookupsDistrictsResponse>(getGetLookupsDistrictsUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
   }
 );}

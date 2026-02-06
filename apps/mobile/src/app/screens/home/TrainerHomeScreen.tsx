@@ -9,7 +9,7 @@ import {
   markSlotCompleted,
   markSlotNoShow,
 } from '@api/trainerSlotsApi';
-import { presentApiError } from '@api/ApiErrorPresenter';
+import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
 import { getAccessToken } from '@auth/tokenStorage';
 import type { SlotDto } from '@generated/api';
 import { t } from '@i18n';
@@ -287,18 +287,19 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
-      showToast({ type: 'success', title: t('status.completed') });
     },
     onError: (error, _variables, context) => {
       if (context?.snapshot) {
         rollbackSlotsCache(context.snapshot);
       }
       const presented = presentApiError(error);
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message: presented.message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
     },
   });
 
@@ -315,18 +316,19 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
-      showToast({ type: 'success', title: t('status.noShow') });
     },
     onError: (error, _variables, context) => {
       if (context?.snapshot) {
         rollbackSlotsCache(context.snapshot);
       }
       const presented = presentApiError(error);
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message: presented.message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
     },
   });
 

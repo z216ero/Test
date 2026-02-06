@@ -181,9 +181,6 @@ export function SlotCard({
               <Text fontSize="$4" fontWeight="700" color={isMuted ? '$muted' : '$text'}>
                 {clientName}
               </Text>
-              <Text fontSize="$3" color="$muted">
-                {statusLabel}
-              </Text>
             </YStack>
           </XStack>
         ) : null}

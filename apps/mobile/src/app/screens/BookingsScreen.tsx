@@ -10,7 +10,8 @@ import {
   type ClientBooking,
 } from '@api/bookingsApi';
 import { ApiError } from '@api/core';
-import { presentApiError } from '@api/ApiErrorPresenter';
+import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
+import { getTrainingTypeLookups } from '@api/lookupsApi';
 import { t } from '@i18n';
 import { onBookingCancelled } from '@notifications/orchestrator';
 import { useAppMutation, useAppQuery } from '@query/hooks';
@@ -32,6 +33,8 @@ import {
 } from '@app/components/bookings/bookingUtils';
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 import type { BookingsStackParamList } from '@app/navigation/types';
+import { buildLookupMap } from '@app/utils/lookups';
+import { AppIcon } from '@ui/AppIcon';
 
 type Props = NativeStackScreenProps<BookingsStackParamList, 'BookingsHome'>;
 
@@ -68,6 +71,21 @@ export function BookingsScreen({ navigation }: Props) {
     queryKey: keys.bookings.upcoming(),
     queryFn: ({ signal }) => getClientUpcomingBookings({ signal }),
   });
+
+  const trainingTypesQuery = useAppQuery({
+    queryKey: keys.lookups.trainingTypes(),
+    queryFn: ({ signal }) => getTrainingTypeLookups({ signal }),
+  });
+
+  const trainingTypeOptions = trainingTypesQuery.data ?? [];
+  const trainingTypeLabels = useMemo(
+    () => buildLookupMap(trainingTypeOptions),
+    [trainingTypeOptions]
+  );
+  const trainingTypeOrder = useMemo(
+    () => new Map(trainingTypeOptions.map((item, index) => [item.code, index])),
+    [trainingTypeOptions]
+  );
 
   const historyQuery = useAppQuery({
     queryKey: keys.bookings.history(),
@@ -189,7 +207,6 @@ export function BookingsScreen({ navigation }: Props) {
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Client') });
       queryClient.invalidateQueries({ queryKey: keys.slots.available(), exact: false });
 
-      showToast({ type: 'success', title: t('bookings.detailsCancelled') });
     },
     onError: (err, _slotId, context) => {
       if (context?.upcomingSnapshot) {
@@ -201,11 +218,13 @@ export function BookingsScreen({ navigation }: Props) {
 
       const presented = presentApiError(err);
       const message = err instanceof ApiError ? err.message : presented.message;
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message,
+        });
+      }
 
       queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
       queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
@@ -218,6 +237,18 @@ export function BookingsScreen({ navigation }: Props) {
     showActions: boolean,
     key: string
   ) => {
+    const trainingTypes = booking.trainerTrainingTypes ?? [];
+    const trainingTypeCode = trainingTypes
+      .slice()
+      .sort((left, right) => {
+        const leftIndex = trainingTypeOrder.get(left) ?? Number.MAX_SAFE_INTEGER;
+        const rightIndex = trainingTypeOrder.get(right) ?? Number.MAX_SAFE_INTEGER;
+        return leftIndex - rightIndex;
+      })[0];
+    const trainingTypeLabel = trainingTypeCode
+      ? (trainingTypeLabels.get(trainingTypeCode) ?? trainingTypeCode)
+      : null;
+    const trainingTypeIcon = trainingTypeCode === 'Group' ? 'users' : 'user';
     const times = getSlotTimes(booking.slot);
     const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : t('common.empty');
     const statusType = getBookingStatusType(booking.slot);
@@ -266,10 +297,13 @@ export function BookingsScreen({ navigation }: Props) {
             <Text fontSize="$4" fontWeight="700" color="$text">
               {booking.trainerName?.trim() || t('common.empty')}
             </Text>
-            {booking.trainerSpecialization ? (
-              <Text fontSize="$3" color="$muted">
-                {booking.trainerSpecialization}
-              </Text>
+            {trainingTypeLabel ? (
+              <XStack alignItems="center" gap="$2">
+                <AppIcon name={trainingTypeIcon} size={14} color="$muted" />
+                <Text fontSize="$3" color="$muted">
+                  {trainingTypeLabel}
+                </Text>
+              </XStack>
             ) : null}
           </YStack>
         </XStack>
@@ -302,7 +336,8 @@ export function BookingsScreen({ navigation }: Props) {
                 navigation.navigate('BookingDetails', {
                   slot: booking.slot,
                   trainerName: booking.trainerName,
-                  trainerSpecialization: booking.trainerSpecialization,
+                  trainerSpecializations: booking.trainerSpecializations,
+                  trainerTrainingTypes: booking.trainerTrainingTypes,
                   trainerAvatarUrl: booking.trainerAvatarUrl,
                 });
               }}
@@ -333,7 +368,8 @@ export function BookingsScreen({ navigation }: Props) {
                 navigation.navigate('BookingDetails', {
                   slot: booking.slot,
                   trainerName: booking.trainerName,
-                  trainerSpecialization: booking.trainerSpecialization,
+                  trainerSpecializations: booking.trainerSpecializations,
+                  trainerTrainingTypes: booking.trainerTrainingTypes,
                   trainerAvatarUrl: booking.trainerAvatarUrl,
                 });
               }}

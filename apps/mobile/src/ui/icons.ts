@@ -15,6 +15,7 @@ import {
   Star,
   Trash2,
   User,
+  Users,
   X,
 } from 'lucide-react-native';
 
@@ -35,6 +36,7 @@ export const iconsMap = {
   star: Star,
   trash: Trash2,
   user: User,
+  users: Users,
 } as const satisfies Record<string, LucideIcon>;
 
 export type AppIconName = keyof typeof iconsMap;

@@ -1,5 +1,6 @@
 using Api.Data;
 using Api.Features.Common;
+using Api.Features.Lookups;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Api.Features.Auth;
@@ -38,9 +39,21 @@ public static class AuthEndpoints
                 errors["name"] = new[] { "Name is required." };
             }
 
-            if (!UserRoles.IsValid(request.Role))
+            if (!LookupCatalog.IsValidRole(request.Role))
             {
                 errors["role"] = new[] { "Role must be Trainer or Client." };
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Gender)
+                && !LookupCatalog.IsValidGender(request.Gender))
+            {
+                errors["gender"] = new[] { "Gender is invalid." };
+            }
+
+            if (request.Specializations is not null
+                && request.Specializations.Any(code => !LookupCatalog.IsValidSpecialization(code)))
+            {
+                errors["specializations"] = new[] { "Specializations contain invalid values." };
             }
 
             if (errors.Count > 0)

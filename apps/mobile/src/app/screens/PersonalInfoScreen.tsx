@@ -5,9 +5,10 @@ import { Button, Input, Text, XStack, YStack } from 'tamagui';
 import { launchImageLibrary } from 'react-native-image-picker';
 import type { UpdateUserRequest } from '@generated/api';
 import { patchUsersMe, putUsersMeAvatar } from '@generated/api';
-import { presentApiError } from '@api/ApiErrorPresenter';
+import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
 import { unwrap } from '@api/core';
 import { getMe } from '@api/homeApi';
+import { getGenderLookups, getSpecializationLookups, getTrainingTypeLookups } from '@api/lookupsApi';
 import { getAccessToken } from '@auth/tokenStorage';
 import { buildAbsoluteUrl } from '@utils/url';
 import { t } from '@i18n';
@@ -20,6 +21,7 @@ import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatPrice } from '@utils/price';
+import { getAnyLookupCode, getDefaultLookupCode } from '@app/utils/lookups';
 
 const getInitials = (name?: string | null) => {
   const value = name?.trim();
@@ -33,32 +35,7 @@ const getInitials = (name?: string | null) => {
   return value.slice(0, 2).toUpperCase();
 };
 
-const trainingTypeOptions = [
-  'Full Body',
-  'Силовая тренировка',
-  'Набор массы',
-  'Похудение',
-  'Функциональная тренировка',
-  'Грудь',
-  'Спина',
-  'Ноги',
-  'Пресс / Core',
-  'Кардио',
-  'HIIT',
-  'Растяжка / Mobility',
-  'Реабилитация',
-] as const;
-
 const trainingTypesPreviewCount = 4;
-
-type ClientGenderPreference = 'Men' | 'Women' | 'All';
-
-const normalizeGenderPreference = (value?: string | null): ClientGenderPreference => {
-  if (value === 'Men' || value === 'Women' || value === 'All') {
-    return value;
-  }
-  return 'All';
-};
 
 type SelectedAvatar = {
   uri: string;
@@ -68,15 +45,23 @@ type SelectedAvatar = {
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'PersonalInfo'>;
 
+const sortByOrder = (values: string[], order: Map<string, number>): string[] => (
+  [...new Set(values)].sort((left, right) => {
+    const leftIndex = order.get(left) ?? Number.MAX_SAFE_INTEGER;
+    const rightIndex = order.get(right) ?? Number.MAX_SAFE_INTEGER;
+    return leftIndex - rightIndex;
+  })
+);
+
 export function PersonalInfoScreen({ navigation }: Props) {
   const [name, setName] = useState('');
-  const [specialization, setSpecialization] = useState('');
   const [email, setEmail] = useState('');
   const [about, setAbout] = useState('');
+  const [specializations, setSpecializations] = useState<string[]>([]);
   const [trainingTypes, setTrainingTypes] = useState<string[]>([]);
   const [trainingTypesExpanded, setTrainingTypesExpanded] = useState(false);
-  const [clientGenderPreference, setClientGenderPreference] =
-    useState<ClientGenderPreference>('All');
+  const [userGender, setUserGender] = useState('');
+  const [worksWithGender, setWorksWithGender] = useState('');
   const [pricePerSession, setPricePerSession] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState<SelectedAvatar | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
@@ -94,36 +79,105 @@ export function PersonalInfoScreen({ navigation }: Props) {
     queryFn: ({ signal }) => getMe({ signal }),
   });
 
+  const gendersQuery = useAppQuery({
+    queryKey: keys.lookups.genders(),
+    queryFn: ({ signal }) => getGenderLookups({ signal }),
+  });
+
+  const specializationsQuery = useAppQuery({
+    queryKey: keys.lookups.specializations(),
+    queryFn: ({ signal }) => getSpecializationLookups({ signal }),
+  });
+
+  const trainingTypesQuery = useAppQuery({
+    queryKey: keys.lookups.trainingTypes(),
+    queryFn: ({ signal }) => getTrainingTypeLookups({ signal }),
+  });
+
+  const genderOptions = gendersQuery.data ?? [];
+  const userGenderOptions = useMemo(
+    () => genderOptions.filter((item) => !item.isAny),
+    [genderOptions]
+  );
+  const specializationOptions = specializationsQuery.data ?? [];
+  const trainingTypeOptions = trainingTypesQuery.data ?? [];
+
+  const specializationOrder = useMemo(
+    () => new Map(specializationOptions.map((item, index) => [item.code, index])),
+    [specializationOptions]
+  );
+  const trainingTypeOrder = useMemo(
+    () => new Map(trainingTypeOptions.map((item, index) => [item.code, index])),
+    [trainingTypeOptions]
+  );
+
+  const allowedSpecializations = useMemo(
+    () => new Set(specializationOptions.map((item) => item.code)),
+    [specializationOptions]
+  );
+  const allowedTrainingTypes = useMemo(
+    () => new Set(trainingTypeOptions.map((item) => item.code)),
+    [trainingTypeOptions]
+  );
+
+  const defaultUserGender = useMemo(
+    () => getDefaultLookupCode(userGenderOptions),
+    [userGenderOptions]
+  );
+  const defaultAnyGender = useMemo(() => {
+    const anyCode = getAnyLookupCode(genderOptions);
+    return anyCode || getDefaultLookupCode(genderOptions);
+  }, [genderOptions]);
+
   const isTrainer = me?.role === 'Trainer';
   const maxPriceRub = 10_000;
-  const genderOptions: { value: ClientGenderPreference; label: string }[] = [
-    { value: 'Men', label: t('profile.personal.genderMen') },
-    { value: 'Women', label: t('profile.personal.genderWomen') },
-    { value: 'All', label: t('profile.personal.genderAll') },
-  ];
 
   useEffect(() => {
     if (!me) {
       return;
     }
+
     setName(me.name?.trim() ?? '');
-    setSpecialization(me.specialization?.trim() ?? '');
     setEmail(me.email?.trim() ?? '');
     setAbout(me.about?.trim() ?? '');
-    setTrainingTypes(
-      me.trainingTypes
-        ?.filter((value): value is string => Boolean(value))
-        .filter((value) => trainingTypeOptions.includes(value as (typeof trainingTypeOptions)[number]))
-      ?? []
+
+    const nextSpecializations = Array.isArray(me.specializations)
+      ? me.specializations.filter((value): value is string => Boolean(value))
+      : [];
+    setSpecializations(
+      sortByOrder(
+        nextSpecializations.filter((value) => allowedSpecializations.has(value)),
+        specializationOrder
+      )
     );
-    setClientGenderPreference(normalizeGenderPreference(me.clientGenderPreference));
+
+    const nextTrainingTypes = Array.isArray(me.trainingTypes)
+      ? me.trainingTypes.filter((value): value is string => Boolean(value))
+      : [];
+    setTrainingTypes(
+      sortByOrder(
+        nextTrainingTypes.filter((value) => allowedTrainingTypes.has(value)),
+        trainingTypeOrder
+      )
+    );
+
+    setUserGender(me.gender ?? defaultUserGender);
+    setWorksWithGender(me.worksWithGender ?? defaultAnyGender);
     if (typeof me.pricePerSession === 'number') {
       const rubles = Math.floor(me.pricePerSession / 100);
       setPricePerSession(Number.isFinite(rubles) ? String(rubles) : '');
     } else {
       setPricePerSession('');
     }
-  }, [me]);
+  }, [
+    me,
+    allowedSpecializations,
+    allowedTrainingTypes,
+    specializationOrder,
+    trainingTypeOrder,
+    defaultUserGender,
+    defaultAnyGender,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,17 +221,27 @@ export function PersonalInfoScreen({ navigation }: Props) {
     trainingTypesExpanded
       ? trainingTypeOptions
       : trainingTypeOptions.slice(0, trainingTypesPreviewCount)
-  ), [trainingTypesExpanded]);
+  ), [trainingTypesExpanded, trainingTypeOptions]);
 
-  const toggleTrainingType = useCallback((type: string) => {
-    setTrainingTypes((prev) => {
-      const exists = prev.includes(type);
+  const toggleSpecialization = useCallback((code: string) => {
+    setSpecializations((prev) => {
+      const exists = prev.includes(code);
       const next = exists
-        ? prev.filter((item) => item !== type)
-        : [...prev, type];
-      return trainingTypeOptions.filter((item) => next.includes(item));
+        ? prev.filter((item) => item !== code)
+        : [...prev, code];
+      return sortByOrder(next, specializationOrder);
     });
-  }, []);
+  }, [specializationOrder]);
+
+  const toggleTrainingType = useCallback((code: string) => {
+    setTrainingTypes((prev) => {
+      const exists = prev.includes(code);
+      const next = exists
+        ? prev.filter((item) => item !== code)
+        : [...prev, code];
+      return sortByOrder(next, trainingTypeOrder);
+    });
+  }, [trainingTypeOrder]);
 
   const handlePriceChange = useCallback((value: string) => {
     const normalized = value.replace(/\D/g, '');
@@ -228,17 +292,18 @@ export function PersonalInfoScreen({ navigation }: Props) {
     mutationFn: async () => {
       const payload: UpdateUserRequest = {
         name: name.trim(),
-        specialization: isTrainer
-          ? specialization.trim() || null
-          : undefined,
+        gender: userGender || null,
         about: isTrainer
           ? about.trim() || null
+          : undefined,
+        specializations: isTrainer
+          ? specializations
           : undefined,
         trainingTypes: isTrainer
           ? trainingTypes
           : undefined,
-        clientGenderPreference: isTrainer
-          ? clientGenderPreference
+        worksWithGender: isTrainer
+          ? worksWithGender
           : undefined,
         pricePerSession: isTrainer
           ? (pricePerSession.trim().length > 0
@@ -259,17 +324,18 @@ export function PersonalInfoScreen({ navigation }: Props) {
     },
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: keys.auth.me() });
-      showToast({ type: 'success', title: t('profile.personal.updated') });
       navigation.goBack();
     },
     onError: (err) => {
       const presented = presentApiError(err);
       setError(presented.message);
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message: presented.message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
     },
   });
 
@@ -393,19 +459,41 @@ export function PersonalInfoScreen({ navigation }: Props) {
                 {...formInputProps}
               />
             </YStack>
-            {isTrainer ? (
-              <YStack gap="$2">
-                <Text fontSize="$3" color="$text">
-                  {t('profile.personal.specialization')}
-                </Text>
-                <Input
-                  value={specialization}
-                  onChangeText={setSpecialization}
-                  placeholder={t('profile.personal.specialization')}
-                  {...formInputProps}
-                />
-              </YStack>
-            ) : null}
+            <YStack gap="$2">
+              <Text fontSize="$3" color="$text">
+                {t('profile.personal.genderUserLabel')}
+              </Text>
+              <XStack gap="$2" flexWrap="wrap">
+                {userGenderOptions.map((option) => {
+                  const selected = userGender === option.code;
+                  return (
+                    <Button
+                      key={option.code}
+                      unstyled
+                      paddingHorizontal="$3"
+                      paddingVertical="$2"
+                      minHeight="$9"
+                      borderRadius="$4"
+                      backgroundColor={selected ? '$accent' : '$background'}
+                      borderWidth={1}
+                      borderColor={selected ? '$accent' : '$border'}
+                      onPress={() => setUserGender(option.code)}
+                    >
+                      <XStack alignItems="center" gap="$2">
+                        <AppIcon
+                          name="check"
+                          size={16}
+                          color={selected ? '$accentText' : '$muted'}
+                        />
+                        <Text fontSize="$3" color={selected ? '$accentText' : '$text'}>
+                          {option.label}
+                        </Text>
+                      </XStack>
+                    </Button>
+                  );
+                })}
+              </XStack>
+            </YStack>
             {isTrainer ? (
               <YStack gap="$2">
                 <Text fontSize="$3" color="$text">
@@ -484,14 +572,14 @@ export function PersonalInfoScreen({ navigation }: Props) {
               borderColor="$border"
             >
               <Text fontSize="$4" fontWeight="700" color="$text">
-                {t('profile.personal.trainingTypes')}
+                {t('profile.personal.specializations')}
               </Text>
               <XStack flexWrap="wrap" gap="$2">
-                {visibleTrainingTypes.map((type) => {
-                  const selected = trainingTypes.includes(type);
+                {specializationOptions.map((option) => {
+                  const selected = specializations.includes(option.code);
                   return (
                     <Button
-                      key={type}
+                      key={option.code}
                       unstyled
                       paddingHorizontal="$3"
                       paddingVertical="$2"
@@ -500,7 +588,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                       backgroundColor={selected ? '$accent' : '$background'}
                       borderWidth={1}
                       borderColor={selected ? '$accent' : '$border'}
-                      onPress={() => toggleTrainingType(type)}
+                      onPress={() => toggleSpecialization(option.code)}
                     >
                       <XStack alignItems="center" gap="$2">
                         <AppIcon
@@ -509,7 +597,52 @@ export function PersonalInfoScreen({ navigation }: Props) {
                           color={selected ? '$accentText' : '$muted'}
                         />
                         <Text fontSize="$3" color={selected ? '$accentText' : '$text'}>
-                          {type}
+                          {option.label}
+                        </Text>
+                      </XStack>
+                    </Button>
+                  );
+                })}
+              </XStack>
+            </YStack>
+          ) : null}
+
+          {isTrainer ? (
+            <YStack
+              gap="$3"
+              padding="$4"
+              backgroundColor="$background"
+              borderRadius="$5"
+              borderWidth={1}
+              borderColor="$border"
+            >
+              <Text fontSize="$4" fontWeight="700" color="$text">
+                {t('profile.personal.trainingTypes')}
+              </Text>
+              <XStack flexWrap="wrap" gap="$2">
+                {visibleTrainingTypes.map((option) => {
+                  const selected = trainingTypes.includes(option.code);
+                  return (
+                    <Button
+                      key={option.code}
+                      unstyled
+                      paddingHorizontal="$3"
+                      paddingVertical="$2"
+                      minHeight="$9"
+                      borderRadius="$4"
+                      backgroundColor={selected ? '$accent' : '$background'}
+                      borderWidth={1}
+                      borderColor={selected ? '$accent' : '$border'}
+                      onPress={() => toggleTrainingType(option.code)}
+                    >
+                      <XStack alignItems="center" gap="$2">
+                        <AppIcon
+                          name="check"
+                          size={16}
+                          color={selected ? '$accentText' : '$muted'}
+                        />
+                        <Text fontSize="$3" color={selected ? '$accentText' : '$text'}>
+                          {option.label}
                         </Text>
                       </XStack>
                     </Button>
@@ -518,7 +651,6 @@ export function PersonalInfoScreen({ navigation }: Props) {
               </XStack>
               {trainingTypeOptions.length > trainingTypesPreviewCount ? (
                 <Button
-                  
                   minHeight="$2"
                   backgroundColor="$background"
                   borderRadius="$4"
@@ -526,7 +658,6 @@ export function PersonalInfoScreen({ navigation }: Props) {
                   borderColor="$border"
                   onPress={() => setTrainingTypesExpanded((prev) => !prev)}
                   paddingHorizontal="$3"
-                  
                   {...secondaryButtonProps}
                 >
                   <Text fontSize="$3" color="$text">
@@ -542,10 +673,10 @@ export function PersonalInfoScreen({ navigation }: Props) {
                 </Text>
                 <YStack gap="$2">
                   {genderOptions.map((option) => {
-                    const selected = clientGenderPreference === option.value;
+                    const selected = worksWithGender === option.code;
                     return (
                       <Button
-                        key={option.value}
+                        key={option.code}
                         unstyled
                         backgroundColor="$background"
                         borderRadius="$4"
@@ -555,7 +686,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                         minHeight="$10"
                         width="100%"
                         justifyContent="flex-start"
-                        onPress={() => setClientGenderPreference(option.value)}
+                        onPress={() => setWorksWithGender(option.code)}
                       >
                         <XStack alignItems="center" gap="$3" flex={1}>
                           <YStack
@@ -616,6 +747,3 @@ export function PersonalInfoScreen({ navigation }: Props) {
     </YStack>
   );
 }
-
-
-

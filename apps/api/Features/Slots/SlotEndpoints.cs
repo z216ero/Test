@@ -1,6 +1,8 @@
 using System.Globalization;
 using Api.Data;
+using Api.Features.Auth;
 using Api.Features.Common;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Slots;
 
@@ -118,10 +120,12 @@ public static class SlotEndpoints
         .ProducesProblem(StatusCodes.Status409Conflict);
 
         availableGroup.MapGet("/available", async (
+            HttpContext httpContext,
             string? fromUtc,
             string? toUtc,
             string[]? specializations,
             string? gender,
+            AppDbContext db,
             SlotService service,
             CancellationToken cancellationToken) =>
         {
@@ -153,16 +157,16 @@ public static class SlotEndpoints
                 }
             }
 
-            ClientGenderPreference? genderPreference = null;
+            Gender? requestedTrainerGender = null;
             if (!string.IsNullOrWhiteSpace(gender))
             {
-                if (Enum.TryParse<ClientGenderPreference>(gender, true, out var parsedGender))
+                if (Enum.TryParse<Gender>(gender, true, out var parsedGender))
                 {
-                    genderPreference = parsedGender;
+                    requestedTrainerGender = parsedGender;
                 }
                 else
                 {
-                    errors["gender"] = new[] { "Gender must be Men, Women, or All." };
+                    errors["gender"] = new[] { "Gender must be Male, Female, or Any." };
                 }
             }
 
@@ -173,11 +177,24 @@ public static class SlotEndpoints
 
             var normalizedSpecializations = NormalizeFilters(specializations);
 
+            Gender? clientGender = null;
+            if (AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                var user = await db.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+                if (user is not null && string.Equals(user.Role, UserRoles.Client, StringComparison.OrdinalIgnoreCase))
+                {
+                    clientGender = user.Gender;
+                }
+            }
+
             var result = await service.GetAvailableSlotsAsync(
                 parsedFrom,
                 parsedTo,
                 normalizedSpecializations,
-                genderPreference,
+                requestedTrainerGender,
+                clientGender,
                 cancellationToken);
 
             if (!result.IsSuccess)

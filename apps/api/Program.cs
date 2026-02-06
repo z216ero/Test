@@ -3,6 +3,7 @@ using Api.Features.Auth;
 using Api.Features.Bookings;
 using Api.Features.Clients;
 using Api.Features.Health;
+using Api.Features.Lookups;
 using Api.Features.Push;
 using Api.Features.Slots;
 using Api.Features.Trainers;
@@ -124,6 +125,7 @@ app.MapBookingEndpoints();
 app.MapClientEndpoints();
 app.MapUserEndpoints();
 app.MapPushEndpoints();
+app.MapLookupEndpoints();
 
 await app.RunAsync();
 

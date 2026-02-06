@@ -159,7 +159,8 @@ public sealed class ClientService(AppDbContext db)
     {
         var trainerProfile = slot.TrainerProfile;
         var trainerName = trainerProfile?.User?.Name;
-        var trainerSpecialization = trainerProfile?.Specialization;
+        var trainerSpecializations = trainerProfile?.Specializations ?? Array.Empty<string>();
+        var trainerTrainingTypes = trainerProfile?.TrainingTypes ?? Array.Empty<string>();
         var trainerUserId = trainerProfile?.UserId;
         var trainerAvatarUrl = trainerUserId.HasValue && trainerAvatarIds.Contains(trainerUserId.Value)
             ? $"/users/{trainerUserId.Value}/avatar"
@@ -168,7 +169,8 @@ public sealed class ClientService(AppDbContext db)
         return new UpcomingSessionDto(
             ToSlotDto(slot, booking.Status),
             trainerName,
-            trainerSpecialization,
+            trainerSpecializations,
+            trainerTrainingTypes,
             trainerAvatarUrl);
     }
 

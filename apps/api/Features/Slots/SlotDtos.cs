@@ -20,7 +20,8 @@ public sealed record AvailableSlotTrainerDto(
     string? AvatarUrl,
     int? PricePerSession,
     IReadOnlyList<string> TrainingTypes,
-    string ClientGenderPreference,
+    string WorksWithGender,
+    string Gender,
     double? Rating);
 
 public sealed record AvailableSlotGroupDto(

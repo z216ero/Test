@@ -2,7 +2,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { Button, Text, YStack } from 'tamagui';
 import { apiClient } from '@api/client';
-import { presentApiError } from '@api/ApiErrorPresenter';
+import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
 import { unwrap } from '@api/core';
 import { useAppMutation } from '@query/hooks';
 import { keys } from '@query/keys';
@@ -44,16 +44,17 @@ export function SlotDetailsScreen({ route, navigation }: Props) {
       }
       queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
       setSuccess('Slot booked successfully.');
-      showToast({ type: 'success', title: 'Slot booked successfully.' });
     },
     onError: (err) => {
       const presented = presentApiError(err);
       setError(presented.message);
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message: presented.message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
     },
   });
 

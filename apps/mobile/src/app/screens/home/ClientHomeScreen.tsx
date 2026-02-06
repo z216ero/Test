@@ -3,12 +3,14 @@ import { RefreshControl } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { getUpcomingForClient } from '@api/homeApi';
+import { getSpecializationLookups } from '@api/lookupsApi';
 import { t } from '@i18n';
 import { useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
 import { AppIcon } from '@ui/AppIcon';
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 import type { HomeMeState, HomeNavigation, HomeUser } from './types';
+import { buildLookupMap, formatLookupList } from '@app/utils/lookups';
 
 const formatDate = (utc: string | undefined) => {
   if (!utc) {
@@ -68,6 +70,16 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
     enabled: Boolean(me),
     queryFn: ({ signal }) => getUpcomingForClient({ signal }),
   });
+
+  const specializationQuery = useAppQuery({
+    queryKey: keys.lookups.specializations(),
+    queryFn: ({ signal }) => getSpecializationLookups({ signal }),
+  });
+
+  const specializationLabels = useMemo(
+    () => buildLookupMap(specializationQuery.data ?? []),
+    [specializationQuery.data]
+  );
 
   const onRefresh = () => {
     refetchMe();
@@ -168,6 +180,10 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
 
     const dateLabel = formatDate(slot.startsAtUtc);
     const timeLabel = formatTimeRange(slot.startsAtUtc, slot.durationMinutes);
+    const specializationLabel = formatLookupList(
+      upcoming.trainerSpecializations,
+      specializationLabels
+    );
 
     return (
       <YStack
@@ -208,9 +224,9 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
                 {upcoming.trainerName}
               </Text>
             ) : null}
-            {upcoming.specialization ? (
+            {specializationLabel ? (
               <Text fontSize="$3" color="$muted">
-                {upcoming.specialization}
+                {specializationLabel}
               </Text>
             ) : null}
             <Text fontSize="$3" color="$muted">

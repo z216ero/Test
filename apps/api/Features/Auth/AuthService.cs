@@ -43,7 +43,10 @@ public sealed class AuthService(
                 Email = request.Email.Trim(),
                 UserName = request.Email.Trim(),
                 Name = request.Name.Trim(),
-                Role = normalizedRole
+                Role = normalizedRole,
+                Gender = Enum.TryParse<Gender>(request.Gender, true, out var parsedGender)
+                    ? parsedGender
+                    : Gender.Male
             };
 
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -76,12 +79,13 @@ public sealed class AuthService(
                     Id = Guid.NewGuid(),
                     UserId = user.Id,
                     GymName = null,
-                    Specialization = string.IsNullOrWhiteSpace(request.Specialization)
-                        ? null
-                        : request.Specialization.Trim(),
                     About = null,
+                    Specializations = request.Specializations?.Where(code => !string.IsNullOrWhiteSpace(code))
+                        .Select(code => code.Trim())
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray() ?? Array.Empty<string>(),
                     TrainingTypes = Array.Empty<string>(),
-                    ClientGenderPreference = ClientGenderPreference.All,
+                    WorksWithGender = Gender.Any,
                     CreatedAtUtc = DateTime.UtcNow
                 });
             }
@@ -90,6 +94,9 @@ public sealed class AuthService(
                 db.ClientProfiles.Add(new ClientProfile
                 {
                     UserId = user.Id,
+                    PreferredTrainerGender = Gender.Any,
+                    Level = ClientLevel.Beginner,
+                    Goals = Array.Empty<string>(),
                     CreatedAtUtc = DateTime.UtcNow
                 });
             }
@@ -233,12 +240,15 @@ public sealed class AuthService(
 
     private async Task<AuthUserDto> BuildUserDtoAsync(AppUser user, CancellationToken cancellationToken)
     {
-        string? specialization = null;
+        var specializations = Array.Empty<string>();
         string? gymName = null;
         string? about = null;
         IReadOnlyList<string> trainingTypes = Array.Empty<string>();
-        string? clientGenderPreference = null;
         int? pricePerSession = null;
+        string? worksWithGender = null;
+        string? preferredTrainerGender = null;
+        string? clientLevel = null;
+        IReadOnlyList<string> clientGoals = Array.Empty<string>();
         double? trainerRating = null;
         int? trainerRatingCount = null;
         var hasAvatar = await db.UserAvatars
@@ -251,14 +261,17 @@ public sealed class AuthService(
             var trainerProfile = await db.TrainerProfiles
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.UserId == user.Id, cancellationToken);
-            specialization = trainerProfile?.Specialization;
+            if (trainerProfile?.Specializations is { Length: > 0 })
+            {
+                specializations = trainerProfile.Specializations;
+            }
             gymName = trainerProfile?.GymName;
             about = trainerProfile?.About;
             if (trainerProfile?.TrainingTypes is { Length: > 0 })
             {
                 trainingTypes = trainerProfile.TrainingTypes;
             }
-            clientGenderPreference = trainerProfile?.ClientGenderPreference.ToString();
+            worksWithGender = trainerProfile?.WorksWithGender.ToString();
             pricePerSession = trainerProfile?.PricePerSession;
 
             if (trainerProfile is not null)
@@ -284,18 +297,34 @@ public sealed class AuthService(
                 }
             }
         }
+        else
+        {
+            var clientProfile = await db.ClientProfiles
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.UserId == user.Id, cancellationToken);
+            if (clientProfile is not null)
+            {
+                preferredTrainerGender = clientProfile.PreferredTrainerGender.ToString();
+                clientLevel = clientProfile.Level.ToString();
+                clientGoals = clientProfile.Goals ?? Array.Empty<string>();
+            }
+        }
 
         return new AuthUserDto(
             user.Id,
             user.Email ?? string.Empty,
             user.Role,
             user.Name,
-            specialization,
+            user.Gender.ToString(),
             gymName,
             about,
             trainingTypes,
-            clientGenderPreference,
+            specializations,
+            worksWithGender,
             pricePerSession,
+            preferredTrainerGender,
+            clientLevel,
+            clientGoals,
             trainerRating,
             trainerRatingCount,
             hasAvatar,

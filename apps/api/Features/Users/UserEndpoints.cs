@@ -1,6 +1,7 @@
 using Api.Data;
 using Api.Features.Auth;
 using Api.Features.Common;
+using Api.Features.Lookups;
 
 namespace Api.Features.Users;
 
@@ -12,23 +13,6 @@ public static class UserEndpoints
     private const int TrainingTypesMinCount = 1;
     private const int PricePerSessionMin = 0;
     private const int PricePerSessionMax = 1_000_000;
-
-    private static readonly Dictionary<string, string> TrainingTypeLookup = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["Full Body"] = "Full Body",
-        ["Силовая тренировка"] = "Силовая тренировка",
-        ["Набор массы"] = "Набор массы",
-        ["Похудение"] = "Похудение",
-        ["Функциональная тренировка"] = "Функциональная тренировка",
-        ["Грудь"] = "Грудь",
-        ["Спина"] = "Спина",
-        ["Ноги"] = "Ноги",
-        ["Пресс / Core"] = "Пресс / Core",
-        ["Кардио"] = "Кардио",
-        ["HIIT"] = "HIIT",
-        ["Растяжка / Mobility"] = "Растяжка / Mobility",
-        ["Реабилитация"] = "Реабилитация"
-    };
 
     public static IEndpointRouteBuilder MapUserEndpoints(this IEndpointRouteBuilder app)
     {
@@ -68,57 +52,113 @@ public static class UserEndpoints
                 }
             }
 
+            string? normalizedGender = null;
+            if (!string.IsNullOrWhiteSpace(request.Gender))
+            {
+                if (LookupCatalog.IsValidGender(request.Gender))
+                {
+                    normalizedGender = NormalizeCode(request.Gender);
+                }
+                else
+                {
+                    errors["gender"] = new[] { "Gender is invalid." };
+                }
+            }
+
+            string[]? normalizedSpecializations = null;
+            if (request.Specializations is not null)
+            {
+                var (normalized, error) = NormalizeCodeArray(
+                    request.Specializations,
+                    LookupCatalog.IsValidSpecialization,
+                    requireAtLeastOne: false);
+                if (error is not null)
+                {
+                    errors["specializations"] = new[] { error };
+                }
+                else
+                {
+                    normalizedSpecializations = normalized;
+                }
+            }
+
             string[]? normalizedTrainingTypes = null;
             if (request.TrainingTypes is not null)
             {
-                var collected = new List<string>();
-                foreach (var type in request.TrainingTypes)
+                var (normalized, error) = NormalizeCodeArray(
+                    request.TrainingTypes,
+                    LookupCatalog.IsValidTrainingType,
+                    requireAtLeastOne: true);
+                if (error is not null)
                 {
-                    if (string.IsNullOrWhiteSpace(type))
-                    {
-                        continue;
-                    }
-
-                    var trimmed = type.Trim();
-                    if (!TrainingTypeLookup.TryGetValue(trimmed, out var canonical))
-                    {
-                        errors["trainingTypes"] = new[] { "TrainingTypes contain invalid values." };
-                        break;
-                    }
-
-                    if (!collected.Any(item =>
-                        string.Equals(item, canonical, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        collected.Add(canonical);
-                    }
+                    errors["trainingTypes"] = new[] { error };
                 }
-
-                if (!errors.ContainsKey("trainingTypes"))
+                else
                 {
-                    if (collected.Count < TrainingTypesMinCount)
+                    if (normalized.Length < TrainingTypesMinCount)
                     {
                         errors["trainingTypes"] = new[] { "At least one training type is required." };
                     }
                     else
                     {
-                        normalizedTrainingTypes = collected.ToArray();
+                        normalizedTrainingTypes = normalized;
                     }
                 }
             }
 
-            string? normalizedGenderPreference = null;
-            if (!string.IsNullOrWhiteSpace(request.ClientGenderPreference))
+            string? normalizedWorksWithGender = null;
+            if (!string.IsNullOrWhiteSpace(request.WorksWithGender))
             {
-                if (Enum.TryParse<ClientGenderPreference>(
-                    request.ClientGenderPreference,
-                    true,
-                    out var preference))
+                if (LookupCatalog.IsValidGender(request.WorksWithGender))
                 {
-                    normalizedGenderPreference = preference.ToString();
+                    normalizedWorksWithGender = NormalizeCode(request.WorksWithGender);
                 }
                 else
                 {
-                    errors["clientGenderPreference"] = new[] { "Client gender preference is invalid." };
+                    errors["worksWithGender"] = new[] { "WorksWithGender is invalid." };
+                }
+            }
+
+            string? normalizedPreferredTrainerGender = null;
+            if (!string.IsNullOrWhiteSpace(request.PreferredTrainerGender))
+            {
+                if (LookupCatalog.IsValidGender(request.PreferredTrainerGender))
+                {
+                    normalizedPreferredTrainerGender = NormalizeCode(request.PreferredTrainerGender);
+                }
+                else
+                {
+                    errors["preferredTrainerGender"] = new[] { "PreferredTrainerGender is invalid." };
+                }
+            }
+
+            string? normalizedLevel = null;
+            if (!string.IsNullOrWhiteSpace(request.Level))
+            {
+                if (LookupCatalog.IsValidLevel(request.Level))
+                {
+                    normalizedLevel = NormalizeCode(request.Level);
+                }
+                else
+                {
+                    errors["level"] = new[] { "Level is invalid." };
+                }
+            }
+
+            string[]? normalizedGoals = null;
+            if (request.Goals is not null)
+            {
+                var (normalized, error) = NormalizeCodeArray(
+                    request.Goals,
+                    LookupCatalog.IsValidGoal,
+                    requireAtLeastOne: false);
+                if (error is not null)
+                {
+                    errors["goals"] = new[] { error };
+                }
+                else
+                {
+                    normalizedGoals = normalized;
                 }
             }
 
@@ -144,14 +184,19 @@ public static class UserEndpoints
                 return Problems.Unauthorized("Unauthorized", "Authentication is required.");
             }
 
-            var normalized = request with
+            var normalizedRequest = request with
             {
                 Name = request.Name.Trim(),
+                Gender = normalizedGender,
                 About = normalizedAbout,
+                Specializations = normalizedSpecializations,
                 TrainingTypes = normalizedTrainingTypes,
-                ClientGenderPreference = normalizedGenderPreference
+                WorksWithGender = normalizedWorksWithGender,
+                PreferredTrainerGender = normalizedPreferredTrainerGender,
+                Level = normalizedLevel,
+                Goals = normalizedGoals
             };
-            var updateResult = await userService.UpdateProfileAsync(userId, normalized, cancellationToken);
+            var updateResult = await userService.UpdateProfileAsync(userId, normalizedRequest, cancellationToken);
             if (!updateResult.IsSuccess)
             {
                 return Problems.FromServiceError(updateResult.Error!);
@@ -284,5 +329,46 @@ public static class UserEndpoints
         .ProducesProblem(StatusCodes.Status404NotFound);
 
         return app;
+    }
+
+    private static string NormalizeCode(string value)
+        => value.Trim();
+
+    private static (string[] Normalized, string? Error) NormalizeCodeArray(
+        IEnumerable<string>? values,
+        Func<string?, bool> isValid,
+        bool requireAtLeastOne)
+    {
+        if (values is null)
+        {
+            return (Array.Empty<string>(), requireAtLeastOne ? "At least one value is required." : null);
+        }
+
+        var collected = new List<string>();
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            var trimmed = value.Trim();
+            if (!isValid(trimmed))
+            {
+                return (Array.Empty<string>(), "Contains invalid values.");
+            }
+
+            if (!collected.Any(item => string.Equals(item, trimmed, StringComparison.OrdinalIgnoreCase)))
+            {
+                collected.Add(trimmed);
+            }
+        }
+
+        if (requireAtLeastOne && collected.Count == 0)
+        {
+            return (Array.Empty<string>(), "At least one value is required.");
+        }
+
+        return (collected.ToArray(), null);
     }
 }

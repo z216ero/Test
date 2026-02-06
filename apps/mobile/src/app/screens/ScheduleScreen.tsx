@@ -15,7 +15,7 @@ import {
   markSlotCompleted,
   markSlotNoShow,
 } from '@api/trainerSlotsApi';
-import { presentApiError } from '@api/ApiErrorPresenter';
+import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
 import type { SlotDto } from '@generated/api';
 import { t } from '@i18n';
 import { useAppMutation, useAppQuery } from '@query/hooks';
@@ -449,7 +449,6 @@ export function ScheduleScreen({ navigation }: Props) {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
       refetch();
-      showToast({ type: 'success', title: t('schedule.toast.cancelled') });
       closeSheet();
     },
     onError: (err, _variables, context) => {
@@ -466,11 +465,13 @@ export function ScheduleScreen({ navigation }: Props) {
           : presented.kind === 'network' || presented.kind === 'timeout'
             ? t('schedule.errorNetwork')
             : presented.message;
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message,
+        });
+      }
     },
   });
 
@@ -495,7 +496,6 @@ export function ScheduleScreen({ navigation }: Props) {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
       refetch();
-      showToast({ type: 'success', title: t('status.completed') });
       closeSheet();
     },
     onError: (err, _variables, context) => {
@@ -506,11 +506,13 @@ export function ScheduleScreen({ navigation }: Props) {
         setActiveSlot(context.activeSlot);
       }
       const presented = presentApiError(err);
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message: presented.message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
     },
   });
 
@@ -535,7 +537,6 @@ export function ScheduleScreen({ navigation }: Props) {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
       refetch();
-      showToast({ type: 'success', title: t('status.noShow') });
       closeSheet();
     },
     onError: (err, _variables, context) => {
@@ -546,11 +547,13 @@ export function ScheduleScreen({ navigation }: Props) {
         setActiveSlot(context.activeSlot);
       }
       const presented = presentApiError(err);
-      showToast({
-        type: 'error',
-        title: presented.title,
-        message: presented.message,
-      });
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
     },
   });
 

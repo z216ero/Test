@@ -197,7 +197,8 @@ public sealed class SlotService(AppDbContext db)
         DateTime? fromUtc,
         DateTime? toUtc,
         IReadOnlyList<string>? specializations,
-        ClientGenderPreference? genderPreference,
+        Gender? preferredTrainerGender,
+        Gender? clientGender,
         CancellationToken cancellationToken)
     {
         if (fromUtc.HasValue && fromUtc.Value.Kind != DateTimeKind.Utc)
@@ -276,7 +277,7 @@ public sealed class SlotService(AppDbContext db)
         {
             var trainer = group.First().TrainerProfile!;
 
-            if (!MatchesGenderFilter(trainer, genderPreference))
+            if (!MatchesGenderFilter(trainer, preferredTrainerGender, clientGender))
             {
                 continue;
             }
@@ -297,7 +298,8 @@ public sealed class SlotService(AppDbContext db)
                 avatarUrl,
                 trainer.PricePerSession,
                 trainer.TrainingTypes ?? Array.Empty<string>(),
-                trainer.ClientGenderPreference.ToString(),
+                trainer.WorksWithGender.ToString(),
+                trainer.User!.Gender.ToString(),
                 null);
 
             var slotDtos = group
@@ -318,15 +320,23 @@ public sealed class SlotService(AppDbContext db)
 
     private static bool MatchesGenderFilter(
         TrainerProfile trainer,
-        ClientGenderPreference? genderPreference)
+        Gender? preferredTrainerGender,
+        Gender? clientGender)
     {
-        if (!genderPreference.HasValue || genderPreference == ClientGenderPreference.All)
+        if (clientGender.HasValue && clientGender != Gender.Any)
+        {
+            if (trainer.WorksWithGender != Gender.Any && trainer.WorksWithGender != clientGender)
+            {
+                return false;
+            }
+        }
+
+        if (!preferredTrainerGender.HasValue || preferredTrainerGender == Gender.Any)
         {
             return true;
         }
 
-        return trainer.ClientGenderPreference == ClientGenderPreference.All
-            || trainer.ClientGenderPreference == genderPreference;
+        return trainer.User?.Gender == preferredTrainerGender;
     }
 
     private static bool MatchesSpecializationFilter(
@@ -338,15 +348,13 @@ public sealed class SlotService(AppDbContext db)
             return true;
         }
 
-        var trainingTypes = trainer.TrainingTypes ?? Array.Empty<string>();
+        var trainingTypes = trainer.Specializations ?? Array.Empty<string>();
         if (trainingTypes.Any(type => specializationSet.Contains(type)))
         {
             return true;
         }
 
-        var specialization = trainer.Specialization?.Trim();
-        return !string.IsNullOrWhiteSpace(specialization)
-            && specializationSet.Contains(specialization);
+        return false;
     }
 
     private static bool Overlaps(DateTime newStart, DateTime newEnd, TrainingSlot existing)
