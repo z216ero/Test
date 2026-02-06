@@ -42,6 +42,21 @@ public static class UserEndpoints
                 errors["name"] = new[] { $"Name must be {NameMaxLength} characters or fewer." };
             }
 
+            if (string.IsNullOrWhiteSpace(request.CityName))
+            {
+                errors["cityName"] = new[] { "CityName is required." };
+            }
+            else if (request.CityName.Trim().Length > 120)
+            {
+                errors["cityName"] = new[] { "CityName must be at most 120 characters." };
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.DistrictName)
+                && request.DistrictName.Trim().Length > 120)
+            {
+                errors["districtName"] = new[] { "DistrictName must be at most 120 characters." };
+            }
+
             string? normalizedAbout = null;
             if (!string.IsNullOrWhiteSpace(request.About))
             {
@@ -187,6 +202,10 @@ public static class UserEndpoints
             var normalizedRequest = request with
             {
                 Name = request.Name.Trim(),
+                CityName = request.CityName.Trim(),
+                DistrictName = string.IsNullOrWhiteSpace(request.DistrictName)
+                    ? null
+                    : request.DistrictName.Trim(),
                 Gender = normalizedGender,
                 About = normalizedAbout,
                 Specializations = normalizedSpecializations,

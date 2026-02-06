@@ -199,6 +199,9 @@ public sealed class SlotService(AppDbContext db)
         IReadOnlyList<string>? specializations,
         Gender? preferredTrainerGender,
         Gender? clientGender,
+        int? clientCityId,
+        int? clientDistrictId,
+        bool districtOnly,
         CancellationToken cancellationToken)
     {
         if (fromUtc.HasValue && fromUtc.Value.Kind != DateTimeKind.Utc)
@@ -230,14 +233,35 @@ public sealed class SlotService(AppDbContext db)
 
         var nowUtc = DateTime.UtcNow;
 
-        var slots = await db.TrainingSlots
+        if (districtOnly && !clientDistrictId.HasValue)
+        {
+            return ServiceResult<IReadOnlyList<AvailableSlotGroupDto>>.Success([]);
+        }
+
+        var query = db.TrainingSlots
             .AsNoTracking()
+            .Include(s => s.TrainerProfile!)
+            .ThenInclude(t => t.City)
+            .Include(s => s.TrainerProfile!)
+            .ThenInclude(t => t.District)
             .Include(s => s.TrainerProfile!)
             .ThenInclude(t => t.User)
             .Where(s => s.Status == TrainingSlotStatus.Open
                 && s.StartsAtUtc >= normalizedFrom
                 && s.StartsAtUtc <= normalizedTo
-                && s.StartsAtUtc >= nowUtc)
+                && s.StartsAtUtc >= nowUtc);
+
+        if (clientCityId.HasValue)
+        {
+            query = query.Where(s => s.TrainerProfile != null && s.TrainerProfile.CityId == clientCityId.Value);
+        }
+
+        if (districtOnly && clientDistrictId.HasValue)
+        {
+            query = query.Where(s => s.TrainerProfile != null && s.TrainerProfile.DistrictId == clientDistrictId.Value);
+        }
+
+        var slots = await query
             .OrderBy(s => s.StartsAtUtc)
             .ToListAsync(cancellationToken);
 
@@ -300,7 +324,9 @@ public sealed class SlotService(AppDbContext db)
                 trainer.TrainingTypes ?? Array.Empty<string>(),
                 trainer.WorksWithGender.ToString(),
                 trainer.User!.Gender.ToString(),
-                null);
+                null,
+                trainer.City?.Name,
+                trainer.District?.Name);
 
             var slotDtos = group
                 .OrderBy(slot => slot.StartsAtUtc)

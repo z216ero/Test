@@ -40,7 +40,14 @@ type CancelContext = {
 const NOW_REFRESH_INTERVAL_MS = 60 * 1000;
 
 export function BookingDetailsScreen({ navigation, route }: Props) {
-  const { slot, trainerName, trainerTrainingTypes, trainerAvatarUrl } = route.params;
+  const {
+    slot,
+    trainerName,
+    trainerTrainingTypes,
+    trainerCityName,
+    trainerDistrictName,
+    trainerAvatarUrl,
+  } = route.params;
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [networkError, setNetworkError] = useState<PresentedError | null>(null);
   const queryClient = useQueryClient();
@@ -73,10 +80,17 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
         return leftIndex - rightIndex;
       })[0] ?? null;
   }, [trainerTrainingTypes, trainingTypeOrder]);
+  const isGroupTraining = trainingTypeCode === 'Group';
   const trainingTypeLabel = trainingTypeCode
-    ? (trainingTypeLabels.get(trainingTypeCode) ?? trainingTypeCode)
+    ? t(isGroupTraining ? 'bookings.trainingTypeGroup' : 'bookings.trainingTypeIndividual')
     : null;
-  const trainingTypeIcon = trainingTypeCode === 'Group' ? 'users' : 'user';
+  const trainingTypeIcon = isGroupTraining ? 'users' : 'user';
+  const locationLabel = useMemo(() => {
+    const parts = [trainerCityName, trainerDistrictName].filter(
+      (value): value is string => !!value && value.trim().length > 0
+    );
+    return parts.length > 0 ? parts.join(', ') : null;
+  }, [trainerCityName, trainerDistrictName]);
 
   useFocusEffect(
     useCallback(() => {
@@ -96,6 +110,15 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
   const statusLabel = t(statusMeta.labelKey);
 
   const canCancel = Boolean(slot.id) && canCancelBooking(slot, nowTs);
+
+  const handleBack = () => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('Bookings', { screen: 'BookingsHome' });
+      return;
+    }
+    navigation.navigate('BookingsHome');
+  };
 
   const cancelMutation = useAppMutation<void, unknown, string, CancelContext>({
     mutationFn: (slotId: string) => cancelBooking(slotId),
@@ -126,7 +149,7 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
       queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Client') });
 
-      navigation.goBack();
+      handleBack();
     },
     onError: (err, _slotId, context) => {
       if (context?.upcomingSnapshot) {
@@ -167,7 +190,7 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
     <YStack flex={1} backgroundColor="$backgroundSoft">
       <TabScrollView>
         <YStack gap="$4" padding="$6">
-          <Button unstyled onPress={() => navigation.goBack()}>
+          <Button unstyled onPress={handleBack}>
             <XStack alignItems="center" gap="$2">
               <AppIcon name="chevronLeft" size={18} color="$muted" />
               <Text fontSize="$3" color="$muted">
@@ -224,6 +247,11 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
                 <Text fontSize="$4" fontWeight="700" color="$text">
                   {trainerName?.trim() || t('common.empty')}
                 </Text>
+                {locationLabel ? (
+                  <Text fontSize="$3" color="$muted">
+                    {locationLabel}
+                  </Text>
+                ) : null}
                 {trainingTypeLabel ? (
                   <XStack alignItems="center" gap="$2">
                     <AppIcon name={trainingTypeIcon} size={14} color="$muted" />

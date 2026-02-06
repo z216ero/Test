@@ -45,11 +45,21 @@ public static class LookupEndpoints
         group.MapGet("/sort-options", (string? lang) => Results.Ok(LookupCatalog.GetSortOptions(NormalizeLang(lang))))
             .Produces<LookupResponse>(StatusCodes.Status200OK);
 
-        group.MapGet("/cities", async (AppDbContext db, CancellationToken cancellationToken) =>
+        group.MapGet("/cities", async (
+            string? q,
+            AppDbContext db,
+            CancellationToken cancellationToken) =>
         {
-            var items = await db.Cities
-                .AsNoTracking()
+            var query = db.Cities.AsNoTracking();
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var term = q.Trim();
+                query = query.Where(x => EF.Functions.ILike(x.Name, $"%{term}%"));
+            }
+
+            var items = await query
                 .OrderBy(x => x.Name)
+                .Take(20)
                 .Select(x => new CityDto(x.Id, x.Name))
                 .ToListAsync(cancellationToken);
             return Results.Ok(items);
@@ -58,6 +68,7 @@ public static class LookupEndpoints
 
         group.MapGet("/districts", async (
             int? cityId,
+            string? q,
             AppDbContext db,
             CancellationToken cancellationToken) =>
         {
@@ -66,9 +77,15 @@ public static class LookupEndpoints
             {
                 query = query.Where(x => x.CityId == cityId.Value);
             }
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var term = q.Trim();
+                query = query.Where(x => EF.Functions.ILike(x.Name, $"%{term}%"));
+            }
 
             var items = await query
                 .OrderBy(x => x.Name)
+                .Take(20)
                 .Select(x => new DistrictDto(x.Id, x.CityId, x.Name))
                 .ToListAsync(cancellationToken);
 

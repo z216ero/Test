@@ -2,6 +2,8 @@ namespace Api.Features.Users;
 
 public sealed record UpdateUserRequest(
     string Name,
+    string CityName,
+    string? DistrictName,
     string? Gender,
     string? About,
     string[]? Specializations,

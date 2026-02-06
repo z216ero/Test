@@ -50,6 +50,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             entity.ToTable("trainer_profiles");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.CityId);
+            entity.Property(x => x.DistrictId);
             entity.Property(x => x.GymName)
                 .HasMaxLength(120);
             entity.Property(x => x.About)
@@ -70,10 +72,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasDefaultValueSql("now() at time zone 'utc'");
             entity.HasIndex(x => x.UserId)
                 .IsUnique();
+            entity.HasIndex(x => x.CityId);
+            entity.HasIndex(x => x.DistrictId);
             entity.HasOne(x => x.User)
                 .WithOne()
                 .HasForeignKey<TrainerProfile>(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.City)
+                .WithMany()
+                .HasForeignKey(x => x.CityId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.District)
+                .WithMany()
+                .HasForeignKey(x => x.DistrictId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ClientProfile>(entity =>
@@ -82,6 +94,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(x => x.UserId);
             entity.Property(x => x.UserId)
                 .IsRequired();
+            entity.Property(x => x.CityId);
+            entity.Property(x => x.DistrictId);
             entity.Property(x => x.PreferredTrainerGender)
                 .HasConversion<string>()
                 .HasMaxLength(12)
@@ -99,6 +113,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithOne()
                 .HasForeignKey<ClientProfile>(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.CityId);
+            entity.HasIndex(x => x.DistrictId);
+            entity.HasOne(x => x.City)
+                .WithMany()
+                .HasForeignKey(x => x.CityId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.District)
+                .WithMany()
+                .HasForeignKey(x => x.DistrictId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<TrainingSlot>(entity =>

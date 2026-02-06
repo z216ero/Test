@@ -125,6 +125,7 @@ public static class SlotEndpoints
             string? toUtc,
             string[]? specializations,
             string? gender,
+            bool? districtOnly,
             AppDbContext db,
             SlotService service,
             CancellationToken cancellationToken) =>
@@ -178,6 +179,8 @@ public static class SlotEndpoints
             var normalizedSpecializations = NormalizeFilters(specializations);
 
             Gender? clientGender = null;
+            int? clientCityId = null;
+            int? clientDistrictId = null;
             if (AuthClaims.TryGetUserId(httpContext.User, out var userId))
             {
                 var user = await db.Users
@@ -186,6 +189,25 @@ public static class SlotEndpoints
                 if (user is not null && string.Equals(user.Role, UserRoles.Client, StringComparison.OrdinalIgnoreCase))
                 {
                     clientGender = user.Gender;
+
+                    var profile = await db.ClientProfiles
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(c => c.UserId == userId, cancellationToken);
+                    if (profile is null)
+                    {
+                        return Problems.NotFound("Client profile not found", "Client profile is not available for this user.");
+                    }
+
+                    if (!profile.CityId.HasValue)
+                    {
+                        return Problems.Validation(new Dictionary<string, string[]>
+                        {
+                            ["cityName"] = new[] { "City is required to browse available slots." }
+                        });
+                    }
+
+                    clientCityId = profile.CityId;
+                    clientDistrictId = profile.DistrictId;
                 }
             }
 
@@ -195,6 +217,9 @@ public static class SlotEndpoints
                 normalizedSpecializations,
                 requestedTrainerGender,
                 clientGender,
+                clientCityId,
+                clientDistrictId,
+                districtOnly ?? false,
                 cancellationToken);
 
             if (!result.IsSuccess)

@@ -1,8 +1,8 @@
-# Domain (MVP)
+ï»¿# Domain (MVP)
 
 This document is the single source of truth for business rules.
 If requirements are unclear or missing in code, ALWAYS follow this document.
-If something is not described here — do NOT invent it.
+If something is not described here â€” do NOT invent it.
 
 ---
 
@@ -56,16 +56,20 @@ A user can have ONLY ONE role in MVP.
 
 ### TrainerProfile
 - userId
+- cityId
+- districtId (optional)
 - pricePerSession
 - specializations (string[], optional; predefined list from product requirements)
 - gymName (string, optional)
 - about (string, optional, max 250)
 - trainingTypes (string[], optional; predefined list from product requirements)
 - worksWithGender: Male | Female | Any (default Any)
-- rating (computed for UI; based on last 5–10 completed trainings)
+- rating (computed for UI; based on last 5â€“10 completed trainings)
 
 ### ClientProfile
 - userId
+- cityId
+- districtId (optional)
 - preferredTrainerGender: Male | Female | Any (default Any)
 - level: Beginner | Intermediate | Advanced (default Beginner)
 - goals (string[], optional; predefined list from product requirements)
@@ -76,7 +80,7 @@ A user can have ONLY ONE role in MVP.
 
 ### District
 - id
-- cityId
+- cityId (optional)
 - name
 
 ### RefreshToken
@@ -178,3 +182,18 @@ Lookups are returned via `GET /lookups/*` and are the only source of truth for U
 - Booking must be atomic (no double booking).
 - When booked:
   - slot.
+---
+
+## Location rules
+
+- City is REQUIRED on registration and profile update for both Trainer and Client.
+- District is OPTIONAL on registration.
+- City/District are stored on profiles (TrainerProfile, ClientProfile).
+- Cities and districts are stored in City and District tables.
+- On registration:
+  - if city does not exist, create it (normalize name: trim, normalize spaces, capitalize).
+  - if district is provided and does not exist in the selected city, create it (normalize name).
+- Trainer discovery for clients:
+  - Trainers are shown ONLY when trainer city matches client city.
+  - Optional client filter: "from my district" shows only trainers in the same district.
+

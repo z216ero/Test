@@ -22,7 +22,9 @@ public sealed record AvailableSlotTrainerDto(
     IReadOnlyList<string> TrainingTypes,
     string WorksWithGender,
     string Gender,
-    double? Rating);
+    double? Rating,
+    string? CityName,
+    string? DistrictName);
 
 public sealed record AvailableSlotGroupDto(
     AvailableSlotTrainerDto Trainer,

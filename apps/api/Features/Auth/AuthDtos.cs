@@ -5,6 +5,8 @@ public sealed record RegisterRequest(
     string Password,
     string Role,
     string Name,
+    string CityName,
+    string? DistrictName,
     string? Gender,
     IReadOnlyList<string>? Specializations);
 
@@ -16,6 +18,10 @@ public sealed record AuthUserDto(
     string Role,
     string Name,
     string Gender,
+    int? CityId,
+    string? CityName,
+    int? DistrictId,
+    string? DistrictName,
     string? GymName,
     string? About,
     IReadOnlyList<string> TrainingTypes,

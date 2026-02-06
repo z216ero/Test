@@ -45,6 +45,12 @@ public sealed class ClientService(AppDbContext db)
             .AsNoTracking()
             .Include(b => b.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
+            .ThenInclude(t => t.City)
+            .Include(b => b.Slot!)
+            .ThenInclude(s => s.TrainerProfile!)
+            .ThenInclude(t => t.District)
+            .Include(b => b.Slot!)
+            .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.User)
             .Where(b => b.ClientId == profile.UserId
                 && b.Slot != null
@@ -97,6 +103,12 @@ public sealed class ClientService(AppDbContext db)
 
         var bookings = await db.Bookings
             .AsNoTracking()
+            .Include(b => b.Slot!)
+            .ThenInclude(s => s.TrainerProfile!)
+            .ThenInclude(t => t.City)
+            .Include(b => b.Slot!)
+            .ThenInclude(s => s.TrainerProfile!)
+            .ThenInclude(t => t.District)
             .Include(b => b.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.User)
@@ -159,6 +171,8 @@ public sealed class ClientService(AppDbContext db)
     {
         var trainerProfile = slot.TrainerProfile;
         var trainerName = trainerProfile?.User?.Name;
+        var trainerCityName = trainerProfile?.City?.Name;
+        var trainerDistrictName = trainerProfile?.District?.Name;
         var trainerSpecializations = trainerProfile?.Specializations ?? Array.Empty<string>();
         var trainerTrainingTypes = trainerProfile?.TrainingTypes ?? Array.Empty<string>();
         var trainerUserId = trainerProfile?.UserId;
@@ -169,6 +183,8 @@ public sealed class ClientService(AppDbContext db)
         return new UpcomingSessionDto(
             ToSlotDto(slot, booking.Status),
             trainerName,
+            trainerCityName,
+            trainerDistrictName,
             trainerSpecializations,
             trainerTrainingTypes,
             trainerAvatarUrl);

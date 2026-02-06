@@ -20,6 +20,7 @@ type FilterSheetProps = {
   specializationOptions: readonly LookupItem[];
   genderOptions: readonly LookupItem[];
   resetGenderCode: string;
+  canFilterDistrict: boolean;
   onApply: (filters: ClientSlotsFilters) => void;
   onOpenChange: (open: boolean) => void;
 };
@@ -30,6 +31,7 @@ export function FilterSheet({
   specializationOptions,
   genderOptions,
   resetGenderCode,
+  canFilterDistrict,
   onApply,
   onOpenChange,
 }: FilterSheetProps) {
@@ -43,6 +45,7 @@ export function FilterSheet({
   const [selectedGender, setSelectedGender] = useState<ClientGenderFilter>(
     filters.gender || resetGenderCode
   );
+  const [districtOnly, setDistrictOnly] = useState<boolean>(filters.districtOnly);
 
   useEffect(() => {
     if (open) {
@@ -50,10 +53,12 @@ export function FilterSheet({
         normalizeSelection(specializationCodes, filters.specializations)
       );
       setSelectedGender(filters.gender || resetGenderCode);
+      setDistrictOnly(filters.districtOnly);
     }
   }, [
     open,
     filters.gender,
+    filters.districtOnly,
     filters.specializations,
     resetGenderCode,
     specializationCodes,
@@ -70,12 +75,14 @@ export function FilterSheet({
   const handleReset = () => {
     setSelectedSpecializations([]);
     setSelectedGender(resetGenderCode);
+    setDistrictOnly(false);
   };
 
   const handleApply = () => {
     onApply({
       specializations: normalizeSelection(specializationCodes, selectedSpecializations),
       gender: selectedGender,
+      districtOnly,
     });
     onOpenChange(false);
   };
@@ -234,6 +241,53 @@ export function FilterSheet({
                   })}
                 </YStack>
               </YStack>
+
+              {canFilterDistrict ? (
+                <YStack
+                  gap="$3"
+                  padding="$4"
+                  backgroundColor="$background"
+                  borderRadius="$5"
+                  borderWidth={1}
+                  borderColor="$border"
+                >
+                  <Text fontSize="$4" fontWeight="700" color="$text">
+                    {t('slots.filters.district')}
+                  </Text>
+                  <Button
+                    unstyled
+                    backgroundColor="$background"
+                    borderRadius="$4"
+                    borderWidth={1}
+                    borderColor={districtOnly ? '$accent' : '$border'}
+                    padding="$3"
+                    minHeight="$10"
+                    width="100%"
+                    justifyContent="flex-start"
+                    onPress={() => setDistrictOnly((prev) => !prev)}
+                  >
+                    <XStack alignItems="center" gap="$3" flex={1}>
+                      <YStack
+                        width="$4"
+                        height="$4"
+                        borderRadius="$10"
+                        borderWidth={1}
+                        borderColor={districtOnly ? '$accent' : '$border'}
+                        backgroundColor={districtOnly ? '$accent' : '$background'}
+                        alignItems="center"
+                        justifyContent="center"
+                      >
+                        {districtOnly ? (
+                          <AppIcon name="check" size={12} color="$accentText" />
+                        ) : null}
+                      </YStack>
+                      <Text fontSize="$3" color="$text">
+                        {t('slots.filters.districtOnly')}
+                      </Text>
+                    </XStack>
+                  </Button>
+                </YStack>
+              ) : null}
             </YStack>
           </Sheet.ScrollView>
 

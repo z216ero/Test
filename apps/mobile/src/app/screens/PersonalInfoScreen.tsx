@@ -8,7 +8,11 @@ import { patchUsersMe, putUsersMeAvatar } from '@generated/api';
 import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
 import { unwrap } from '@api/core';
 import { getMe } from '@api/homeApi';
-import { getGenderLookups, getSpecializationLookups, getTrainingTypeLookups } from '@api/lookupsApi';
+import {
+  getGenderLookups,
+  getSpecializationLookups,
+  getTrainingTypeLookups,
+} from '@api/lookupsApi';
 import { getAccessToken } from '@auth/tokenStorage';
 import { buildAbsoluteUrl } from '@utils/url';
 import { t } from '@i18n';
@@ -53,10 +57,13 @@ const sortByOrder = (values: string[], order: Map<string, number>): string[] => 
   })
 );
 
-export function PersonalInfoScreen({ navigation }: Props) {
+export function PersonalInfoScreen({ navigation, route }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [about, setAbout] = useState('');
+  const [cityName, setCityName] = useState('');
+  const [districtName, setDistrictName] = useState('');
+  const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
   const [specializations, setSpecializations] = useState<string[]>([]);
   const [trainingTypes, setTrainingTypes] = useState<string[]>([]);
   const [trainingTypesExpanded, setTrainingTypesExpanded] = useState(false);
@@ -93,6 +100,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
     queryKey: keys.lookups.trainingTypes(),
     queryFn: ({ signal }) => getTrainingTypeLookups({ signal }),
   });
+
 
   const genderOptions = gendersQuery.data ?? [];
   const userGenderOptions = useMemo(
@@ -140,9 +148,14 @@ export function PersonalInfoScreen({ navigation }: Props) {
     setName(me.name?.trim() ?? '');
     setEmail(me.email?.trim() ?? '');
     setAbout(me.about?.trim() ?? '');
+    setCityName(me.cityName?.trim() ?? '');
+    setDistrictName(me.districtName?.trim() ?? '');
+    setSelectedCityId(typeof me.cityId === 'number' ? me.cityId : null);
 
     const nextSpecializations = Array.isArray(me.specializations)
-      ? me.specializations.filter((value): value is string => Boolean(value))
+      ? me.specializations.filter(
+        (value: unknown): value is string => typeof value === 'string' && value.length > 0
+      )
       : [];
     setSpecializations(
       sortByOrder(
@@ -152,7 +165,9 @@ export function PersonalInfoScreen({ navigation }: Props) {
     );
 
     const nextTrainingTypes = Array.isArray(me.trainingTypes)
-      ? me.trainingTypes.filter((value): value is string => Boolean(value))
+      ? me.trainingTypes.filter(
+        (value: unknown): value is string => typeof value === 'string' && value.length > 0
+      )
       : [];
     setTrainingTypes(
       sortByOrder(
@@ -178,6 +193,22 @@ export function PersonalInfoScreen({ navigation }: Props) {
     defaultUserGender,
     defaultAnyGender,
   ]);
+
+  useEffect(() => {
+    const selection = route.params?.locationSelection;
+    if (!selection) {
+      return;
+    }
+    if (selection.cityName) {
+      setCityName(selection.cityName ?? '');
+      setSelectedCityId(typeof selection.cityId === 'number' ? selection.cityId : null);
+      setDistrictName('');
+    }
+    if (selection.districtName) {
+      setDistrictName(selection.districtName ?? '');
+    }
+    navigation.setParams({ locationSelection: undefined });
+  }, [navigation, route.params?.locationSelection]);
 
   useEffect(() => {
     let cancelled = false;
@@ -292,6 +323,8 @@ export function PersonalInfoScreen({ navigation }: Props) {
     mutationFn: async () => {
       const payload: UpdateUserRequest = {
         name: name.trim(),
+        cityName: cityName.trim(),
+        districtName: districtName.trim() || null,
         gender: userGender || null,
         about: isTrainer
           ? about.trim() || null
@@ -343,6 +376,10 @@ export function PersonalInfoScreen({ navigation }: Props) {
     setError(null);
     if (isTrainer && trainingTypes.length === 0) {
       setError(t('profile.personal.trainingTypesRequired'));
+      return;
+    }
+    if (!cityName.trim()) {
+      setError(t('profile.personal.cityRequired'));
       return;
     }
     if (isTrainer && pricePerSession.trim().length > 0) {
@@ -458,6 +495,65 @@ export function PersonalInfoScreen({ navigation }: Props) {
                 placeholder={t('profile.personal.name')}
                 {...formInputProps}
               />
+            </YStack>
+            <YStack gap="$2">
+              <Text fontSize="$3" color="$text">
+                {t('profile.personal.city')}
+              </Text>
+              <Button
+                backgroundColor="$background"
+                borderRadius="$4"
+                borderWidth={1}
+                borderColor="$border"
+                height={44}
+                paddingHorizontal="$3"
+                justifyContent="flex-start"
+                alignItems="center"
+                onPress={() => navigation.navigate('LocationSearch', { mode: 'city', returnTo: 'PersonalInfo' })}
+              >
+                <Text
+                  color={cityName ? '$text' : '$muted'}
+                  width="100%"
+                  textAlign="left"
+                >
+                  {cityName || t('profile.personal.cityPlaceholder')}
+                </Text>
+              </Button>
+            </YStack>
+            <YStack gap="$2">
+              <Text fontSize="$3" color="$text">
+                {t('profile.personal.district')}
+              </Text>
+              <Button
+                backgroundColor="$background"
+                borderRadius="$4"
+                borderWidth={1}
+                borderColor="$border"
+                height={44}
+                paddingHorizontal="$3"
+                justifyContent="flex-start"
+                alignItems="center"
+                onPress={() => {
+                  if (!selectedCityId) {
+                    setError(t('profile.personal.cityRequired'));
+                    return;
+                  }
+                  navigation.navigate('LocationSearch', {
+                    mode: 'district',
+                    cityId: selectedCityId,
+                    cityName,
+                    returnTo: 'PersonalInfo',
+                  });
+                }}
+              >
+                <Text
+                  color={districtName ? '$text' : '$muted'}
+                  width="100%"
+                  textAlign="left"
+                >
+                  {districtName || t('profile.personal.districtPlaceholder')}
+                </Text>
+              </Button>
             </YStack>
             <YStack gap="$2">
               <Text fontSize="$3" color="$text">

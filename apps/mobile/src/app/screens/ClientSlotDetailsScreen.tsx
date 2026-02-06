@@ -91,6 +91,12 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
   const dateLabel = times ? formatDateWithWeekdayRu(times.start) : t('common.empty');
   const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : t('common.empty');
   const priceLabel = formatPrice(slot.trainerPricePerSession ?? trainer.pricePerSession);
+  const locationLabel = useMemo(() => {
+    const parts = [trainer.cityName, trainer.districtName].filter(
+      (value): value is string => !!value && value.trim().length > 0
+    );
+    return parts.length > 0 ? parts.join(', ') : null;
+  }, [trainer.cityName, trainer.districtName]);
   const conflict = canCheckConflicts && hasTimeConflict(slot, bookings);
   const startTs = times?.start.getTime() ?? null;
   const isPast = startTs !== null && startTs <= Date.now();
@@ -182,15 +188,20 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
             borderColor="$border"
           >
             <XStack alignItems="center" gap="$3">
-              <TrainerAvatar name={trainer.name} avatarUrl={trainer.avatarUrl} size="$10" />
-              <YStack gap="$1" flex={1}>
-                <Text fontSize="$5" fontWeight="700" color="$text">
-                  {trainer.name ?? t('common.empty')}
+            <TrainerAvatar name={trainer.name} avatarUrl={trainer.avatarUrl} size="$10" />
+            <YStack gap="$1" flex={1}>
+              <Text fontSize="$5" fontWeight="700" color="$text">
+                {trainer.name ?? t('common.empty')}
+              </Text>
+              {locationLabel ? (
+                <Text fontSize="$3" color="$muted">
+                  {locationLabel}
                 </Text>
-                {trainer.rating ? (
-                  <XStack alignItems="center" gap="$2">
-                    <AppIcon name="star" size={14} color="$accent" />
-                    <Text fontSize="$3" color="$muted">
+              ) : null}
+              {trainer.rating ? (
+                <XStack alignItems="center" gap="$2">
+                  <AppIcon name="star" size={14} color="$accent" />
+                  <Text fontSize="$3" color="$muted">
                       {trainer.rating.toFixed(1)}
                     </Text>
                   </XStack>

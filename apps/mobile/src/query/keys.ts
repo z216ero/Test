@@ -45,10 +45,13 @@ export const keys = {
     paymentMethods: () => ['lookups', 'payment-methods'] as const,
     dateFilters: () => ['lookups', 'date-filters'] as const,
     sortOptions: () => ['lookups', 'sort-options'] as const,
-    cities: () => ['lookups', 'cities'] as const,
-    districts: (cityId?: number) =>
-      cityId !== undefined
-        ? (['lookups', 'districts', cityId] as const)
+    cities: (query?: string) =>
+      query
+        ? (['lookups', 'cities', query] as const)
+        : (['lookups', 'cities'] as const),
+    districts: (cityId?: number, query?: string) =>
+      cityId !== undefined || query
+        ? (['lookups', 'districts', cityId ?? null, query ?? null] as const)
         : (['lookups', 'districts'] as const),
   },
 };

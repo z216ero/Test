@@ -61,6 +61,21 @@ public static class TrainerEndpoints
                 errors["gymName"] = new[] { "GymName must be at most 120 characters." };
             }
 
+            if (string.IsNullOrWhiteSpace(request.CityName))
+            {
+                errors["cityName"] = new[] { "CityName is required." };
+            }
+            else if (request.CityName.Length > 120)
+            {
+                errors["cityName"] = new[] { "CityName must be at most 120 characters." };
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.DistrictName)
+                && request.DistrictName.Length > 120)
+            {
+                errors["districtName"] = new[] { "DistrictName must be at most 120 characters." };
+            }
+
             if (errors.Count > 0)
             {
                 return Problems.Validation(errors);

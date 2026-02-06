@@ -612,7 +612,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/String<>f__AnonymousType1"
+                  "$ref": "#/components/schemas/String<>f__AnonymousType3"
                 }
               }
             }
@@ -628,6 +628,494 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/lookups/roles": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/genders": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/levels": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/goals": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/specializations": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/training-types": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/slot-statuses": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/booking-statuses": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/payment-statuses": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/payment-methods": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/date-filters": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/sort-options": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/cities": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CityDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/districts": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "parameters": [
+          {
+            "name": "cityId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DistrictDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/push/tokens": {
+      "post": {
+        "tags": [
+          "Push"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterPushTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/push/tokens/disable": {
+      "post": {
+        "tags": [
+          "Push"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisablePushTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -765,6 +1253,88 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/slots/available": {
+      "get": {
+        "tags": [
+          "Slots"
+        ],
+        "parameters": [
+          {
+            "name": "fromUtc",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toUtc",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "specializations",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "gender",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "districtOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AvailableSlotGroupDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1115,558 +1685,6 @@
           }
         }
       }
-    },
-    "/push/tokens": {
-      "post": {
-        "tags": [
-          "Push"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterPushTokenRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/slots/available": {
-      "get": {
-        "tags": [
-          "Slots"
-        ],
-        "parameters": [
-          {
-            "name": "fromUtc",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "date-time"
-            }
-          },
-          {
-            "name": "toUtc",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "date-time"
-            }
-          },
-          {
-            "name": "specializations",
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          {
-            "name": "gender",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AvailableSlotGroupDto"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/push/tokens/disable": {
-      "post": {
-        "tags": [
-          "Push"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DisablePushTokenRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/roles": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "parameters": [
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "required": false
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LookupResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/genders": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "parameters": [
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LookupResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/levels": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "parameters": [
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LookupResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/goals": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "parameters": [
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LookupResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/specializations": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "parameters": [
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LookupResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/training-types": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "parameters": [
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LookupResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/slot-statuses": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "parameters": [
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LookupResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/booking-statuses": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "parameters": [
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LookupResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/payment-statuses": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "parameters": [
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LookupResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/payment-methods": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "parameters": [
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LookupResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/date-filters": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "parameters": [
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LookupResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/sort-options": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "parameters": [
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LookupResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/cities": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/CityDto"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/lookups/districts": {
-      "get": {
-        "tags": [
-          "Lookups"
-        ],
-        "parameters": [
-          {
-            "name": "cityId",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "nullable": true
-            },
-            "required": false
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DistrictDto"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
@@ -1707,6 +1725,28 @@
             "type": "string",
             "nullable": true
           },
+          "gender": {
+            "type": "string",
+            "nullable": true
+          },
+          "cityId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "cityName": {
+            "type": "string",
+            "nullable": true
+          },
+          "districtId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "districtName": {
+            "type": "string",
+            "nullable": true
+          },
           "gymName": {
             "type": "string",
             "nullable": true
@@ -1722,9 +1762,35 @@
             },
             "nullable": true
           },
+          "specializations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "worksWithGender": {
+            "type": "string",
+            "nullable": true
+          },
           "pricePerSession": {
             "type": "integer",
             "format": "int32",
+            "nullable": true
+          },
+          "preferredTrainerGender": {
+            "type": "string",
+            "nullable": true
+          },
+          "clientLevel": {
+            "type": "string",
+            "nullable": true
+          },
+          "clientGoals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
             "nullable": true
           },
           "trainerRating": {
@@ -1743,11 +1809,47 @@
           "avatarUrl": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AvailableSlotGroupDto": {
+        "type": "object",
+        "properties": {
+          "trainer": {
+            "$ref": "#/components/schemas/AvailableSlotTrainerDto"
           },
-          "gender": {
-            "type": "string"
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SlotDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AvailableSlotTrainerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
           },
-          "specializations": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "pricePerSession": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "trainingTypes": {
             "type": "array",
             "items": {
               "type": "string"
@@ -1758,19 +1860,21 @@
             "type": "string",
             "nullable": true
           },
-          "preferredTrainerGender": {
+          "gender": {
             "type": "string",
             "nullable": true
           },
-          "clientLevel": {
+          "rating": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "cityName": {
             "type": "string",
             "nullable": true
           },
-          "clientGoals": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
+          "districtName": {
+            "type": "string",
             "nullable": true
           }
         },
@@ -1812,6 +1916,20 @@
         },
         "additionalProperties": false
       },
+      "CityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ClientProfileDto": {
         "type": "object",
         "properties": {
@@ -1846,6 +1964,42 @@
           "gymName": {
             "type": "string",
             "nullable": true
+          },
+          "cityName": {
+            "type": "string",
+            "nullable": true
+          },
+          "districtName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DisablePushTokenRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DistrictDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cityId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -1874,11 +2028,42 @@
         },
         "additionalProperties": false
       },
-      "DisablePushTokenRequest": {
+      "LookupItem": {
         "type": "object",
         "properties": {
-          "token": {
+          "code": {
             "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "isAny": {
+            "type": "boolean"
+          },
+          "isTrainerRole": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "isClientRole": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LookupResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupItem"
+            },
             "nullable": true
           }
         },
@@ -1909,7 +2094,17 @@
             "nullable": true
           }
         },
-        "additionalProperties": {}
+        "additionalProperties": { }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "RegisterPushTokenRequest": {
         "type": "object",
@@ -1919,16 +2114,6 @@
             "nullable": true
           },
           "platform": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "RefreshRequest": {
-        "type": "object",
-        "properties": {
-          "refreshToken": {
             "type": "string",
             "nullable": true
           }
@@ -1951,6 +2136,14 @@
             "nullable": true
           },
           "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "cityName": {
+            "type": "string",
+            "nullable": true
+          },
+          "districtName": {
             "type": "string",
             "nullable": true
           },
@@ -2015,61 +2208,7 @@
         },
         "additionalProperties": false
       },
-      "AvailableSlotTrainerDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "avatarUrl": {
-            "type": "string",
-            "nullable": true
-          },
-          "pricePerSession": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "trainingTypes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "rating": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "worksWithGender": {
-            "type": "string"
-          },
-          "gender": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
-      "AvailableSlotGroupDto": {
-        "type": "object",
-        "properties": {
-          "trainer": {
-            "$ref": "#/components/schemas/AvailableSlotTrainerDto"
-          },
-          "slots": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SlotDto"
-            }
-          }
-        },
-        "additionalProperties": false
-      },
-      "String<>f__AnonymousType1": {
+      "String<>f__AnonymousType3": {
         "type": "object",
         "properties": {
           "status": {
@@ -2116,7 +2255,11 @@
             "type": "string",
             "nullable": true
           },
-          "trainerAvatarUrl": {
+          "trainerCityName": {
+            "type": "string",
+            "nullable": true
+          },
+          "trainerDistrictName": {
             "type": "string",
             "nullable": true
           },
@@ -2133,6 +2276,10 @@
               "type": "string"
             },
             "nullable": true
+          },
+          "trainerAvatarUrl": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -2144,23 +2291,19 @@
             "type": "string",
             "nullable": true
           },
-          "about": {
+          "cityName": {
             "type": "string",
             "nullable": true
           },
-          "trainingTypes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true
-          },
-          "pricePerSession": {
-            "type": "integer",
-            "format": "int32",
+          "districtName": {
+            "type": "string",
             "nullable": true
           },
           "gender": {
+            "type": "string",
+            "nullable": true
+          },
+          "about": {
             "type": "string",
             "nullable": true
           },
@@ -2171,8 +2314,20 @@
             },
             "nullable": true
           },
+          "trainingTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
           "worksWithGender": {
             "type": "string",
+            "nullable": true
+          },
+          "pricePerSession": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           },
           "preferredTrainerGender": {
@@ -2192,72 +2347,6 @@
           }
         },
         "additionalProperties": false
-      },
-      "LookupItem": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "label": {
-            "type": "string"
-          },
-          "isDefault": {
-            "type": "boolean"
-          },
-          "isAny": {
-            "type": "boolean"
-          },
-          "isTrainerRole": {
-            "type": "boolean",
-            "nullable": true
-          },
-          "isClientRole": {
-            "type": "boolean",
-            "nullable": true
-          }
-        }
-      },
-      "LookupResponse": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LookupItem"
-            }
-          }
-        }
-      },
-      "CityDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "name": {
-            "type": "string",
-            "nullable": true
-          }
-        }
-      },
-      "DistrictDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "cityId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "name": {
-            "type": "string",
-            "nullable": true
-          }
-        }
       }
     },
     "securitySchemes": {
@@ -2281,6 +2370,12 @@
     },
     {
       "name": "Health"
+    },
+    {
+      "name": "Lookups"
+    },
+    {
+      "name": "Push"
     },
     {
       "name": "Slots"

@@ -16,7 +16,12 @@ const resolveTokenValue = <T,>(value: TokenValue<T> | undefined): T | undefined 
   value && isTokenValue(value) ? value.val : value;
 
 export const useTabBarPadding = (options: TabBarPaddingOptions = {}) => {
-  const tabBarHeight = useBottomTabBarHeight();
+  let tabBarHeight = 0;
+  try {
+    tabBarHeight = useBottomTabBarHeight();
+  } catch {
+    tabBarHeight = 0;
+  }
   const baseSpaceKey = (options.baseSpaceToken ?? 6) as SpaceTokenKey;
   const baseSpace = resolveTokenValue<number>(config.tokens.space[baseSpaceKey]) ?? 0;
   const extraTokenKey = options.extraBottomToken;

@@ -12,6 +12,8 @@ import { customFetch } from './custom-fetch';
 export type ClientBooking = {
   slot: SlotDto;
   trainerName?: string | null;
+  trainerCityName?: string | null;
+  trainerDistrictName?: string | null;
   trainerSpecializations?: string[] | null;
   trainerTrainingTypes?: string[] | null;
   trainerAvatarUrl?: string | null;
@@ -122,6 +124,8 @@ const mapSessionToBooking = (session: UpcomingSessionDto): ClientBooking | null 
   return {
     slot: session.slot,
     trainerName: session.trainerName,
+    trainerCityName: session.trainerCityName,
+    trainerDistrictName: session.trainerDistrictName,
     trainerSpecializations: session.trainerSpecializations,
     trainerTrainingTypes: session.trainerTrainingTypes,
     trainerAvatarUrl: session.trainerAvatarUrl,

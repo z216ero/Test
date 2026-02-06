@@ -5,13 +5,15 @@ export type ClientGenderFilter = string;
 export type ClientSlotsFilters = {
   specializations: string[];
   gender: ClientGenderFilter;
+  districtOnly: boolean;
 };
 
-const STORAGE_KEY = 'clientSlots.filters.v2';
+const STORAGE_KEY = 'clientSlots.filters.v3';
 
 export const DEFAULT_CLIENT_SLOTS_FILTERS: ClientSlotsFilters = {
   specializations: [],
   gender: '',
+  districtOnly: false,
 };
 
 const normalizeSpecializations = (value: unknown): string[] => {
@@ -42,6 +44,7 @@ export const loadClientSlotsFilters = async (): Promise<ClientSlotsFilters> => {
     return {
       specializations: normalizeSpecializations(parsed.specializations),
       gender: typeof parsed.gender === 'string' ? parsed.gender : '',
+      districtOnly: typeof parsed.districtOnly === 'boolean' ? parsed.districtOnly : false,
     };
   } catch {
     return DEFAULT_CLIENT_SLOTS_FILTERS;

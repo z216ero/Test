@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Api.Data;
 using Api.Features.Common;
 using Microsoft.AspNetCore.Http;
@@ -12,6 +14,11 @@ public sealed class UserService(AppDbContext db)
         UpdateUserRequest request,
         CancellationToken cancellationToken)
     {
+        var normalizedCityName = NormalizeLocationName(request.CityName);
+        var normalizedDistrictName = string.IsNullOrWhiteSpace(request.DistrictName)
+            ? null
+            : NormalizeLocationName(request.DistrictName);
+
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
         if (user is null)
         {
@@ -26,6 +33,13 @@ public sealed class UserService(AppDbContext db)
             && Enum.TryParse<Gender>(request.Gender, true, out var parsedGender))
         {
             user.Gender = parsedGender;
+        }
+
+        var city = await GetOrCreateCityAsync(normalizedCityName, cancellationToken);
+        District? district = null;
+        if (!string.IsNullOrWhiteSpace(normalizedDistrictName))
+        {
+            district = await GetOrCreateDistrictAsync(city.Id, normalizedDistrictName!, cancellationToken);
         }
 
         if (string.Equals(user.Role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
@@ -62,6 +76,8 @@ public sealed class UserService(AppDbContext db)
             }
 
             profile.PricePerSession = request.PricePerSession;
+            profile.CityId = city.Id;
+            profile.DistrictId = district?.Id;
         }
         else
         {
@@ -92,10 +108,89 @@ public sealed class UserService(AppDbContext db)
             {
                 profile.Goals = request.Goals;
             }
+
+            profile.CityId = city.Id;
+            profile.DistrictId = district?.Id;
         }
 
         await db.SaveChangesAsync(cancellationToken);
         return ServiceResult<bool>.Success(true);
+    }
+
+    private async Task<City> GetOrCreateCityAsync(string cityName, CancellationToken cancellationToken)
+    {
+        var existing = await db.Cities
+            .FirstOrDefaultAsync(c => EF.Functions.ILike(c.Name, cityName), cancellationToken);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var city = new City { Name = cityName };
+        db.Cities.Add(city);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return city;
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(city).State = EntityState.Detached;
+            var fallback = await db.Cities
+                .FirstOrDefaultAsync(c => EF.Functions.ILike(c.Name, cityName), cancellationToken);
+            if (fallback is not null)
+            {
+                return fallback;
+            }
+            throw;
+        }
+    }
+
+    private async Task<District> GetOrCreateDistrictAsync(
+        int cityId,
+        string districtName,
+        CancellationToken cancellationToken)
+    {
+        var existing = await db.Districts
+            .FirstOrDefaultAsync(
+                d => d.CityId == cityId && EF.Functions.ILike(d.Name, districtName),
+                cancellationToken);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var district = new District { CityId = cityId, Name = districtName };
+        db.Districts.Add(district);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return district;
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(district).State = EntityState.Detached;
+            var fallback = await db.Districts
+                .FirstOrDefaultAsync(
+                    d => d.CityId == cityId && EF.Functions.ILike(d.Name, districtName),
+                    cancellationToken);
+            if (fallback is not null)
+            {
+                return fallback;
+            }
+            throw;
+        }
+    }
+
+    private static string NormalizeLocationName(string value)
+    {
+        var trimmed = value.Trim();
+        var collapsed = Regex.Replace(trimmed, "\\s+", " ");
+        var culture = CultureInfo.GetCultureInfo("ru-RU");
+        var lowered = collapsed.ToLower(culture);
+        return culture.TextInfo.ToTitleCase(lowered);
     }
 
     public async Task<ServiceResult<bool>> UpsertAvatarAsync(

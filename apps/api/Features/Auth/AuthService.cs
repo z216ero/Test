@@ -2,6 +2,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Api.Data;
 using Api.Features.Common;
 using Microsoft.AspNetCore.Identity;
@@ -21,6 +23,10 @@ public sealed class AuthService(
         CancellationToken cancellationToken)
     {
         var normalizedRole = UserRoles.Normalize(request.Role);
+        var normalizedCityName = NormalizeLocationName(request.CityName);
+        var normalizedDistrictName = string.IsNullOrWhiteSpace(request.DistrictName)
+            ? null
+            : NormalizeLocationName(request.DistrictName);
 
         var strategy = db.Database.CreateExecutionStrategy();
         ServiceResult<AuthResponse>? result = null;
@@ -74,10 +80,19 @@ public sealed class AuthService(
 
             if (normalizedRole == UserRoles.Trainer)
             {
+                var city = await GetOrCreateCityAsync(normalizedCityName, cancellationToken);
+                District? district = null;
+                if (!string.IsNullOrWhiteSpace(normalizedDistrictName))
+                {
+                    district = await GetOrCreateDistrictAsync(city.Id, normalizedDistrictName!, cancellationToken);
+                }
+
                 db.TrainerProfiles.Add(new TrainerProfile
                 {
                     Id = Guid.NewGuid(),
                     UserId = user.Id,
+                    CityId = city.Id,
+                    DistrictId = district?.Id,
                     GymName = null,
                     About = null,
                     Specializations = request.Specializations?.Where(code => !string.IsNullOrWhiteSpace(code))
@@ -91,9 +106,18 @@ public sealed class AuthService(
             }
             else
             {
+                var city = await GetOrCreateCityAsync(normalizedCityName, cancellationToken);
+                District? district = null;
+                if (!string.IsNullOrWhiteSpace(normalizedDistrictName))
+                {
+                    district = await GetOrCreateDistrictAsync(city.Id, normalizedDistrictName!, cancellationToken);
+                }
+
                 db.ClientProfiles.Add(new ClientProfile
                 {
                     UserId = user.Id,
+                    CityId = city.Id,
+                    DistrictId = district?.Id,
                     PreferredTrainerGender = Gender.Any,
                     Level = ClientLevel.Beginner,
                     Goals = Array.Empty<string>(),
@@ -251,6 +275,10 @@ public sealed class AuthService(
         IReadOnlyList<string> clientGoals = Array.Empty<string>();
         double? trainerRating = null;
         int? trainerRatingCount = null;
+        int? cityId = null;
+        string? cityName = null;
+        int? districtId = null;
+        string? districtName = null;
         var hasAvatar = await db.UserAvatars
             .AsNoTracking()
             .AnyAsync(a => a.UserId == user.Id, cancellationToken);
@@ -260,6 +288,8 @@ public sealed class AuthService(
         {
             var trainerProfile = await db.TrainerProfiles
                 .AsNoTracking()
+                .Include(t => t.City)
+                .Include(t => t.District)
                 .FirstOrDefaultAsync(t => t.UserId == user.Id, cancellationToken);
             if (trainerProfile?.Specializations is { Length: > 0 })
             {
@@ -273,6 +303,10 @@ public sealed class AuthService(
             }
             worksWithGender = trainerProfile?.WorksWithGender.ToString();
             pricePerSession = trainerProfile?.PricePerSession;
+            cityId = trainerProfile?.CityId;
+            cityName = trainerProfile?.City?.Name;
+            districtId = trainerProfile?.DistrictId;
+            districtName = trainerProfile?.District?.Name;
 
             if (trainerProfile is not null)
             {
@@ -301,12 +335,18 @@ public sealed class AuthService(
         {
             var clientProfile = await db.ClientProfiles
                 .AsNoTracking()
+                .Include(c => c.City)
+                .Include(c => c.District)
                 .FirstOrDefaultAsync(c => c.UserId == user.Id, cancellationToken);
             if (clientProfile is not null)
             {
                 preferredTrainerGender = clientProfile.PreferredTrainerGender.ToString();
                 clientLevel = clientProfile.Level.ToString();
                 clientGoals = clientProfile.Goals ?? Array.Empty<string>();
+                cityId = clientProfile.CityId;
+                cityName = clientProfile.City?.Name;
+                districtId = clientProfile.DistrictId;
+                districtName = clientProfile.District?.Name;
             }
         }
 
@@ -316,6 +356,10 @@ public sealed class AuthService(
             user.Role,
             user.Name,
             user.Gender.ToString(),
+            cityId,
+            cityName,
+            districtId,
+            districtName,
             gymName,
             about,
             trainingTypes,
@@ -363,5 +407,81 @@ public sealed class AuthService(
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private async Task<City> GetOrCreateCityAsync(string cityName, CancellationToken cancellationToken)
+    {
+        var existing = await db.Cities
+            .FirstOrDefaultAsync(c => EF.Functions.ILike(c.Name, cityName), cancellationToken);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var city = new City { Name = cityName };
+        db.Cities.Add(city);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return city;
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(city).State = EntityState.Detached;
+            var fallback = await db.Cities
+                .FirstOrDefaultAsync(c => EF.Functions.ILike(c.Name, cityName), cancellationToken);
+            if (fallback is not null)
+            {
+                return fallback;
+            }
+            throw;
+        }
+    }
+
+    private async Task<District> GetOrCreateDistrictAsync(
+        int cityId,
+        string districtName,
+        CancellationToken cancellationToken)
+    {
+        var existing = await db.Districts
+            .FirstOrDefaultAsync(
+                d => d.CityId == cityId && EF.Functions.ILike(d.Name, districtName),
+                cancellationToken);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var district = new District { CityId = cityId, Name = districtName };
+        db.Districts.Add(district);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return district;
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(district).State = EntityState.Detached;
+            var fallback = await db.Districts
+                .FirstOrDefaultAsync(
+                    d => d.CityId == cityId && EF.Functions.ILike(d.Name, districtName),
+                    cancellationToken);
+            if (fallback is not null)
+            {
+                return fallback;
+            }
+            throw;
+        }
+    }
+
+    private static string NormalizeLocationName(string value)
+    {
+        var trimmed = value.Trim();
+        var collapsed = Regex.Replace(trimmed, "\\s+", " ");
+        var culture = CultureInfo.GetCultureInfo("ru-RU");
+        var lowered = collapsed.ToLower(culture);
+        return culture.TextInfo.ToTitleCase(lowered);
     }
 }

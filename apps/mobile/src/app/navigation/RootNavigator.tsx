@@ -10,6 +10,7 @@ import { BookingsScreen } from '@app/screens/BookingsScreen';
 import { CreateSlotTabScreen } from '@app/screens/CreateSlotTabScreen';
 import { HomeScreen } from '@app/screens/HomeScreen';
 import { LoginScreen } from '@app/screens/LoginScreen';
+import { LocationSearchScreen } from '@app/screens/LocationSearchScreen';
 import { NotificationsScreen } from '@app/screens/NotificationsScreen';
 import { PersonalInfoScreen } from '@app/screens/PersonalInfoScreen';
 import { ProfileScreen } from '@app/screens/ProfileScreen';
@@ -46,6 +47,7 @@ const AuthStackNavigator = () => (
   <AuthStack.Navigator>
     <AuthStack.Screen name="Login" component={LoginScreen} options={{ title: t('auth.login.title') }} />
     <AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: t('auth.register.title') }} />
+    <AuthStack.Screen name="LocationSearch" component={LocationSearchScreen} options={{ headerShown: false }} />
   </AuthStack.Navigator>
 );
 
@@ -54,6 +56,7 @@ const ProfileStackNavigator = () => (
     <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} />
     <ProfileStack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
     <ProfileStack.Screen name="Notifications" component={NotificationsScreen} />
+    <ProfileStack.Screen name="LocationSearch" component={LocationSearchScreen} />
   </ProfileStack.Navigator>
 );
 

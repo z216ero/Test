@@ -27,10 +27,13 @@ import { getDefaultLookupCode } from '@app/utils/lookups';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
-export function RegisterScreen({ navigation }: Props) {
+export function RegisterScreen({ navigation, route }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [cityName, setCityName] = useState('');
+  const [districtName, setDistrictName] = useState('');
+  const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
   const [role, setRole] = useState('');
   const [gender, setGender] = useState('');
   const [specialization, setSpecialization] = useState('');
@@ -50,6 +53,7 @@ export function RegisterScreen({ navigation }: Props) {
     queryKey: keys.lookups.specializations(),
     queryFn: ({ signal }) => getSpecializationLookups({ signal }),
   });
+
 
   const roleOptions = rolesQuery.data ?? [];
   const genderOptionsAll = gendersQuery.data ?? [];
@@ -84,6 +88,22 @@ export function RegisterScreen({ navigation }: Props) {
     }
   }, [defaultSpecialization, specialization]);
 
+  useEffect(() => {
+    const selection = route.params?.locationSelection;
+    if (!selection) {
+      return;
+    }
+    if (selection.cityName) {
+      setCityName(selection.cityName ?? '');
+      setSelectedCityId(typeof selection.cityId === 'number' ? selection.cityId : null);
+      setDistrictName('');
+    }
+    if (selection.districtName) {
+      setDistrictName(selection.districtName ?? '');
+    }
+    navigation.setParams({ locationSelection: undefined });
+  }, [navigation, route.params?.locationSelection]);
+
   const isTrainer = useMemo(
     () => roleOptions.find((option) => option.code === role)?.isTrainerRole ?? false,
     [roleOptions, role]
@@ -99,6 +119,8 @@ export function RegisterScreen({ navigation }: Props) {
       email: string;
       password: string;
       name: string;
+      cityName: string;
+      districtName?: string | null;
       role: string;
       gender: string;
       specializations?: string[];
@@ -107,6 +129,8 @@ export function RegisterScreen({ navigation }: Props) {
         email: payload.email,
         password: payload.password,
         name: payload.name,
+        cityName: payload.cityName,
+        districtName: payload.districtName ?? null,
         role: payload.role,
         gender: payload.gender,
         specializations: payload.specializations,
@@ -144,7 +168,7 @@ export function RegisterScreen({ navigation }: Props) {
   });
 
   const handleRegister = async () => {
-    if (!email.trim() || !password || !name.trim()) {
+    if (!email.trim() || !password || !name.trim() || !cityName.trim()) {
       setError(t('auth.register.validationRequired'));
       return;
     }
@@ -161,6 +185,8 @@ export function RegisterScreen({ navigation }: Props) {
         email: email.trim(),
         password,
         name: name.trim(),
+        cityName: cityName.trim(),
+        districtName: districtName.trim() || null,
         role,
         gender,
         specializations: specializationValue,
@@ -199,6 +225,57 @@ export function RegisterScreen({ navigation }: Props) {
           onChangeText={setName}
           placeholder={t('common.namePlaceholder')}
         />
+        <YStack gap="$2">
+          <Text fontSize="$3" color="$muted">
+            {t('auth.register.city')}
+          </Text>
+          <Button
+            backgroundColor="$background"
+            borderRadius="$4"
+            borderWidth={1}
+            borderColor="$border"
+            height={44}
+            paddingHorizontal="$3"
+            justifyContent="flex-start"
+            alignItems="center"
+            onPress={() => navigation.navigate('LocationSearch', { mode: 'city', returnTo: 'Register' })}
+          >
+            <Text color={cityName ? '$text' : '$muted'} width="100%" textAlign="left">
+              {cityName || t('auth.register.cityPlaceholder')}
+            </Text>
+          </Button>
+        </YStack>
+        <YStack gap="$2">
+          <Text fontSize="$3" color="$muted">
+            {t('auth.register.district')}
+          </Text>
+          <Button
+            backgroundColor="$background"
+            borderRadius="$4"
+            borderWidth={1}
+            borderColor="$border"
+            height={44}
+            paddingHorizontal="$3"
+            justifyContent="flex-start"
+            alignItems="center"
+            onPress={() => {
+              if (!selectedCityId) {
+                setError(t('auth.register.selectCityFirst'));
+                return;
+              }
+              navigation.navigate('LocationSearch', {
+                mode: 'district',
+                cityId: selectedCityId,
+                cityName,
+                returnTo: 'Register',
+              });
+            }}
+          >
+            <Text color={districtName ? '$text' : '$muted'} width="100%" textAlign="left">
+              {districtName || t('auth.register.districtPlaceholder')}
+            </Text>
+          </Button>
+        </YStack>
         <YStack gap="$2">
           <Text fontSize="$3" color="$muted">
             {t('auth.register.role')}

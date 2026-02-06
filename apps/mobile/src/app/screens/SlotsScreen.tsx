@@ -10,6 +10,7 @@ import { Button, Text, XStack, YStack } from 'tamagui';
 import type { AvailableSlotTrainerDto, SlotDto } from '@generated/api';
 import type { ClientBooking } from '@api/bookingsApi';
 import { getClientUpcomingBookings } from '@api/bookingsApi';
+import { me } from '@api/authApi';
 import { getAvailableSlotsForClient } from '@api/slotsApi';
 import { presentApiError } from '@api/ApiErrorPresenter';
 import { getGenderLookups, getSpecializationLookups } from '@api/lookupsApi';
@@ -64,13 +65,16 @@ const normalizeFilters = (
   filters: ClientSlotsFilters,
   specializationOrder: Map<string, number>,
   allowedSpecializations: Set<string>,
-  defaultGender: string
+  defaultGender: string,
+  canFilterDistrict: boolean
 ): ClientSlotsFilters => {
   const specializations = filters.specializations.filter((item) => allowedSpecializations.has(item));
   const gender = filters.gender || defaultGender;
+  const districtOnly = canFilterDistrict ? filters.districtOnly : false;
   return {
     gender,
     specializations: sortByOrder(specializations, specializationOrder),
+    districtOnly,
   };
 };
 
@@ -165,6 +169,11 @@ export function SlotsScreen({ navigation }: Props) {
     queryFn: ({ signal }) => getGenderLookups({ signal }),
   });
 
+  const meQuery = useAppQuery({
+    queryKey: keys.auth.me(),
+    queryFn: ({ signal }) => me({ signal }),
+  });
+
   const specializationOptions = specializationsQuery.data ?? [];
   const genderOptions = gendersQuery.data ?? [];
   const specializationOrder = useMemo(
@@ -179,6 +188,7 @@ export function SlotsScreen({ navigation }: Props) {
   const defaultGenderCode = useMemo(() => getDefaultCode(genderOptions), [genderOptions]);
   const resetGenderCode = anyGenderCode || defaultGenderCode || '';
   const lookupsReady = !specializationsQuery.isLoading && !gendersQuery.isLoading;
+  const canFilterDistrict = typeof meQuery.data?.districtId === 'number';
 
   const todayDate = useMemo(() => startOfLocalDay(new Date()), []);
   const tomorrowDate = useMemo(() => addDays(todayDate, 1), [todayDate]);
@@ -214,7 +224,8 @@ export function SlotsScreen({ navigation }: Props) {
       filters,
       specializationOrder,
       allowedSpecializations,
-      resetGenderCode
+      resetGenderCode,
+      canFilterDistrict
     );
     return {
       fromUtc,
@@ -225,6 +236,7 @@ export function SlotsScreen({ navigation }: Props) {
       gender: normalized.gender && normalized.gender !== resetGenderCode
         ? normalized.gender
         : undefined,
+      districtOnly: normalized.districtOnly ? true : undefined,
     };
   }, [
     filters,
@@ -235,6 +247,7 @@ export function SlotsScreen({ navigation }: Props) {
     specializationOrder,
     allowedSpecializations,
     resetGenderCode,
+    canFilterDistrict,
   ]);
 
   const slotsQuery = useAppQuery({
@@ -284,21 +297,24 @@ export function SlotsScreen({ navigation }: Props) {
       filters,
       specializationOrder,
       allowedSpecializations,
-      resetGenderCode
+      resetGenderCode,
+      canFilterDistrict
     ),
-    [filters, specializationOrder, allowedSpecializations, resetGenderCode]
+    [filters, specializationOrder, allowedSpecializations, resetGenderCode, canFilterDistrict]
   );
 
   const hasActiveFilters =
     normalizedFilters.specializations.length > 0
-    || (normalizedFilters.gender && normalizedFilters.gender !== resetGenderCode);
+    || (normalizedFilters.gender && normalizedFilters.gender !== resetGenderCode)
+    || normalizedFilters.districtOnly;
 
   const handleApplyFilters = (next: ClientSlotsFilters) => {
     const normalized = normalizeFilters(
       next,
       specializationOrder,
       allowedSpecializations,
-      resetGenderCode
+      resetGenderCode,
+      canFilterDistrict
     );
     setFilters(normalized);
     saveClientSlotsFilters(normalized).catch(() => undefined);
@@ -415,6 +431,10 @@ export function SlotsScreen({ navigation }: Props) {
     const trainer = group.trainer;
     const trainerName = trainer.name ?? t('common.empty');
     const ratingLabel = trainer.rating ? trainer.rating.toFixed(1) : null;
+    const locationParts = [trainer.cityName, trainer.districtName].filter(
+      (value): value is string => !!value && value.trim().length > 0
+    );
+    const locationLabel = locationParts.length > 0 ? locationParts.join(', ') : null;
 
     return (
       <YStack
@@ -437,6 +457,11 @@ export function SlotsScreen({ navigation }: Props) {
               <Text fontSize="$4" fontWeight="700" color="$text">
                 {trainerName}
               </Text>
+              {locationLabel ? (
+                <Text fontSize="$3" color="$muted">
+                  {locationLabel}
+                </Text>
+              ) : null}
               {ratingLabel ? (
                 <XStack alignItems="center" gap="$2">
                   <AppIcon name="star" size={14} color="$accent" />
@@ -593,6 +618,7 @@ export function SlotsScreen({ navigation }: Props) {
         specializationOptions={specializationOptions}
         genderOptions={genderOptions}
         resetGenderCode={resetGenderCode}
+        canFilterDistrict={canFilterDistrict}
         onApply={handleApplyFilters}
         onOpenChange={setSheetOpen}
       />

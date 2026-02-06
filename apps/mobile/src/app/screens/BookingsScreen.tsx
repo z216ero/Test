@@ -245,10 +245,11 @@ export function BookingsScreen({ navigation }: Props) {
         const rightIndex = trainingTypeOrder.get(right) ?? Number.MAX_SAFE_INTEGER;
         return leftIndex - rightIndex;
       })[0];
+    const isGroupTraining = trainingTypeCode === 'Group';
     const trainingTypeLabel = trainingTypeCode
-      ? (trainingTypeLabels.get(trainingTypeCode) ?? trainingTypeCode)
+      ? t(isGroupTraining ? 'bookings.trainingTypeGroup' : 'bookings.trainingTypeIndividual')
       : null;
-    const trainingTypeIcon = trainingTypeCode === 'Group' ? 'users' : 'user';
+    const trainingTypeIcon = isGroupTraining ? 'users' : 'user';
     const times = getSlotTimes(booking.slot);
     const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : t('common.empty');
     const statusType = getBookingStatusType(booking.slot);
@@ -338,6 +339,8 @@ export function BookingsScreen({ navigation }: Props) {
                   trainerName: booking.trainerName,
                   trainerSpecializations: booking.trainerSpecializations,
                   trainerTrainingTypes: booking.trainerTrainingTypes,
+                  trainerCityName: booking.trainerCityName,
+                  trainerDistrictName: booking.trainerDistrictName,
                   trainerAvatarUrl: booking.trainerAvatarUrl,
                 });
               }}
@@ -370,6 +373,8 @@ export function BookingsScreen({ navigation }: Props) {
                   trainerName: booking.trainerName,
                   trainerSpecializations: booking.trainerSpecializations,
                   trainerTrainingTypes: booking.trainerTrainingTypes,
+                  trainerCityName: booking.trainerCityName,
+                  trainerDistrictName: booking.trainerDistrictName,
                   trainerAvatarUrl: booking.trainerAvatarUrl,
                 });
               }}

@@ -5,6 +5,10 @@ public sealed class TrainerProfile
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public AppUser? User { get; set; }
+    public int? CityId { get; set; }
+    public City? City { get; set; }
+    public int? DistrictId { get; set; }
+    public District? District { get; set; }
     public int? PricePerSession { get; set; }
     public string? GymName { get; set; }
     public string? About { get; set; }
