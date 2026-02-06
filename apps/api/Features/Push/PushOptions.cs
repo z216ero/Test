@@ -7,4 +7,5 @@ public sealed class PushOptions
     public string? FirebaseCredentialsPath { get; init; }
     public string? FirebaseCredentialsJson { get; init; }
     public string? FirebaseProjectId { get; init; }
+    public string? FirebaseCredentialsJsonBase64 { get; init; }
 }
