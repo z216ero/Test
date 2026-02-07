@@ -7,6 +7,7 @@
   'auth.login.loading': 'Вход...',
   'auth.login.secondary': 'Создать аккаунт',
   'auth.login.validationRequired': 'Почта и пароль обязательны.',
+  'auth.login.invalidCredentials': 'Неверная почта или пароль.',
 
   'auth.register.title': 'Начать',
   'auth.register.subtitle': 'Создайте аккаунт для записи на тренировки.',

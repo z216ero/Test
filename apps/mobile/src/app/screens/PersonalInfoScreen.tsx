@@ -509,7 +509,11 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
                 paddingHorizontal="$3"
                 justifyContent="flex-start"
                 alignItems="center"
-                onPress={() => navigation.navigate('LocationSearch', { mode: 'city', returnTo: 'PersonalInfo' })}
+                onPress={() => navigation.navigate('LocationSearch', {
+                  mode: 'city',
+                  returnTo: 'PersonalInfo',
+                  returnToKey: route.key,
+                })}
               >
                 <Text
                   color={cityName ? '$text' : '$muted'}
@@ -543,6 +547,7 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
                     cityId: selectedCityId,
                     cityName,
                     returnTo: 'PersonalInfo',
+                    returnToKey: route.key,
                   });
                 }}
               >

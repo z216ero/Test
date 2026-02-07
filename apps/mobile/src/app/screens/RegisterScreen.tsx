@@ -289,7 +289,11 @@ export function RegisterScreen({ navigation, route }: Props) {
             paddingHorizontal="$3"
             justifyContent="flex-start"
             alignItems="center"
-            onPress={() => navigation.navigate('LocationSearch', { mode: 'city', returnTo: 'Register' })}
+            onPress={() => navigation.navigate('LocationSearch', {
+              mode: 'city',
+              returnTo: 'Register',
+              returnToKey: route.key,
+            })}
           >
             <Text color={cityName ? '$text' : '$muted'} width="100%" textAlign="left">
               {cityName || t('auth.register.cityPlaceholder')}
@@ -319,6 +323,7 @@ export function RegisterScreen({ navigation, route }: Props) {
                 cityId: selectedCityId,
                 cityName,
                 returnTo: 'Register',
+                returnToKey: route.key,
               });
             }}
           >

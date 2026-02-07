@@ -1,3 +1,4 @@
+import { CommonActions } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useMemo, useEffect, useState } from 'react';
 import { getCities, getDistricts } from '@api/lookupsApi';
@@ -16,7 +17,7 @@ type Props =
 const DEBOUNCE_MS = 300;
 
 export function LocationSearchScreen({ navigation, route }: Props) {
-  const { mode, cityId, cityName, returnTo } = route.params;
+  const { mode, cityId, cityName, returnTo, returnToKey } = route.params;
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
 
@@ -67,18 +68,34 @@ export function LocationSearchScreen({ navigation, route }: Props) {
       return;
     }
 
+    const locationSelection = mode === 'city'
+      ? {
+        cityId: typeof id === 'number' ? id : null,
+        cityName: name,
+        districtId: null,
+        districtName: null,
+      }
+      : {
+        districtId: typeof id === 'number' ? id : null,
+        districtName: name,
+        cityId: typeof cityId === 'number' ? cityId : null,
+        cityName: cityName ?? null,
+      };
+
+    if (returnToKey) {
+      navigation.dispatch({
+        ...CommonActions.setParams({ locationSelection }),
+        source: returnToKey,
+      });
+      navigation.goBack();
+      return;
+    }
+
     if (returnTo === 'Register') {
       const authNavigation =
         navigation as NativeStackScreenProps<AuthStackParamList, 'LocationSearch'>['navigation'];
       authNavigation.navigate('Register', {
-        locationSelection: {
-          cityId: mode === 'city'
-            ? (typeof id === 'number' ? id : null)
-            : (typeof cityId === 'number' ? cityId : null),
-          cityName: mode === 'city' ? name : cityName ?? null,
-          districtId: mode === 'district' ? (typeof id === 'number' ? id : null) : undefined,
-          districtName: mode === 'district' ? name : undefined,
-        },
+        locationSelection,
       });
       return;
     }
@@ -88,25 +105,15 @@ export function LocationSearchScreen({ navigation, route }: Props) {
 
     if (mode === 'city') {
       profileNavigation.navigate('PersonalInfo', {
-        locationSelection: {
-          cityId: typeof id === 'number' ? id : null,
-          cityName: name,
-          districtId: null,
-          districtName: null,
-        },
+        locationSelection,
       });
       return;
     }
 
     profileNavigation.navigate('PersonalInfo', {
-      locationSelection: {
-        districtId: typeof id === 'number' ? id : null,
-        districtName: name,
-        cityId: typeof cityId === 'number' ? cityId : null,
-        cityName: cityName ?? null,
-      },
+      locationSelection,
     });
-  }, [cityId, cityName, mode, navigation, returnTo]);
+  }, [cityId, cityName, mode, navigation, returnTo, returnToKey]);
 
   const renderList = useMemo(() => {
     if (showCityRequired) {

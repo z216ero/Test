@@ -31,6 +31,7 @@ export type LocationSearchParams = {
   cityId?: number | null;
   cityName?: string | null;
   returnTo: 'Register' | 'PersonalInfo';
+  returnToKey?: string;
 };
 
 export type ProfileStackParamList = {

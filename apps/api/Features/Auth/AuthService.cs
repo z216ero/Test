@@ -99,7 +99,7 @@ public sealed class AuthService(
                         .Select(code => code.Trim())
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToArray() ?? Array.Empty<string>(),
-                    TrainingTypes = Array.Empty<string>(),
+                    TrainingTypes = ["Individual"],
                     WorksWithGender = Gender.Any,
                     CreatedAtUtc = DateTime.UtcNow
                 });
