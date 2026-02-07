@@ -3,10 +3,14 @@ import type {
   CreateSlotRequest,
   GetTrainersTrainerIdSlotsParams,
   SlotDto,
+  SlotAttendeeDto,
   TrainerDto,
 } from '@generated/api';
 import {
   getTrainersMe,
+  getSlotsSlotIdAttendees,
+  postSlotsSlotIdAttendeesClientIdComplete,
+  postSlotsSlotIdAttendeesClientIdNoShow,
   getTrainersTrainerIdSlots,
   postSlotsSlotIdCancel,
   postSlotsSlotIdComplete,
@@ -210,6 +214,44 @@ export const cancelTrainerSlot = async (
   try {
     const response = await postSlotsSlotIdCancel(slotId, options);
     return unwrap<SlotDto>(response, t('errors.generic'));
+  } catch (error) {
+    throw mapAttendanceError(error);
+  }
+};
+
+export const getGroupSlotAttendees = async (
+  slotId: string,
+  options?: RequestInit
+): Promise<SlotAttendeeDto[]> => {
+  try {
+    const response = await getSlotsSlotIdAttendees(slotId, options);
+    return unwrap<SlotAttendeeDto[]>(response, t('errors.generic'));
+  } catch (error) {
+    throw mapAttendanceError(error);
+  }
+};
+
+export const markGroupAttendeeCompleted = async (
+  slotId: string,
+  clientId: string,
+  options?: RequestInit
+): Promise<SlotAttendeeDto> => {
+  try {
+    const response = await postSlotsSlotIdAttendeesClientIdComplete(slotId, clientId, options);
+    return unwrap<SlotAttendeeDto>(response, t('errors.generic'));
+  } catch (error) {
+    throw mapAttendanceError(error);
+  }
+};
+
+export const markGroupAttendeeNoShow = async (
+  slotId: string,
+  clientId: string,
+  options?: RequestInit
+): Promise<SlotAttendeeDto> => {
+  try {
+    const response = await postSlotsSlotIdAttendeesClientIdNoShow(slotId, clientId, options);
+    return unwrap<SlotAttendeeDto>(response, t('errors.generic'));
   } catch (error) {
     throw mapAttendanceError(error);
   }

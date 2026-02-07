@@ -1,18 +1,34 @@
 namespace Api.Features.Slots;
 
-public sealed record CreateSlotRequest(DateTime StartsAtUtc, int DurationMinutes);
+public sealed record CreateSlotRequest(
+    DateTime StartsAtUtc,
+    int DurationMinutes,
+    string? SlotType = null,
+    int? CapacityMax = null,
+    int? CapacityMin = null);
 
 public sealed record SlotDto(
     Guid Id,
     Guid TrainerId,
     DateTime StartsAtUtc,
     int DurationMinutes,
+    string SlotType,
+    int? CapacityMax,
+    int? CapacityMin,
+    int? OccupiedCount,
+    bool? IsFull,
     string Status,
     string? BookingStatus,
     DateTime CreatedAtUtc,
     string? ClientName,
     string? ClientAvatarUrl,
     int? TrainerPricePerSession);
+
+public sealed record SlotAttendeeDto(
+    Guid ClientId,
+    string ClientName,
+    string? ClientAvatarUrl,
+    string Status);
 
 public sealed record AvailableSlotTrainerDto(
     Guid Id,

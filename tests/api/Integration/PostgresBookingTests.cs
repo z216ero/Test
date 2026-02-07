@@ -58,7 +58,7 @@ public sealed class PostgresBookingTests : IClassFixture<PostgresFixture>
 
             var start = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            async Task<Api.Features.Common.ServiceResult<BookingDto>> AttemptAsync()
+            async Task<Api.Features.Common.ServiceResult<Api.Features.Slots.SlotDto>> AttemptAsync()
             {
                 await start.Task;
                 await using var db = _fixture.CreateDbContext();

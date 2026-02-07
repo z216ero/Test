@@ -80,6 +80,9 @@ export function SlotCard({
   const isNeedsAttention = statusType === 'needs_attention';
   const resolvedHighlight = isNeedsAttention ? null : highlight;
   const titleColor = isMuted ? '$muted' : '$text';
+  const isGroup = (slot.slotType ?? '').toLowerCase() === 'group';
+  const occupiedCount = slot.occupiedCount ?? 0;
+  const capacityMax = slot.capacityMax ?? null;
   const statusColor = status.dotColor;
   const labelColor = status.labelColor;
   const baseBackground = isMuted ? '$surfaceMuted' : '$background';
@@ -124,6 +127,12 @@ export function SlotCard({
             {timeLabel || t('common.empty')}
           </Text>
           <XStack alignItems="center" gap="$2">
+            <AppIcon name={isGroup ? 'users' : 'user'} size={14} color="$muted" />
+            {isGroup && capacityMax ? (
+              <Text fontSize="$2" color={labelColor}>
+                {`${occupiedCount}/${capacityMax}`}
+              </Text>
+            ) : null}
             {resolvedHighlight ? (
               <XStack
                 paddingHorizontal="$2"

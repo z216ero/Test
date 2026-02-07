@@ -11,7 +11,6 @@ import {
 } from '@api/bookingsApi';
 import { ApiError } from '@api/core';
 import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
-import { getTrainingTypeLookups } from '@api/lookupsApi';
 import { t } from '@i18n';
 import { onBookingCancelled } from '@notifications/orchestrator';
 import { useAppMutation, useAppQuery } from '@query/hooks';
@@ -33,7 +32,6 @@ import {
 } from '@app/components/bookings/bookingUtils';
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 import type { BookingsStackParamList } from '@app/navigation/types';
-import { buildLookupMap } from '@app/utils/lookups';
 import { AppIcon } from '@ui/AppIcon';
 
 type Props = NativeStackScreenProps<BookingsStackParamList, 'BookingsHome'>;
@@ -71,21 +69,6 @@ export function BookingsScreen({ navigation }: Props) {
     queryKey: keys.bookings.upcoming(),
     queryFn: ({ signal }) => getClientUpcomingBookings({ signal }),
   });
-
-  const trainingTypesQuery = useAppQuery({
-    queryKey: keys.lookups.trainingTypes(),
-    queryFn: ({ signal }) => getTrainingTypeLookups({ signal }),
-  });
-
-  const trainingTypeOptions = trainingTypesQuery.data ?? [];
-  const trainingTypeLabels = useMemo(
-    () => buildLookupMap(trainingTypeOptions),
-    [trainingTypeOptions]
-  );
-  const trainingTypeOrder = useMemo(
-    () => new Map(trainingTypeOptions.map((item, index) => [item.code, index])),
-    [trainingTypeOptions]
-  );
 
   const historyQuery = useAppQuery({
     queryKey: keys.bookings.history(),
@@ -237,14 +220,7 @@ export function BookingsScreen({ navigation }: Props) {
     showActions: boolean,
     key: string
   ) => {
-    const trainingTypes = booking.trainerTrainingTypes ?? [];
-    const trainingTypeCode = trainingTypes
-      .slice()
-      .sort((left, right) => {
-        const leftIndex = trainingTypeOrder.get(left) ?? Number.MAX_SAFE_INTEGER;
-        const rightIndex = trainingTypeOrder.get(right) ?? Number.MAX_SAFE_INTEGER;
-        return leftIndex - rightIndex;
-      })[0];
+    const trainingTypeCode = booking.slot.slotType ?? null;
     const isGroupTraining = trainingTypeCode === 'Group';
     const trainingTypeLabel = trainingTypeCode
       ? t(isGroupTraining ? 'bookings.trainingTypeGroup' : 'bookings.trainingTypeIndividual')

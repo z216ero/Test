@@ -388,6 +388,10 @@ export function ScheduleScreen({ navigation }: Props) {
     if (!slot.id) {
       return;
     }
+    if ((slot.slotType ?? '').toLowerCase() === 'group') {
+      navigation.navigate('SlotDetails', { slot });
+      return;
+    }
     markSlotHighlightSeen(slot.id).catch(() => {});
     setActiveSlot(slot);
     setSheetOpen(true);

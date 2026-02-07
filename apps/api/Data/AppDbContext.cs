@@ -12,6 +12,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<ClientProfile> ClientProfiles => Set<ClientProfile>();
     public DbSet<TrainingSlot> TrainingSlots => Set<TrainingSlot>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<SlotAttendee> SlotAttendees => Set<SlotAttendee>();
     public DbSet<UserAvatar> UserAvatars => Set<UserAvatar>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
@@ -133,6 +134,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsRequired();
             entity.Property(x => x.DurationMinutes)
                 .IsRequired();
+            entity.Property(x => x.SlotType)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(TrainingSlotType.Individual)
+                .IsRequired();
+            entity.Property(x => x.CapacityMax);
+            entity.Property(x => x.CapacityMin);
             entity.Property(x => x.Status)
                 .HasConversion<string>()
                 .HasMaxLength(20)
@@ -140,6 +148,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.CreatedAtUtc)
                 .HasDefaultValueSql("now() at time zone 'utc'");
             entity.HasIndex(x => new { x.TrainerId, x.StartsAtUtc });
+            entity.ToTable(tb => tb.HasCheckConstraint(
+                "CK_training_slots_slot_type_capacity",
+                "(\"SlotType\" = 'Individual' AND \"CapacityMin\" IS NULL AND \"CapacityMax\" IS NULL) "
+                + "OR (\"SlotType\" = 'Group' AND \"CapacityMin\" IS NOT NULL AND \"CapacityMax\" IS NOT NULL "
+                + "AND \"CapacityMin\" >= 2 AND \"CapacityMin\" <= \"CapacityMax\" AND \"CapacityMax\" <= 100)"));
             entity.HasOne(x => x.TrainerProfile)
                 .WithMany(x => x.Slots)
                 .HasForeignKey(x => x.TrainerId)
@@ -164,6 +177,30 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasOne(x => x.Slot)
                 .WithOne(x => x.Booking)
                 .HasForeignKey<Booking>(x => x.SlotId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SlotAttendee>(entity =>
+        {
+            entity.ToTable("slot_attendees");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ClientId)
+                .IsRequired();
+            entity.Property(x => x.Status)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(SlotAttendeeStatus.Booked)
+                .IsRequired();
+            entity.Property(x => x.CreatedAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.Property(x => x.UpdatedAtUtc);
+            entity.HasIndex(x => new { x.SlotId, x.ClientId })
+                .IsUnique();
+            entity.HasIndex(x => x.SlotId);
+            entity.HasIndex(x => new { x.ClientId, x.Status });
+            entity.HasOne(x => x.Slot)
+                .WithMany(x => x.Attendees)
+                .HasForeignKey(x => x.SlotId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

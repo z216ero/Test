@@ -39,10 +39,9 @@ public static class BookingEndpoints
                 return Problems.FromServiceError(result.Error!);
             }
 
-            var booking = result.Value!;
-            return Results.Created($"/slots/{slotId}/book", booking);
+            return Results.Ok(result.Value);
         })
-        .Produces<BookingDto>(StatusCodes.Status201Created)
+        .Produces<SlotDto>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict);
@@ -116,6 +115,90 @@ public static class BookingEndpoints
         })
         .Produces<BookingDto>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/attendees/{clientId:guid}/complete", async (
+            Guid slotId,
+            Guid clientId,
+            HttpContext httpContext,
+            BookingService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            if (!string.Equals(role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
+            {
+                return TypedResults.Problem(
+                    title: "Forbidden",
+                    detail: "Only trainers can mark attendee attendance.",
+                    statusCode: StatusCodes.Status403Forbidden,
+                    type: "https://errors.trainerapp/forbidden");
+            }
+
+            var result = await service.MarkGroupAttendeeAttendanceAsync(
+                slotId,
+                userId,
+                clientId,
+                SlotAttendeeStatus.Completed,
+                cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .RequireAuthorization()
+        .Produces<SlotAttendeeDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/attendees/{clientId:guid}/no-show", async (
+            Guid slotId,
+            Guid clientId,
+            HttpContext httpContext,
+            BookingService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            if (!string.Equals(role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
+            {
+                return TypedResults.Problem(
+                    title: "Forbidden",
+                    detail: "Only trainers can mark attendee attendance.",
+                    statusCode: StatusCodes.Status403Forbidden,
+                    type: "https://errors.trainerapp/forbidden");
+            }
+
+            var result = await service.MarkGroupAttendeeAttendanceAsync(
+                slotId,
+                userId,
+                clientId,
+                SlotAttendeeStatus.NoShow,
+                cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .RequireAuthorization()
+        .Produces<SlotAttendeeDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict);
 

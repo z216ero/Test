@@ -99,6 +99,7 @@
   'slots.empty.resetFilters': 'Сбросить фильтры',
   'slots.status.available': 'Свободно',
   'slots.status.conflict': 'Конфликт',
+  'slots.status.full': 'Мест нет',
   'slots.status.unavailable': 'Недоступно',
   'slots.conflictBanner': 'У вас уже есть запись на это время',
   'slots.details.priceLabel': 'Стоимость: {price}',

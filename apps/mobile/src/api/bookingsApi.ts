@@ -1,4 +1,4 @@
-import type { AuthUserDto, BookingDto, SlotDto, UpcomingSessionDto } from '@generated/api';
+import type { AuthUserDto, SlotDto, UpcomingSessionDto } from '@generated/api';
 import {
   getAuthMe,
   postSlotsSlotIdBook,
@@ -21,11 +21,26 @@ export type ClientBooking = {
 
 export class BookingConflictError extends ApiError {}
 export class BookingTimeConflictError extends ApiError {}
+export class BookingSlotFullError extends ApiError {}
 export class BookingNotFoundError extends ApiError {}
 
-const isTimeConflict = (details: unknown): boolean => {
+const readErrorCode = (details: unknown): string | null => {
   if (!details || typeof details !== 'object') {
-    return false;
+    return null;
+  }
+
+  const maybeCode = (details as { errorCode?: unknown }).errorCode;
+  if (typeof maybeCode === 'string' && maybeCode.trim().length > 0) {
+    return maybeCode.trim();
+  }
+
+  return null;
+};
+
+const isTimeConflict = (details: unknown): boolean => {
+  const code = readErrorCode(details);
+  if (code === 'booking_time_conflict') {
+    return true;
   }
 
   const problem = details as { title?: string | null; detail?: string | null };
@@ -46,6 +61,15 @@ const mapBookingError = (error: unknown): Error => {
 
   if (error instanceof ApiError) {
     if (error.status === 409) {
+      const code = readErrorCode(error.details);
+      if (code === 'slot_full') {
+        return new BookingSlotFullError(
+          t('slots.status.full'),
+          error.status,
+          error.details
+        );
+      }
+
       if (isTimeConflict(error.details)) {
         return new BookingTimeConflictError(
           t('errors.slotTimeConflict'),
@@ -96,11 +120,11 @@ const getCurrentUserId = async (options?: RequestInit): Promise<string> => {
 export const createBooking = async (
   slotId: string,
   options?: RequestInit
-): Promise<BookingDto> => {
+): Promise<SlotDto> => {
   try {
     const clientId = await getCurrentUserId(options);
     const response = await postSlotsSlotIdBook(slotId, { clientId }, options);
-    return unwrap<BookingDto>(response, t('errors.generic'));
+    return unwrap<SlotDto>(response, t('errors.generic'));
   } catch (error) {
     throw mapBookingError(error);
   }

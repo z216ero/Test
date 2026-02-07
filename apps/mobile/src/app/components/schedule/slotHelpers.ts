@@ -70,6 +70,9 @@ const hasClient = (slot: SlotDto): boolean => {
   return Boolean(name);
 };
 
+const isGroupSlot = (slot: SlotDto): boolean =>
+  (slot.slotType ?? '').toLowerCase().trim() === 'group';
+
 const isBookingStatus = (value?: string | null, expected?: string) =>
   normalize(value) === expected?.toLowerCase();
 
@@ -151,6 +154,17 @@ export const getUiSlotStatus = (slot: SlotDto, nowTs: number): UiSlotStatus => {
     return 'booked';
   }
 
+  if ((status === 'available' || status === 'open') && bookingStatus === 'booked') {
+    const startTs = getStartTimestamp(slot);
+    if (startTs !== null) {
+      const endTs = getSlotEndTimestamp(slot) ?? startTs;
+      if (nowTs >= startTs + NO_SHOW_AVAILABLE_AFTER_MS || nowTs >= endTs) {
+        return 'needs_attention';
+      }
+    }
+    return 'booked';
+  }
+
   if (status === 'available' || status === 'open') {
     return 'available';
   }
@@ -204,7 +218,8 @@ const isSlotAvailable = (slot: SlotDto): boolean => {
   return status === 'available' || status === 'open';
 };
 
-const isSlotBooked = (slot: SlotDto): boolean => normalize(slot.status) === 'booked';
+const isSlotBooked = (slot: SlotDto): boolean =>
+  normalize(slot.status) === 'booked' || normalize(slot.bookingStatus) === 'booked';
 
 export const canCancelSlot = (slot: SlotDto, nowTs: number): boolean => {
   if (!isSlotAvailable(slot)) {
@@ -264,6 +279,9 @@ export const shouldShowInCompletedToday = (slot: SlotDto): boolean => {
     return true;
   }
   if (isBookingStatus(bookingStatus, 'cancelled') && hasClient(slot)) {
+    return true;
+  }
+  if (isBookingStatus(bookingStatus, 'cancelled') && isGroupSlot(slot)) {
     return true;
   }
   return false;

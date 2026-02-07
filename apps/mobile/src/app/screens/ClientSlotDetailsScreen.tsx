@@ -4,6 +4,7 @@ import { Button, Text, XStack, YStack } from 'tamagui';
 import type { ClientBooking } from '@api/bookingsApi';
 import {
   BookingConflictError,
+  BookingSlotFullError,
   BookingTimeConflictError,
   createBooking,
   getClientUpcomingBookings,
@@ -31,6 +32,9 @@ const isSlotOpen = (slot: SlotDto) => {
   return normalized === 'open' || normalized === 'available';
 };
 
+const isGroupSlot = (slot: SlotDto) =>
+  (slot.slotType ?? '').toLowerCase() === 'group';
+
 const getSlotRange = (slot: SlotDto): { start: number; end: number } | null => {
   if (!slot.startsAtUtc) {
     return null;
@@ -49,6 +53,9 @@ const hasTimeConflict = (slot: SlotDto, bookings: ClientBooking[]): boolean => {
     return false;
   }
   return bookings.some((booking) => {
+    if (slot.id && booking.slot.id && slot.id === booking.slot.id) {
+      return false;
+    }
     const bookingRange = booking.slot ? getSlotRange(booking.slot) : null;
     if (!bookingRange) {
       return false;
@@ -102,6 +109,10 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
   const isPast = startTs !== null && startTs <= Date.now();
   const open = isSlotOpen(slot);
   const hasValidTime = Boolean(times);
+  const group = isGroupSlot(slot);
+  const occupiedCount = slot.occupiedCount ?? 0;
+  const capacityMax = slot.capacityMax ?? null;
+  const isFull = slot.isFull ?? (group && capacityMax !== null && occupiedCount >= capacityMax);
 
   const bookingMutation = useAppMutation({
     mutationFn: (slotId: string) => createBooking(slotId),
@@ -132,6 +143,8 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
       const presented = presentApiError(err);
       if (err instanceof BookingTimeConflictError) {
         setActionError(t('errors.slotTimeConflict'));
+      } else if (err instanceof BookingSlotFullError) {
+        setActionError(t('slots.status.full'));
       } else if (err instanceof BookingConflictError) {
         setActionError(t('errors.slotTaken'));
       } else {
@@ -146,14 +159,18 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
         });
       }
 
-      if (err instanceof BookingTimeConflictError || err instanceof BookingConflictError) {
+      if (
+        err instanceof BookingTimeConflictError
+        || err instanceof BookingConflictError
+        || err instanceof BookingSlotFullError
+      ) {
         queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
         queryClient.invalidateQueries({ queryKey: keys.slots.available(), exact: false });
       }
     },
   });
 
-  const isBookable = Boolean(slot.id) && hasValidTime && open && !isPast && !conflict;
+  const isBookable = Boolean(slot.id) && hasValidTime && open && !isPast && !conflict && !isFull;
 
   const disabledReason = (() => {
     if (!slot.id || !hasValidTime) {
@@ -161,6 +178,9 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
     }
     if (conflict) {
       return t('slots.conflictBanner');
+    }
+    if (isFull) {
+      return t('slots.status.full');
     }
     if (!open) {
       return t('slots.details.unavailable');
@@ -224,6 +244,14 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
             <Text fontSize="$5" fontWeight="700" color="$text">
               {timeLabel}
             </Text>
+            <XStack alignItems="center" gap="$2">
+              <AppIcon name={group ? 'users' : 'user'} size={14} color="$muted" />
+              {group && capacityMax ? (
+                <Text fontSize="$3" color="$muted">
+                  {`${occupiedCount}/${capacityMax}`}
+                </Text>
+              ) : null}
+            </XStack>
             {priceLabel ? (
               <Text fontSize="$4" color="$text">
                 {t('slots.details.priceLabel', { price: priceLabel })}

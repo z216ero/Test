@@ -35,6 +35,23 @@ public sealed class SlotService(AppDbContext db)
                 "DurationMinutes must be greater than 0.");
         }
 
+        if (!TryResolveSlotType(request.SlotType, out var slotType))
+        {
+            return ServiceResult<SlotDto>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid slot type",
+                "SlotType must be Individual or Group.");
+        }
+
+        var capacityValidation = ValidateCapacity(slotType, request.CapacityMin, request.CapacityMax);
+        if (capacityValidation is not null)
+        {
+            return ServiceResult<SlotDto>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid capacity",
+                capacityValidation);
+        }
+
         var normalizedStart = request.StartsAtUtc;
         var nowUtc = DateTime.UtcNow;
         if (normalizedStart <= nowUtc)
@@ -48,7 +65,7 @@ public sealed class SlotService(AppDbContext db)
         var trainerProfile = await db.TrainerProfiles
             .AsNoTracking()
             .Where(t => t.Id == trainerId)
-            .Select(t => new { t.Id, t.PricePerSession })
+            .Select(t => new { t.Id, t.PricePerSession, t.TrainingTypes })
             .FirstOrDefaultAsync(cancellationToken);
         if (trainerProfile is null)
         {
@@ -56,6 +73,15 @@ public sealed class SlotService(AppDbContext db)
                 StatusCodes.Status404NotFound,
                 "Trainer not found",
                 "Trainer does not exist.");
+        }
+
+        if (slotType == TrainingSlotType.Group
+            && (trainerProfile.TrainingTypes?.Any(x => string.Equals(x, "Group", StringComparison.OrdinalIgnoreCase)) != true))
+        {
+            return ServiceResult<SlotDto>.Fail(
+                StatusCodes.Status409Conflict,
+                "Group training is disabled",
+                "Enable group trainings in profile before creating group slots.");
         }
 
         var newEnd = normalizedStart.AddMinutes(request.DurationMinutes);
@@ -78,6 +104,9 @@ public sealed class SlotService(AppDbContext db)
             TrainerId = trainerId,
             StartsAtUtc = normalizedStart,
             DurationMinutes = request.DurationMinutes,
+            SlotType = slotType,
+            CapacityMin = slotType == TrainingSlotType.Group ? request.CapacityMin : null,
+            CapacityMax = slotType == TrainingSlotType.Group ? request.CapacityMax : null,
             Status = TrainingSlotStatus.Open,
             CreatedAtUtc = DateTime.UtcNow
         };
@@ -134,22 +163,26 @@ public sealed class SlotService(AppDbContext db)
                 "fromUtc must be earlier than or equal to toUtc.");
         }
 
-        var query = db.TrainingSlots
+        var slots = await db.TrainingSlots
             .Include(s => s.Booking)
-            .Where(s => s.TrainerId == trainerId);
-        query = query.Where(s => s.StartsAtUtc >= normalizedFrom && s.StartsAtUtc <= normalizedTo);
-
-        var slots = await query
+            .Include(s => s.Attendees)
+            .Where(s => s.TrainerId == trainerId
+                && s.StartsAtUtc >= normalizedFrom
+                && s.StartsAtUtc <= normalizedTo)
             .OrderBy(s => s.StartsAtUtc)
             .ToListAsync(cancellationToken);
 
-        if (slots.Count == 0)
+        var filtered = slots
+            .Where(slot => !ShouldHideFromTrainerList(slot))
+            .ToList();
+
+        if (filtered.Count == 0)
         {
             return ServiceResult<IReadOnlyList<SlotDto>>.Success([]);
         }
 
-        var clientIds = slots
-            .Where(slot => slot.Booking is not null)
+        var clientIds = filtered
+            .Where(slot => slot.SlotType == TrainingSlotType.Individual && slot.Booking is not null)
             .Select(slot => slot.Booking!.ClientId)
             .Distinct()
             .ToList();
@@ -172,13 +205,15 @@ public sealed class SlotService(AppDbContext db)
                 .ToHashSetAsync(cancellationToken);
         }
 
-        var dtos = slots.Select(slot =>
+        var dtos = filtered.Select(slot =>
         {
             string? clientName = null;
             string? clientAvatarUrl = null;
 
             var clientId = slot.Booking?.ClientId;
-            if (clientId.HasValue && clientNames.TryGetValue(clientId.Value, out var name))
+            if (slot.SlotType == TrainingSlotType.Individual
+                && clientId.HasValue
+                && clientNames.TryGetValue(clientId.Value, out var name))
             {
                 clientName = name;
                 if (clientAvatarIds.Contains(clientId.Value))
@@ -240,6 +275,7 @@ public sealed class SlotService(AppDbContext db)
 
         var query = db.TrainingSlots
             .AsNoTracking()
+            .Include(s => s.Attendees)
             .Include(s => s.TrainerProfile!)
             .ThenInclude(t => t.City)
             .Include(s => s.TrainerProfile!)
@@ -344,6 +380,87 @@ public sealed class SlotService(AppDbContext db)
         return ServiceResult<IReadOnlyList<AvailableSlotGroupDto>>.Success(sorted);
     }
 
+    public async Task<ServiceResult<IReadOnlyList<SlotAttendeeDto>>> GetSlotAttendeesAsync(
+        Guid slotId,
+        Guid trainerUserId,
+        CancellationToken cancellationToken)
+    {
+        var trainerProfileId = await db.TrainerProfiles
+            .AsNoTracking()
+            .Where(t => t.UserId == trainerUserId)
+            .Select(t => (Guid?)t.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!trainerProfileId.HasValue)
+        {
+            return ServiceResult<IReadOnlyList<SlotAttendeeDto>>.Fail(
+                StatusCodes.Status404NotFound,
+                "Trainer profile not found",
+                "Trainer profile is not available for this user.");
+        }
+
+        var slot = await db.TrainingSlots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == slotId, cancellationToken);
+        if (slot is null)
+        {
+            return ServiceResult<IReadOnlyList<SlotAttendeeDto>>.Fail(
+                StatusCodes.Status404NotFound,
+                "Slot not found",
+                "Slot does not exist.");
+        }
+
+        if (slot.TrainerId != trainerProfileId.Value)
+        {
+            return ServiceResult<IReadOnlyList<SlotAttendeeDto>>.Fail(
+                StatusCodes.Status403Forbidden,
+                "Forbidden",
+                "Slot does not belong to this trainer.");
+        }
+
+        if (slot.SlotType != TrainingSlotType.Group)
+        {
+            return ServiceResult<IReadOnlyList<SlotAttendeeDto>>.Fail(
+                StatusCodes.Status409Conflict,
+                "Invalid slot type",
+                "Attendees are available only for group slots.");
+        }
+
+        var attendees = await db.SlotAttendees
+            .AsNoTracking()
+            .Where(a => a.SlotId == slotId)
+            .OrderBy(a => a.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        if (attendees.Count == 0)
+        {
+            return ServiceResult<IReadOnlyList<SlotAttendeeDto>>.Success([]);
+        }
+
+        var clientIds = attendees.Select(x => x.ClientId).Distinct().ToList();
+        var names = await db.Users
+            .AsNoTracking()
+            .Where(u => clientIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.Name })
+            .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
+
+        var avatarIds = await db.UserAvatars
+            .AsNoTracking()
+            .Where(x => clientIds.Contains(x.UserId))
+            .Select(x => x.UserId)
+            .ToHashSetAsync(cancellationToken);
+
+        var dtos = attendees.Select(attendee =>
+            new SlotAttendeeDto(
+                attendee.ClientId,
+                names.TryGetValue(attendee.ClientId, out var name) ? name : "Client",
+                avatarIds.Contains(attendee.ClientId) ? $"/users/{attendee.ClientId}/avatar" : null,
+                attendee.Status.ToString()))
+            .ToList();
+
+        return ServiceResult<IReadOnlyList<SlotAttendeeDto>>.Success(dtos);
+    }
+
     private static bool MatchesGenderFilter(
         TrainerProfile trainer,
         Gender? preferredTrainerGender,
@@ -402,20 +519,119 @@ public sealed class SlotService(AppDbContext db)
         };
     }
 
-    private static SlotDto ToDto(
+    private static bool TryResolveSlotType(string? value, out TrainingSlotType slotType)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            slotType = TrainingSlotType.Individual;
+            return true;
+        }
+
+        return Enum.TryParse(value.Trim(), true, out slotType);
+    }
+
+    private static string? ValidateCapacity(TrainingSlotType slotType, int? capacityMin, int? capacityMax)
+    {
+        if (slotType == TrainingSlotType.Individual)
+        {
+            if (capacityMin.HasValue || capacityMax.HasValue)
+            {
+                return "Individual slots must not have CapacityMin or CapacityMax.";
+            }
+
+            return null;
+        }
+
+        if (!capacityMin.HasValue || !capacityMax.HasValue)
+        {
+            return "Group slots require CapacityMin and CapacityMax.";
+        }
+
+        if (capacityMin.Value < 2)
+        {
+            return "CapacityMin must be at least 2 for group slots.";
+        }
+
+        if (capacityMax.Value > 100)
+        {
+            return "CapacityMax must be less than or equal to 100 for group slots.";
+        }
+
+        if (capacityMin.Value > capacityMax.Value)
+        {
+            return "CapacityMin must be less than or equal to CapacityMax.";
+        }
+
+        return null;
+    }
+
+    private static int GetOccupiedCount(TrainingSlot slot)
+        => slot.Attendees.Count(a => a.Status == SlotAttendeeStatus.Booked);
+
+    private static bool ShouldHideFromTrainerList(TrainingSlot slot)
+        => slot.SlotType == TrainingSlotType.Group
+            && slot.Status == TrainingSlotStatus.Cancelled
+            && slot.Attendees.Count == 0;
+
+    private static string? ResolveBookingStatus(TrainingSlot slot)
+    {
+        if (slot.SlotType == TrainingSlotType.Individual)
+        {
+            return slot.Booking?.Status.ToString();
+        }
+
+        if (slot.Attendees.Any(a => a.Status == SlotAttendeeStatus.Booked))
+        {
+            return SlotAttendeeStatus.Booked.ToString();
+        }
+
+        if (slot.Attendees.Any(a => a.Status == SlotAttendeeStatus.Completed))
+        {
+            return SlotAttendeeStatus.Completed.ToString();
+        }
+
+        if (slot.Attendees.Any(a => a.Status == SlotAttendeeStatus.NoShow))
+        {
+            return SlotAttendeeStatus.NoShow.ToString();
+        }
+
+        if (slot.Attendees.Any(a => a.Status == SlotAttendeeStatus.Cancelled))
+        {
+            return SlotAttendeeStatus.Cancelled.ToString();
+        }
+
+        return null;
+    }
+
+    public static SlotDto ToDto(
         TrainingSlot slot,
         string? clientName,
         string? clientAvatarUrl,
         int? trainerPricePerSession)
-        => new(
+    {
+        var occupiedCount = slot.SlotType == TrainingSlotType.Group
+            ? (int?)GetOccupiedCount(slot)
+            : null;
+        var isFull = slot.SlotType == TrainingSlotType.Group
+            && slot.CapacityMax.HasValue
+            ? occupiedCount >= slot.CapacityMax.Value
+            : (bool?)null;
+
+        return new SlotDto(
             slot.Id,
             slot.TrainerId,
             slot.StartsAtUtc,
             slot.DurationMinutes,
+            slot.SlotType.ToString(),
+            slot.CapacityMax,
+            slot.CapacityMin,
+            occupiedCount,
+            isFull,
             slot.Status.ToString(),
-            slot.Booking?.Status.ToString(),
+            ResolveBookingStatus(slot),
             slot.CreatedAtUtc,
             clientName,
             clientAvatarUrl,
             trainerPricePerSession);
+    }
 }

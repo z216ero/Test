@@ -96,6 +96,9 @@ const hasTimeConflict = (slot: SlotDto, bookings: ClientBooking[]): boolean => {
     return false;
   }
   return bookings.some((booking) => {
+    if (slot.id && booking.slot.id && slot.id === booking.slot.id) {
+      return false;
+    }
     const bookingRange = booking.slot ? getSlotRange(booking.slot) : null;
     if (!bookingRange) {
       return false;
@@ -110,6 +113,9 @@ const isSlotOpen = (slot: SlotDto) => {
   const normalized = normalizeStatus(slot.status);
   return normalized === 'open' || normalized === 'available';
 };
+
+const isGroupSlot = (slot: SlotDto) =>
+  (slot.slotType ?? '').toLowerCase() === 'group';
 
 const sortSlotsByStart = (left: SlotDto, right: SlotDto) => {
   const leftTs = left.startsAtUtc ? new Date(left.startsAtUtc).getTime() : 0;
@@ -174,8 +180,14 @@ export function SlotsScreen({ navigation }: Props) {
     queryFn: ({ signal }) => me({ signal }),
   });
 
-  const specializationOptions = specializationsQuery.data ?? [];
-  const genderOptions = gendersQuery.data ?? [];
+  const specializationOptions = useMemo(
+    () => specializationsQuery.data ?? [],
+    [specializationsQuery.data]
+  );
+  const genderOptions = useMemo(
+    () => gendersQuery.data ?? [],
+    [gendersQuery.data]
+  );
   const specializationOrder = useMemo(
     () => new Map(specializationOptions.map((item, index) => [item.code, index])),
     [specializationOptions]
@@ -377,14 +389,22 @@ export function SlotsScreen({ navigation }: Props) {
     const startTs = range?.start.getTime() ?? null;
     const isPast = startTs !== null && startTs <= nowTs;
     const open = isSlotOpen(slot);
-    const isBookable = Boolean(slot.id) && open && !isPast && !conflict;
+    const group = isGroupSlot(slot);
+    const occupiedCount = slot.occupiedCount ?? 0;
+    const capacityMax = slot.capacityMax ?? null;
+    const isFull = slot.isFull ?? (group && capacityMax !== null && occupiedCount >= capacityMax);
+    const isBookable = Boolean(slot.id) && open && !isPast && !conflict && !isFull;
     const statusLabel = conflict
       ? t('slots.status.conflict')
+      : isFull
+        ? t('slots.status.full')
       : open && !isPast
         ? t('slots.status.available')
         : t('slots.status.unavailable');
     const statusColor = conflict
       ? '$danger'
+      : isFull
+        ? '$danger'
       : open && !isPast
         ? '$accent'
         : '$muted';
@@ -414,11 +434,23 @@ export function SlotsScreen({ navigation }: Props) {
           <Text fontSize="$4" fontWeight="600" color={isBookable ? '$text' : '$muted'}>
             {timeLabel}
           </Text>
-          {priceLabel ? (
-            <Text fontSize="$3" color={isBookable ? '$text' : '$muted'}>
-              {priceLabel}
-            </Text>
-          ) : null}
+          <XStack alignItems="center" gap="$2">
+            {group ? (
+              <>
+                <AppIcon name="users" size={14} color={isBookable ? '$muted' : '$muted'} />
+                <Text fontSize="$3" color={isBookable ? '$text' : '$muted'}>
+                  {capacityMax ? `${occupiedCount}/${capacityMax}` : `${occupiedCount}`}
+                </Text>
+              </>
+            ) : (
+              <AppIcon name="user" size={14} color={isBookable ? '$muted' : '$muted'} />
+            )}
+            {priceLabel ? (
+              <Text fontSize="$3" color={isBookable ? '$text' : '$muted'}>
+                {priceLabel}
+              </Text>
+            ) : null}
+          </XStack>
         </XStack>
         <Text fontSize="$2" color={statusColor} marginTop="$1">
           {statusLabel}

@@ -11,38 +11,20 @@ public sealed class ClientService(AppDbContext db)
         Guid userId,
         CancellationToken cancellationToken)
     {
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
-        if (user is null)
+        var profile = await EnsureClientProfileAsync(userId, cancellationToken);
+        if (!profile.IsSuccess)
         {
             return ServiceResult<List<UpcomingSessionDto>>.Fail(
-                StatusCodes.Status401Unauthorized,
-                "Unauthorized",
-                "User is not available.");
-        }
-
-        if (!string.Equals(user.Role, UserRoles.Client, StringComparison.OrdinalIgnoreCase))
-        {
-            return ServiceResult<List<UpcomingSessionDto>>.Fail(
-                StatusCodes.Status404NotFound,
-                "Client profile not found",
-                "Client profile is not available for this user.");
-        }
-
-        var profile = await db.ClientProfiles
-            .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.UserId == userId, cancellationToken);
-        if (profile is null)
-        {
-            return ServiceResult<List<UpcomingSessionDto>>.Fail(
-                StatusCodes.Status404NotFound,
-                "Client profile not found",
-                "Client profile is not available for this user.");
+                profile.Error!.StatusCode,
+                profile.Error.Title,
+                profile.Error.Detail);
         }
 
         var now = DateTime.UtcNow;
 
-        var bookings = await db.Bookings
+        var individualBookings = await db.Bookings
             .AsNoTracking()
+            .Include(b => b.Slot!)
             .Include(b => b.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.City)
@@ -52,57 +34,74 @@ public sealed class ClientService(AppDbContext db)
             .Include(b => b.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.User)
-            .Where(b => b.ClientId == profile.UserId
+            .Where(b => b.ClientId == profile.Value!.UserId
                 && b.Slot != null
                 && b.Status == BookingStatus.Booked
-                && b.Slot.Status == TrainingSlotStatus.Booked
+                && b.Slot.Status != TrainingSlotStatus.Cancelled
                 && b.Slot.StartsAtUtc > now)
-            .OrderBy(b => b.Slot!.StartsAtUtc)
             .ToListAsync(cancellationToken);
 
-        var trainerAvatarIds = await GetTrainerAvatarIdsAsync(bookings, cancellationToken);
-        var dtos = bookings
+        var groupAttendees = await db.SlotAttendees
+            .AsNoTracking()
+            .Include(a => a.Slot!)
+            .ThenInclude(s => s.Booking)
+            .Include(a => a.Slot!)
+            .ThenInclude(s => s.TrainerProfile!)
+            .ThenInclude(t => t.City)
+            .Include(a => a.Slot!)
+            .ThenInclude(s => s.TrainerProfile!)
+            .ThenInclude(t => t.District)
+            .Include(a => a.Slot!)
+            .ThenInclude(s => s.TrainerProfile!)
+            .ThenInclude(t => t.User)
+            .Where(a => a.ClientId == profile.Value.UserId
+                && a.Status == SlotAttendeeStatus.Booked
+                && a.Slot != null
+                && a.Slot.Status != TrainingSlotStatus.Cancelled
+                && a.Slot.StartsAtUtc > now)
+            .ToListAsync(cancellationToken);
+
+        var occupiedCounts = await LoadGroupOccupiedCountsAsync(
+            individualBookings
+                .Select(b => b.SlotId)
+                .Concat(groupAttendees.Select(a => a.SlotId))
+                .Distinct()
+                .ToList(),
+            cancellationToken);
+
+        var trainerAvatarIds = await GetTrainerAvatarIdsAsync(individualBookings, groupAttendees, cancellationToken);
+
+        var sessions = new List<UpcomingSessionDto>(individualBookings.Count + groupAttendees.Count);
+        sessions.AddRange(individualBookings
             .Where(booking => booking.Slot is not null)
-            .Select(booking => ToSessionDto(booking, booking.Slot!, trainerAvatarIds))
+            .Select(booking => ToSessionDto(booking.Slot!, booking.Status, trainerAvatarIds, occupiedCounts)));
+        sessions.AddRange(groupAttendees
+            .Where(attendee => attendee.Slot is not null)
+            .Select(attendee => ToSessionDto(attendee.Slot!, attendee.Status, trainerAvatarIds, occupiedCounts)));
+
+        var sorted = sessions
+            .OrderBy(x => x.Slot.StartsAtUtc)
             .ToList();
 
-        return ServiceResult<List<UpcomingSessionDto>>.Success(dtos);
+        return ServiceResult<List<UpcomingSessionDto>>.Success(sorted);
     }
 
     public async Task<ServiceResult<List<UpcomingSessionDto>>> GetBookingHistoryAsync(
         Guid userId,
         CancellationToken cancellationToken)
     {
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
-        if (user is null)
+        var profile = await EnsureClientProfileAsync(userId, cancellationToken);
+        if (!profile.IsSuccess)
         {
             return ServiceResult<List<UpcomingSessionDto>>.Fail(
-                StatusCodes.Status401Unauthorized,
-                "Unauthorized",
-                "User is not available.");
+                profile.Error!.StatusCode,
+                profile.Error.Title,
+                profile.Error.Detail);
         }
 
-        if (!string.Equals(user.Role, UserRoles.Client, StringComparison.OrdinalIgnoreCase))
-        {
-            return ServiceResult<List<UpcomingSessionDto>>.Fail(
-                StatusCodes.Status404NotFound,
-                "Client profile not found",
-                "Client profile is not available for this user.");
-        }
-
-        var profile = await db.ClientProfiles
+        var individualBookings = await db.Bookings
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.UserId == userId, cancellationToken);
-        if (profile is null)
-        {
-            return ServiceResult<List<UpcomingSessionDto>>.Fail(
-                StatusCodes.Status404NotFound,
-                "Client profile not found",
-                "Client profile is not available for this user.");
-        }
-
-        var bookings = await db.Bookings
-            .AsNoTracking()
+            .Include(b => b.Slot!)
             .Include(b => b.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.City)
@@ -112,31 +111,82 @@ public sealed class ClientService(AppDbContext db)
             .Include(b => b.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.User)
-            .Where(b => b.ClientId == profile.UserId
+            .Where(b => b.ClientId == profile.Value!.UserId
                 && b.Slot != null
                 && (b.Status == BookingStatus.Completed
                     || b.Status == BookingStatus.NoShow
                     || b.Status == BookingStatus.Cancelled))
-            .OrderByDescending(b => b.Slot!.StartsAtUtc)
             .ToListAsync(cancellationToken);
 
-        var trainerAvatarIds = await GetTrainerAvatarIdsAsync(bookings, cancellationToken);
-        var dtos = bookings
+        var groupAttendees = await db.SlotAttendees
+            .AsNoTracking()
+            .Include(a => a.Slot!)
+            .ThenInclude(s => s.Booking)
+            .Include(a => a.Slot!)
+            .ThenInclude(s => s.TrainerProfile!)
+            .ThenInclude(t => t.City)
+            .Include(a => a.Slot!)
+            .ThenInclude(s => s.TrainerProfile!)
+            .ThenInclude(t => t.District)
+            .Include(a => a.Slot!)
+            .ThenInclude(s => s.TrainerProfile!)
+            .ThenInclude(t => t.User)
+            .Where(a => a.ClientId == profile.Value.UserId
+                && (a.Status == SlotAttendeeStatus.Completed
+                    || a.Status == SlotAttendeeStatus.NoShow
+                    || a.Status == SlotAttendeeStatus.Cancelled)
+                && a.Slot != null)
+            .ToListAsync(cancellationToken);
+
+        var occupiedCounts = await LoadGroupOccupiedCountsAsync(
+            individualBookings
+                .Select(b => b.SlotId)
+                .Concat(groupAttendees.Select(a => a.SlotId))
+                .Distinct()
+                .ToList(),
+            cancellationToken);
+
+        var trainerAvatarIds = await GetTrainerAvatarIdsAsync(individualBookings, groupAttendees, cancellationToken);
+
+        var sessions = new List<UpcomingSessionDto>(individualBookings.Count + groupAttendees.Count);
+        sessions.AddRange(individualBookings
             .Where(booking => booking.Slot is not null)
-            .Select(booking => ToSessionDto(booking, booking.Slot!, trainerAvatarIds))
+            .Select(booking => ToSessionDto(booking.Slot!, booking.Status, trainerAvatarIds, occupiedCounts)));
+        sessions.AddRange(groupAttendees
+            .Where(attendee => attendee.Slot is not null)
+            .Select(attendee => ToSessionDto(attendee.Slot!, attendee.Status, trainerAvatarIds, occupiedCounts)));
+
+        var sorted = sessions
+            .OrderByDescending(x => x.Slot.StartsAtUtc)
             .ToList();
 
-        return ServiceResult<List<UpcomingSessionDto>>.Success(dtos);
+        return ServiceResult<List<UpcomingSessionDto>>.Success(sorted);
     }
 
     public async Task<ServiceResult<ClientProfileDto>> GetClientProfileAsync(
         Guid userId,
         CancellationToken cancellationToken)
     {
+        var result = await EnsureClientProfileAsync(userId, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return ServiceResult<ClientProfileDto>.Fail(
+                result.Error!.StatusCode,
+                result.Error.Title,
+                result.Error.Detail);
+        }
+
+        return ServiceResult<ClientProfileDto>.Success(new ClientProfileDto(result.Value!.UserId));
+    }
+
+    private async Task<ServiceResult<ClientProfile>> EnsureClientProfileAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
         if (user is null)
         {
-            return ServiceResult<ClientProfileDto>.Fail(
+            return ServiceResult<ClientProfile>.Fail(
                 StatusCodes.Status401Unauthorized,
                 "Unauthorized",
                 "User is not available.");
@@ -144,7 +194,7 @@ public sealed class ClientService(AppDbContext db)
 
         if (!string.Equals(user.Role, UserRoles.Client, StringComparison.OrdinalIgnoreCase))
         {
-            return ServiceResult<ClientProfileDto>.Fail(
+            return ServiceResult<ClientProfile>.Fail(
                 StatusCodes.Status404NotFound,
                 "Client profile not found",
                 "Client profile is not available for this user.");
@@ -155,19 +205,34 @@ public sealed class ClientService(AppDbContext db)
             .FirstOrDefaultAsync(c => c.UserId == userId, cancellationToken);
         if (profile is null)
         {
-            return ServiceResult<ClientProfileDto>.Fail(
+            return ServiceResult<ClientProfile>.Fail(
                 StatusCodes.Status404NotFound,
                 "Client profile not found",
                 "Client profile is not available for this user.");
         }
 
-        return ServiceResult<ClientProfileDto>.Success(new ClientProfileDto(profile.UserId));
+        return ServiceResult<ClientProfile>.Success(profile);
     }
 
     private static UpcomingSessionDto ToSessionDto(
-        Booking booking,
         TrainingSlot slot,
-        HashSet<Guid> trainerAvatarIds)
+        BookingStatus bookingStatus,
+        HashSet<Guid> trainerAvatarIds,
+        IReadOnlyDictionary<Guid, int> occupiedCounts)
+        => ToSessionDto(slot, bookingStatus.ToString(), trainerAvatarIds, occupiedCounts);
+
+    private static UpcomingSessionDto ToSessionDto(
+        TrainingSlot slot,
+        SlotAttendeeStatus attendeeStatus,
+        HashSet<Guid> trainerAvatarIds,
+        IReadOnlyDictionary<Guid, int> occupiedCounts)
+        => ToSessionDto(slot, attendeeStatus.ToString(), trainerAvatarIds, occupiedCounts);
+
+    private static UpcomingSessionDto ToSessionDto(
+        TrainingSlot slot,
+        string bookingStatus,
+        HashSet<Guid> trainerAvatarIds,
+        IReadOnlyDictionary<Guid, int> occupiedCounts)
     {
         var trainerProfile = slot.TrainerProfile;
         var trainerName = trainerProfile?.User?.Name;
@@ -181,7 +246,7 @@ public sealed class ClientService(AppDbContext db)
             : null;
 
         return new UpcomingSessionDto(
-            ToSlotDto(slot, booking.Status),
+            ToSlotDto(slot, bookingStatus, occupiedCounts),
             trainerName,
             trainerCityName,
             trainerDistrictName,
@@ -192,10 +257,12 @@ public sealed class ClientService(AppDbContext db)
 
     private async Task<HashSet<Guid>> GetTrainerAvatarIdsAsync(
         List<Booking> bookings,
+        List<SlotAttendee> attendees,
         CancellationToken cancellationToken)
     {
         var trainerUserIds = bookings
             .Select(booking => booking.Slot?.TrainerProfile?.UserId)
+            .Concat(attendees.Select(attendee => attendee.Slot?.TrainerProfile?.UserId))
             .Where(id => id.HasValue)
             .Select(id => id!.Value)
             .Distinct()
@@ -215,16 +282,51 @@ public sealed class ClientService(AppDbContext db)
         return ids.ToHashSet();
     }
 
-    private static SlotDto ToSlotDto(TrainingSlot slot, BookingStatus? bookingStatus)
-        => new(
+    private async Task<Dictionary<Guid, int>> LoadGroupOccupiedCountsAsync(
+        IReadOnlyCollection<Guid> slotIds,
+        CancellationToken cancellationToken)
+    {
+        if (slotIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await db.SlotAttendees
+            .AsNoTracking()
+            .Where(a => slotIds.Contains(a.SlotId) && a.Status == SlotAttendeeStatus.Booked)
+            .GroupBy(a => a.SlotId)
+            .Select(g => new { SlotId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.SlotId, x => x.Count, cancellationToken);
+    }
+
+    private static SlotDto ToSlotDto(
+        TrainingSlot slot,
+        string bookingStatus,
+        IReadOnlyDictionary<Guid, int> occupiedCounts)
+    {
+        var occupiedCount = slot.SlotType == TrainingSlotType.Group
+            ? (int?)(occupiedCounts.TryGetValue(slot.Id, out var count) ? count : 0)
+            : null;
+        var isFull = slot.SlotType == TrainingSlotType.Group
+            && slot.CapacityMax.HasValue
+            ? occupiedCount >= slot.CapacityMax.Value
+            : (bool?)null;
+
+        return new SlotDto(
             slot.Id,
             slot.TrainerId,
             slot.StartsAtUtc,
             slot.DurationMinutes,
+            slot.SlotType.ToString(),
+            slot.CapacityMax,
+            slot.CapacityMin,
+            occupiedCount,
+            isFull,
             slot.Status.ToString(),
-            bookingStatus?.ToString(),
+            bookingStatus,
             slot.CreatedAtUtc,
             null,
             null,
             slot.TrainerProfile?.PricePerSession);
+    }
 }
