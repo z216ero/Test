@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useMemo, useEffect, useState } from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import { getCities, getDistricts } from '@api/lookupsApi';
 import { t } from '@i18n';
 import { useAppQuery } from '@query/hooks';
@@ -7,7 +7,7 @@ import { keys } from '@query/keys';
 import { AppIcon } from '@ui/AppIcon';
 import { TabScrollView } from '@ui/layout/TabScrollView';
 import type { AuthStackParamList, ProfileStackParamList } from '@app/navigation/types';
-import { Button, Input, ScrollView, Text, XStack, YStack } from 'tamagui';
+import { Button, Input, Text, XStack, YStack } from 'tamagui';
 
 type Props =
   | NativeStackScreenProps<AuthStackParamList, 'LocationSearch'>
@@ -46,13 +46,23 @@ export function LocationSearchScreen({ navigation, route }: Props) {
     queryFn: ({ signal }) => getDistricts(cityId ?? undefined, districtQuery, { signal }),
   });
 
-  const items = mode === 'city' ? citiesQuery.data ?? [] : districtsQuery.data ?? [];
+  const items = useMemo(
+    () => (mode === 'city' ? citiesQuery.data ?? [] : districtsQuery.data ?? []),
+    [citiesQuery.data, districtsQuery.data, mode]
+  );
   const isLoading = mode === 'city' ? citiesQuery.isLoading : districtsQuery.isLoading;
-
-  const isEmpty = !isLoading && items.length === 0;
   const showCityRequired = mode === 'district' && !cityId;
+  const isEmpty = !isLoading && items.length === 0;
+  const normalizedInput = query.trim();
+  const hasExactMatch = items.some(
+    (item) => item.name?.trim().toLowerCase() === normalizedInput.toLowerCase()
+  );
+  const canUseTypedValue = !showCityRequired
+    && normalizedInput.length > 0
+    && !isLoading
+    && !hasExactMatch;
 
-  const handleSelect = (id?: number | null, name?: string | null) => {
+  const handleSelect = useCallback((id?: number | null, name?: string | null) => {
     if (!name) {
       return;
     }
@@ -96,7 +106,7 @@ export function LocationSearchScreen({ navigation, route }: Props) {
         cityName: cityName ?? null,
       },
     });
-  };
+  }, [cityId, cityName, mode, navigation, returnTo]);
 
   const renderList = useMemo(() => {
     if (showCityRequired) {
@@ -107,16 +117,24 @@ export function LocationSearchScreen({ navigation, route }: Props) {
       );
     }
 
-    if (isEmpty) {
-      return (
-        <Text fontSize="$3" color="$muted">
-          {t('location.search.empty')}
-        </Text>
-      );
-    }
-
     return (
       <YStack gap="$2">
+        {canUseTypedValue ? (
+          <Button
+            unstyled
+            paddingVertical="$3"
+            paddingHorizontal="$2"
+            borderBottomWidth={1}
+            borderColor="$border"
+            onPress={() => handleSelect(null, normalizedInput)}
+          >
+            <Text fontSize="$4" color="$text" fontWeight="700">
+              {mode === 'city'
+                ? t('location.search.useTypedCity', { value: normalizedInput })
+                : t('location.search.useTypedDistrict', { value: normalizedInput })}
+            </Text>
+          </Button>
+        ) : null}
         {items.map((item) => (
           <Button
             key={`${mode}-${item.id ?? item.name}`}
@@ -132,9 +150,14 @@ export function LocationSearchScreen({ navigation, route }: Props) {
             </Text>
           </Button>
         ))}
+        {isEmpty ? (
+          <Text fontSize="$3" color="$muted">
+            {t('location.search.empty')}
+          </Text>
+        ) : null}
       </YStack>
     );
-  }, [handleSelect, isEmpty, items, mode, showCityRequired]);
+  }, [canUseTypedValue, handleSelect, isEmpty, items, mode, normalizedInput, showCityRequired]);
 
   return (
     <YStack flex={1} backgroundColor="$background">
