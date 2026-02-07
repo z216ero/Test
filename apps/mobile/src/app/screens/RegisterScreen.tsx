@@ -24,8 +24,51 @@ import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
 import { registerPushTokenIfPossible } from '@notifications/pushRegistration';
 import { getDefaultLookupCode } from '@app/utils/lookups';
+import type { LookupItem } from '@api/lookupsApi';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
+
+const fallbackRoleOptions: LookupItem[] = [
+  {
+    code: 'Client',
+    label: 'Client',
+    isDefault: true,
+    isTrainerRole: false,
+    isClientRole: true,
+  },
+  {
+    code: 'Trainer',
+    label: 'Trainer',
+    isDefault: false,
+    isTrainerRole: true,
+    isClientRole: false,
+  },
+];
+
+const fallbackGenderOptions: LookupItem[] = [
+  { code: 'Male', label: 'Male', isDefault: true, isAny: false },
+  { code: 'Female', label: 'Female', isDefault: false, isAny: false },
+];
+
+const getRoleLabel = (code: string): string => {
+  if (code === 'Trainer') {
+    return t('auth.register.roleTrainer');
+  }
+  if (code === 'Client') {
+    return t('auth.register.roleClient');
+  }
+  return code;
+};
+
+const getGenderLabel = (code: string): string => {
+  if (code === 'Male') {
+    return t('auth.register.genderMale');
+  }
+  if (code === 'Female') {
+    return t('auth.register.genderFemale');
+  }
+  return code;
+};
 
 export function RegisterScreen({ navigation, route }: Props) {
   const [email, setEmail] = useState('');
@@ -55,13 +98,21 @@ export function RegisterScreen({ navigation, route }: Props) {
   });
 
 
-  const roleOptions = rolesQuery.data ?? [];
-  const genderOptionsAll = gendersQuery.data ?? [];
-  const genderOptions = useMemo(
-    () => genderOptionsAll.filter((item) => !item.isAny),
-    [genderOptionsAll]
+  const roleOptions = useMemo(
+    () => (rolesQuery.data?.length ? rolesQuery.data : fallbackRoleOptions),
+    [rolesQuery.data]
   );
-  const specializationOptions = specializationsQuery.data ?? [];
+  const genderOptions = useMemo(
+    () => {
+      const filtered = (gendersQuery.data ?? []).filter((item) => !item.isAny);
+      return filtered.length > 0 ? filtered : fallbackGenderOptions;
+    },
+    [gendersQuery.data]
+  );
+  const specializationOptions = useMemo(
+    () => specializationsQuery.data ?? [],
+    [specializationsQuery.data]
+  );
 
   const defaultRole = useMemo(() => getDefaultLookupCode(roleOptions), [roleOptions]);
   const defaultGender = useMemo(() => getDefaultLookupCode(genderOptions), [genderOptions]);
@@ -297,7 +348,7 @@ export function RegisterScreen({ navigation, route }: Props) {
                   flex={1}
                   minHeight="$10"
                 >
-                  {item.label}
+                  {getRoleLabel(item.code)}
                 </Button>
               );
             })}
@@ -324,7 +375,7 @@ export function RegisterScreen({ navigation, route }: Props) {
                   flex={1}
                   minHeight="$10"
                 >
-                  {item.label}
+                  {getGenderLabel(item.code)}
                 </Button>
               );
             })}

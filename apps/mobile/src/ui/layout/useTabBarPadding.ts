@@ -1,4 +1,5 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useContext } from 'react';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import config from '../../../tamagui.config.cjs';
 
 type SpaceTokenKey = keyof typeof config.tokens.space;
@@ -16,12 +17,7 @@ const resolveTokenValue = <T,>(value: TokenValue<T> | undefined): T | undefined 
   value && isTokenValue(value) ? value.val : value;
 
 export const useTabBarPadding = (options: TabBarPaddingOptions = {}) => {
-  let tabBarHeight = 0;
-  try {
-    tabBarHeight = useBottomTabBarHeight();
-  } catch {
-    tabBarHeight = 0;
-  }
+  const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
   const baseSpaceKey = (options.baseSpaceToken ?? 6) as SpaceTokenKey;
   const baseSpace = resolveTokenValue<number>(config.tokens.space[baseSpaceKey]) ?? 0;
   const extraTokenKey = options.extraBottomToken;

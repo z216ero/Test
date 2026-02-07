@@ -85,6 +85,9 @@ $RECYCLE.BIN/
 .vscode/
 *.swp
 *.swo
+
+# Local temporary build dirs
+.tmp_*/
 # Certificates
 **/*.pfx
 **/*.crt
