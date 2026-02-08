@@ -4,10 +4,9 @@ import {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, RefreshControl } from 'react-native';
-import { Button, Text, XStack, YStack } from 'tamagui';
+import { Button, Text, YStack } from 'tamagui';
 import {
   attendanceActionsAvailable,
   cancelTrainerSlot,
@@ -20,6 +19,7 @@ import type { SlotDto } from '@generated/api';
 import { t } from '@i18n';
 import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
+import { IOSDatePickerCard } from '@ui/components';
 import { useToast } from '@ui/feedback/useToast';
 import { useTabBarPadding } from '@ui/layout/useTabBarPadding';
 import { TabScrollView } from '@ui/layout/TabScrollView';
@@ -45,6 +45,8 @@ import {
   markSlotHighlightSeen,
   usePushIndicators,
 } from '@notifications/pushIndicators';
+import { ScheduleCompletedTodaySection } from './schedule/ui/ScheduleCompletedTodaySection';
+import { ScheduleSkeleton } from './schedule/ui/ScheduleSkeleton';
 
 const FUTURE_DATE_RANGE_DAYS = 14;
 const PAST_DATE_RANGE_DAYS = 14;
@@ -78,102 +80,27 @@ const sortByStart = (a: SlotDto, b: SlotDto) => {
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, 'ScheduleHome'>;
 
-type CompletedSectionProps = {
-  open: boolean;
-  count: number;
-  slots: SlotDto[];
-  nowTs: number;
-  onToggle: () => void;
-  getHighlight?: (slot: SlotDto) => { color: 'success' | 'destructive'; chipText: string } | null;
-};
-
-const ScheduleSkeleton = () => (
-  <YStack gap="$4">
-    {Array.from({ length: 3 }).map((_, index) => (
-      <YStack
-        key={`skeleton-${index}`}
-        gap="$3"
-        padding="$4"
-        backgroundColor="$background"
-        borderRadius="$5"
-        borderWidth={1}
-        borderColor="$border"
-      >
-        <YStack height={16} width="60%" backgroundColor="$surfaceMuted" borderRadius="$3" />
-        <YStack height={12} width="40%" backgroundColor="$surfaceMuted" borderRadius="$3" />
-        <XStack gap="$3" alignItems="center">
-          <YStack width="$10" height="$10" borderRadius="$6" backgroundColor="$surfaceMuted" />
-          <YStack gap="$2" flex={1}>
-            <YStack height={14} width="70%" backgroundColor="$surfaceMuted" borderRadius="$3" />
-            <YStack height={12} width="50%" backgroundColor="$surfaceMuted" borderRadius="$3" />
-          </YStack>
-        </XStack>
-      </YStack>
-    ))}
-  </YStack>
-);
-
-const CompletedTodaySection = ({
-  open,
-  count,
-  slots,
-  nowTs,
-  onToggle,
-  getHighlight,
-}: CompletedSectionProps) => {
-  if (count === 0) {
-    return null;
+const resolveInitialSelectedDate = (initialDateIsoLocal?: string): Date => {
+  if (!initialDateIsoLocal) {
+    return startOfLocalDay(new Date());
   }
-
-  return (
-    <YStack gap="$3">
-      <Button
-        unstyled
-        backgroundColor="$surfaceMuted"
-        borderWidth={1}
-        borderColor="$border"
-        borderRadius="$4"
-        padding="$3"
-        onPress={onToggle}
-      >
-        <XStack alignItems="center" justifyContent="space-between">
-          <Text fontSize="$3" fontWeight="600" color="$text">
-            {t('schedule.completedTodayTitle', { count })}
-          </Text>
-          <YStack
-            style={{
-              transform: [{ rotate: open ? '90deg' : '0deg' }],
-            }}
-          >
-            <AppIcon name="chevronRight" size={18} color="$muted" />
-          </YStack>
-        </XStack>
-      </Button>
-      {open ? (
-        <YStack gap="$3">
-          {slots.map((slot) => (
-            <SlotCard
-              key={slot.id ?? `${slot.startsAtUtc ?? 'slot'}`}
-              slot={slot}
-              nowTs={nowTs}
-              onPress={undefined}
-              variant="muted"
-              highlight={getHighlight ? getHighlight(slot) : null}
-            />
-          ))}
-        </YStack>
-      ) : null}
-    </YStack>
-  );
+  const parsed = new Date(initialDateIsoLocal);
+  if (Number.isNaN(parsed.getTime())) {
+    return startOfLocalDay(new Date());
+  }
+  return startOfLocalDay(parsed);
 };
 
-export function ScheduleScreen({ navigation }: Props) {
+export function ScheduleScreen({ navigation, route }: Props) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { contentBottomPadding } = useTabBarPadding();
   const { slotHighlights } = usePushIndicators();
+  const initialDateIsoLocal = route.params?.initialDateIsoLocal;
 
-  const [selectedDate, setSelectedDate] = useState(() => startOfLocalDay(new Date()));
+  const [selectedDate, setSelectedDate] = useState(() =>
+    resolveInitialSelectedDate(initialDateIsoLocal)
+  );
   const [todayDate, setTodayDate] = useState(() => startOfLocalDay(new Date()));
   const [tomorrowDate, setTomorrowDate] = useState(() => addDays(startOfLocalDay(new Date()), 1));
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -187,6 +114,13 @@ export function ScheduleScreen({ navigation }: Props) {
   useEffect(() => {
     todayRef.current = todayDate;
   }, [todayDate]);
+
+  useEffect(() => {
+    const nextDate = resolveInitialSelectedDate(initialDateIsoLocal);
+    setSelectedDate((current) =>
+      isSameLocalDay(current, nextDate) ? current : nextDate
+    );
+  }, [initialDateIsoLocal]);
 
   const dateRange = useMemo(() => {
     const dayStart = startOfLocalDay(selectedDate);
@@ -386,6 +320,10 @@ export function ScheduleScreen({ navigation }: Props) {
 
   const openSlot = (slot: SlotDto) => {
     if (!slot.id) {
+      return;
+    }
+    if ((slot.slotType ?? '').toLowerCase() === 'group') {
+      navigation.navigate('SlotDetails', { slot });
       return;
     }
     markSlotHighlightSeen(slot.id).catch(() => {});
@@ -635,7 +573,7 @@ export function ScheduleScreen({ navigation }: Props) {
           />
         ))}
         {isSelectedToday ? (
-          <CompletedTodaySection
+          <ScheduleCompletedTodaySection
             open={completedExpanded}
             count={completedTodaySlots.length}
             slots={completedTodaySlots}
@@ -679,31 +617,13 @@ export function ScheduleScreen({ navigation }: Props) {
           />
           {/* iOS-пикер даты */}
           {pickerVisible && Platform.OS === 'ios' ? (
-            <YStack
-              padding="$4"
-              borderWidth={1}
-              borderColor="$border"
-              borderRadius="$4"
-              backgroundColor="$background"
-              gap="$3"
-            >
-              <DateTimePicker
-                value={selectedDate}
-                mode="date"
-                display="inline"
-                minimumDate={minDate}
-                maximumDate={maxDate}
-                onChange={handleDateChange}
-              />
-              <Button
-                backgroundColor="$surfaceMuted"
-                borderWidth={1}
-                borderColor="$border"
-                onPress={() => setPickerVisible(false)}
-              >
-                {t('common.close')}
-              </Button>
-            </YStack>
+            <IOSDatePickerCard
+              value={selectedDate}
+              minimumDate={minDate}
+              maximumDate={maxDate}
+              onChange={handleDateChange}
+              onClose={() => setPickerVisible(false)}
+            />
           ) : null}
           {/* Сводка по дню */}
           {summaryLabel ? (

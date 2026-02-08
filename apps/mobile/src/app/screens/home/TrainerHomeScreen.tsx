@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { type QueryKey, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Image, RefreshControl } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Alert, RefreshControl } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   attendanceActionsAvailable,
@@ -10,17 +10,16 @@ import {
   markSlotNoShow,
 } from '@api/trainerSlotsApi';
 import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
-import { getAccessToken } from '@auth/tokenStorage';
 import type { SlotDto } from '@generated/api';
 import { t } from '@i18n';
 import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
 import { AppIcon } from '@ui/AppIcon';
+import { useAuthorizedImageSource } from '@ui/components';
 import { useToast } from '@ui/feedback/useToast';
 import { useTabBarPadding } from '@ui/layout/useTabBarPadding';
 import { TabScrollView } from '@ui/layout/TabScrollView';
 import { formatTimeRangeRu } from '@utils/datetime';
-import { buildAbsoluteUrl } from '@utils/url';
 import {
   canMarkCompleted,
   canMarkNoShow,
@@ -32,9 +31,13 @@ import {
   getUiSlotStatus,
 } from '@app/components/schedule/slotHelpers';
 import type { HomeMeState, HomeNavigation, HomeUser } from './types';
+import { TrainerHomeAlertsCard } from './trainer-home/ui/TrainerHomeAlertsCard';
+import { TrainerHomeHeader } from './trainer-home/ui/TrainerHomeHeader';
+import { TrainerNowNextCard } from './trainer-home/ui/TrainerNowNextCard';
 
 const NOW_REFRESH_INTERVAL_MS = 30 * 1000;
 const UPCOMING_ALERT_WINDOW_MS = 30 * 60 * 1000;
+const FUTURE_HOME_RANGE_DAYS = 14;
 
 const startOfLocalDay = (value: Date) =>
   new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
@@ -42,27 +45,29 @@ const startOfLocalDay = (value: Date) =>
 const endOfLocalDay = (value: Date) =>
   new Date(value.getFullYear(), value.getMonth(), value.getDate(), 23, 59, 59, 999);
 
+const addDays = (value: Date, days: number) => {
+  const next = new Date(value);
+  next.setDate(next.getDate() + days);
+  return next;
+};
+
 const isSameLocalDay = (left: Date, right: Date) =>
   left.getFullYear() === right.getFullYear()
   && left.getMonth() === right.getMonth()
   && left.getDate() === right.getDate();
 
+const toStartOfLocalDayIso = (value: string): string | null => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return startOfLocalDay(parsed).toISOString();
+};
+
 const sortByStart = (a: SlotDto, b: SlotDto) => {
   const aTime = getSlotStartTimestamp(a) ?? 0;
   const bTime = getSlotStartTimestamp(b) ?? 0;
   return aTime - bTime;
-};
-
-const getInitials = (name?: string | null) => {
-  const value = name?.trim();
-  if (!value) {
-    return t('common.initialsPlaceholder');
-  }
-  const parts = value.split(' ').filter(Boolean);
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }
-  return value.slice(0, 2).toUpperCase();
 };
 
 type TrainerHomeScreenProps = {
@@ -84,11 +89,10 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
 
   const [todayDate, setTodayDate] = useState(() => startOfLocalDay(new Date()));
   const [nowTs, setNowTs] = useState(() => Date.now());
-  const [avatarToken, setAvatarToken] = useState<string | null>(null);
 
   const dateRange = useMemo(() => {
     const startLocal = startOfLocalDay(todayDate);
-    const endLocal = endOfLocalDay(todayDate);
+    const endLocal = endOfLocalDay(addDays(todayDate, FUTURE_HOME_RANGE_DAYS));
     return {
       fromUtc: startLocal.toISOString(),
       toUtc: endLocal.toISOString(),
@@ -99,19 +103,9 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     queryKey: keys.trainerSlots.mine(dateRange),
     enabled: Boolean(me),
     queryFn: ({ signal }) => getMyTrainerSlots(dateRange, { signal }),
+    refetchInterval: NOW_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: false,
   });
-
-  useEffect(() => {
-    let cancelled = false;
-    getAccessToken().then((token) => {
-      if (!cancelled) {
-        setAvatarToken(token);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -141,12 +135,16 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
       .sort(sortByStart);
   }, [trainerSlotsQuery.data, todayDate]);
 
-  const activeBookedSlots = useMemo(() =>
-    sortedTodaySlots.filter((slot) => {
+  const activeBookedSlots = useMemo(() => {
+    const slots = trainerSlotsQuery.data ?? [];
+    return slots
+      .slice()
+      .sort(sortByStart)
+      .filter((slot) => {
       const status = getUiSlotStatus(slot, nowTs);
       return status === 'booked' || status === 'needs_attention';
-    }), [sortedTodaySlots, nowTs]
-  );
+      });
+  }, [trainerSlotsQuery.data, nowTs]);
 
   const currentSlot = useMemo(() =>
     activeBookedSlots.find((slot) => {
@@ -216,35 +214,27 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
   const highlightTimeLabel = highlightTimes
     ? formatTimeRangeRu(highlightTimes.start, highlightTimes.end)
     : t('common.empty');
+  const highlightSlotType = (highlightSlot?.slotType ?? '').toLowerCase().trim();
+  const highlightIsGroup = highlightSlotType === 'group';
   const highlightClientName = highlightSlot ? getClientName(highlightSlot) : null;
+  const highlightTitleLabel = highlightIsGroup
+    ? t('bookings.trainingTypeGroup')
+    : t('bookings.trainingTypeIndividual');
+  const highlightDetailLabel = highlightIsGroup
+    ? typeof highlightSlot?.capacityMax === 'number' && highlightSlot.capacityMax > 0
+      ? t('home.trainer.groupClients', {
+        occupied: highlightSlot.occupiedCount ?? 0,
+        capacity: highlightSlot.capacityMax,
+      })
+      : t('home.trainer.groupClientsOpen', {
+        occupied: highlightSlot?.occupiedCount ?? 0,
+      })
+    : highlightClientName;
   const highlightAvatarUrl = highlightSlot ? getClientAvatarUrl(highlightSlot) : null;
-  const highlightAvatarAbsolute = highlightAvatarUrl
-    ? buildAbsoluteUrl(highlightAvatarUrl)
-    : null;
-  const profileAvatarUrl = me?.avatarUrl ?? null;
-  const profileAvatarAbsolute = profileAvatarUrl
-    ? buildAbsoluteUrl(profileAvatarUrl)
-    : null;
-
-  const highlightAvatarSource = useMemo(() => {
-    if (!highlightAvatarAbsolute || !avatarToken) {
-      return null;
-    }
-    return {
-      uri: highlightAvatarAbsolute,
-      headers: { Authorization: `Bearer ${avatarToken}` },
-    };
-  }, [avatarToken, highlightAvatarAbsolute]);
-
-  const profileAvatarSource = useMemo(() => {
-    if (!profileAvatarAbsolute || !avatarToken) {
-      return null;
-    }
-    return {
-      uri: profileAvatarAbsolute,
-      headers: { Authorization: `Bearer ${avatarToken}` },
-    };
-  }, [avatarToken, profileAvatarAbsolute]);
+  const highlightAvatarSource = useAuthorizedImageSource(
+    highlightIsGroup ? null : highlightAvatarUrl
+  );
+  const profileAvatarSource = useAuthorizedImageSource(me?.avatarUrl ?? null);
 
   const updateSlotsCache = useCallback((slotId: string, updater: (slot: SlotDto) => SlotDto) => {
     queryClient.setQueriesData<SlotDto[]>(
@@ -378,178 +368,6 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     });
   };
 
-  const renderTrainerNowNext = () => {
-    const isLoading = isMeLoading || trainerSlotsQuery.isLoading;
-    const hasError = Boolean(meError || trainerSlotsQuery.error);
-    const sectionTitle = t('home.trainer.sectionTitle');
-
-    if (isLoading) {
-      return (
-        <YStack
-          gap="$3"
-          padding="$5"
-          backgroundColor="$background"
-          borderRadius="$6"
-          borderWidth={1}
-          borderColor="$border"
-        >
-          <Text fontSize="$4" fontWeight="700" color="$text">
-            {sectionTitle}
-          </Text>
-          <Text fontSize="$3" color="$muted">
-            {t('common.loading')}
-          </Text>
-        </YStack>
-      );
-    }
-
-    if (hasError) {
-      return (
-        <YStack
-          gap="$3"
-          padding="$5"
-          backgroundColor="$background"
-          borderRadius="$6"
-          borderWidth={1}
-          borderColor="$border"
-        >
-          <Text fontSize="$4" fontWeight="700" color="$text">
-            {sectionTitle}
-          </Text>
-          <Text fontSize="$3" color="$muted">
-            {t('errors.generic')}
-          </Text>
-          <Button
-            backgroundColor="$accent"
-            color="$accentText"
-            borderRadius="$4"
-            minHeight="$9"
-            paddingHorizontal="$4"
-            onPress={onRefresh}
-          >
-            {t('common.retry')}
-          </Button>
-        </YStack>
-      );
-    }
-
-    if (!highlightSlot) {
-      return (
-        <YStack
-          gap="$3"
-          padding="$5"
-          backgroundColor="$background"
-          borderRadius="$6"
-          borderWidth={1}
-          borderColor="$border"
-        >
-          <Text fontSize="$4" fontWeight="700" color="$text">
-            {sectionTitle}
-          </Text>
-          <Text fontSize="$3" color="$muted">
-            {t('home.trainer.noTrainings')}
-          </Text>
-        </YStack>
-      );
-    }
-
-    const header = currentSlot
-      ? t('home.trainer.nowTitle')
-      : t('home.trainer.nextTitle');
-
-    return (
-      <YStack
-        gap="$3"
-        padding="$5"
-        backgroundColor="$background"
-        borderRadius="$6"
-        borderWidth={1}
-        borderColor="$border"
-        minHeight="200"
-      >
-        <YStack gap="$1">
-          <Text fontSize="$4" fontWeight="700" color="$text">
-            {header}
-          </Text>
-          <Text fontSize="$3" color="$muted">
-            {highlightTimeLabel}
-          </Text>
-        </YStack>
-        <XStack gap="$3" alignItems="center">
-          <YStack
-            width="$10"
-            height="$10"
-            borderRadius="$6"
-            backgroundColor="$surfaceMuted"
-            borderWidth={1}
-            borderColor="$border"
-            alignItems="center"
-            justifyContent="center"
-            overflow="hidden"
-          >
-            {highlightAvatarSource ? (
-              <Image
-                source={highlightAvatarSource}
-                style={{ width: '100%', height: '100%' }}
-                resizeMode="cover"
-              />
-            ) : (
-              <Text fontSize="$4" color="$muted">
-                {getInitials(highlightClientName)}
-              </Text>
-            )}
-          </YStack>
-          <YStack gap="$1" flex={1}>
-            <Text fontSize="$4" fontWeight="700" color="$text">
-              {highlightClientName ?? t('common.empty')}
-            </Text>
-          </YStack>
-        </XStack>
-        {currentSlot && attendanceActionsAvailable ? (
-          <XStack gap="$3" flexWrap="wrap">
-            {canMarkCompleted(currentSlot, nowTs) ? (
-              <Button
-                flex={1}
-                minHeight="$9"
-                backgroundColor="$accent"
-                color="$accentText"
-                borderRadius="$5"
-                onPress={() => handleMarkCompleted(currentSlot)}
-              >
-                {t('slotDetails.markCompleted')}
-              </Button>
-            ) : null}
-            {canMarkNoShow(currentSlot, nowTs) ? (
-              <Button
-                flex={1}
-                minHeight="$9"
-                backgroundColor="$surfaceMuted"
-                borderRadius="$5"
-                borderWidth={1}
-                borderColor="$border"
-                onPress={() => handleMarkNoShow(currentSlot)}
-              >
-                {t('slotDetails.markNoShow')}
-              </Button>
-            ) : null}
-          </XStack>
-        ) : null}
-        {!currentSlot ? (
-          <Button
-            backgroundColor="$surfaceMuted"
-            borderRadius="$5"
-            borderWidth={1}
-            borderColor="$border"
-            minHeight="$9"
-            onPress={() => navigation.navigate('Schedule', { screen: 'ScheduleHome' })}
-          >
-            {t('home.trainer.goToSchedule')}
-          </Button>
-        ) : null}
-      </YStack>
-    );
-  };
-
   const showSummary = !isMeLoading
     && !trainerSlotsQuery.isLoading
     && !meError
@@ -578,65 +396,41 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
         extraBottom={96}
       >
         <YStack gap="$4">
-          <XStack alignItems="center" justifyContent="space-between">
-            <Text fontSize="$8" fontWeight="700" color="$text">
-              {t('home.trainer.title')}
-            </Text>
-            <YStack
-              width="$10"
-              height="$10"
-              borderRadius="$6"
-              backgroundColor="$background"
-              borderWidth={1}
-              borderColor="$border"
-              alignItems="center"
-              justifyContent="center"
-              overflow="hidden"
-            >
-              {profileAvatarSource ? (
-                <Image
-                  source={profileAvatarSource}
-                  style={{ width: '100%', height: '100%' }}
-                  resizeMode="cover"
-                />
-              ) : (
-                <AppIcon name="user" size={20} color="$muted" />
-              )}
-            </YStack>
-          </XStack>
-          {renderTrainerNowNext()}
+          <TrainerHomeHeader profileAvatarSource={profileAvatarSource} />
+          <TrainerNowNextCard
+            isLoading={isMeLoading || trainerSlotsQuery.isLoading}
+            hasError={Boolean(meError || trainerSlotsQuery.error)}
+            highlightSlot={highlightSlot ?? null}
+            currentSlot={currentSlot ?? null}
+            highlightTimeLabel={highlightTimeLabel}
+            highlightTitleLabel={highlightTitleLabel}
+            highlightDetailLabel={highlightDetailLabel}
+            isGroupTraining={highlightIsGroup}
+            highlightAvatarSource={highlightAvatarSource}
+            nowTs={nowTs}
+            showAttendanceActions={attendanceActionsAvailable}
+            onRetry={onRefresh}
+            onMarkCompleted={handleMarkCompleted}
+            onMarkNoShow={handleMarkNoShow}
+            onGoToSchedule={() => {
+              const initialDateIsoLocal = highlightSlot?.startsAtUtc
+                ? toStartOfLocalDayIso(highlightSlot.startsAtUtc)
+                : null;
+
+              navigation.navigate('Schedule', {
+                screen: 'ScheduleHome',
+                params: initialDateIsoLocal
+                  ? { initialDateIsoLocal }
+                  : undefined,
+              });
+            }}
+          />
           {summaryLabel ? (
             <Text fontSize="$4" fontWeight="600" color="$text">
               {summaryLabel}
             </Text>
           ) : null}
-          {alerts.length > 0 ? (
-            <YStack
-              gap="$3"
-              padding="$4"
-              backgroundColor="$background"
-              borderRadius="$6"
-              borderWidth={1}
-              borderColor="$border"
-            >
-              <XStack alignItems="center" gap="$2">
-                <AppIcon name="alertCircle" size={18} color="$muted" />
-                <Text fontSize="$4" fontWeight="600" color="$text">
-                  {t('home.trainer.alertsTitle')}
-                </Text>
-              </XStack>
-              {alerts.map((item) => (
-                <XStack key={item} gap="$2" alignItems="flex-start">
-                  <YStack marginTop="$1">
-                    <AppIcon name="info" size={16} color="$muted" />
-                  </YStack>
-                  <Text fontSize="$3" color="$text" flex={1}>
-                    {item}
-                  </Text>
-                </XStack>
-              ))}
-            </YStack>
-          ) : null}
+          <TrainerHomeAlertsCard alerts={alerts} />
         </YStack>
       </TabScrollView>
       <Button

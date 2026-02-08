@@ -1,12 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Image } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import type { SlotDto } from '@generated/api';
 import { t } from '@i18n';
 import { formatTimeRangeRu } from '@utils/datetime';
-import { buildAbsoluteUrl } from '@utils/url';
-import { getAccessToken } from '@auth/tokenStorage';
 import { AppIcon } from '@ui/AppIcon';
+import { Avatar, useAuthorizedImageSource } from '@ui/components';
 import {
   getClientAvatarUrl,
   getClientName,
@@ -14,18 +11,6 @@ import {
   getUiSlotStatus,
   uiSlotStatusMeta,
 } from './slotHelpers';
-
-const getInitials = (name?: string | null) => {
-  const value = name?.trim();
-  if (!value) {
-    return t('common.initialsPlaceholder');
-  }
-  const parts = value.split(' ').filter(Boolean);
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }
-  return value.slice(0, 2).toUpperCase();
-};
 
 type SlotCardProps = {
   slot: SlotDto;
@@ -45,7 +30,6 @@ export function SlotCard({
   variant = 'default',
   highlight = null,
 }: SlotCardProps) {
-  const [avatarToken, setAvatarToken] = useState<string | null>(null);
   const statusType = getUiSlotStatus(slot, nowTs);
   const status = uiSlotStatusMeta[statusType];
   const statusLabel = t(status.labelKey);
@@ -53,33 +37,15 @@ export function SlotCard({
   const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : '';
   const clientName = statusType !== 'available' ? getClientName(slot) : null;
   const avatarUrl = statusType !== 'available' ? getClientAvatarUrl(slot) : null;
-  const resolvedAvatar = avatarUrl ? buildAbsoluteUrl(avatarUrl) : null;
-  const avatarSource = useMemo(() => {
-    if (!resolvedAvatar || !avatarToken) {
-      return null;
-    }
-    return {
-      uri: resolvedAvatar,
-      headers: { Authorization: `Bearer ${avatarToken}` },
-    };
-  }, [avatarToken, resolvedAvatar]);
-
-  useEffect(() => {
-    let cancelled = false;
-    getAccessToken().then((token) => {
-      if (!cancelled) {
-        setAvatarToken(token);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const avatarSource = useAuthorizedImageSource(avatarUrl);
 
   const isMuted = variant === 'muted';
   const isNeedsAttention = statusType === 'needs_attention';
   const resolvedHighlight = isNeedsAttention ? null : highlight;
   const titleColor = isMuted ? '$muted' : '$text';
+  const isGroup = (slot.slotType ?? '').toLowerCase() === 'group';
+  const occupiedCount = slot.occupiedCount ?? 0;
+  const capacityMax = slot.capacityMax ?? null;
   const statusColor = status.dotColor;
   const labelColor = status.labelColor;
   const baseBackground = isMuted ? '$surfaceMuted' : '$background';
@@ -124,6 +90,12 @@ export function SlotCard({
             {timeLabel || t('common.empty')}
           </Text>
           <XStack alignItems="center" gap="$2">
+            <AppIcon name={isGroup ? 'users' : 'user'} size={14} color="$muted" />
+            {isGroup && capacityMax ? (
+              <Text fontSize="$2" color={labelColor}>
+                {`${occupiedCount}/${capacityMax}`}
+              </Text>
+            ) : null}
             {resolvedHighlight ? (
               <XStack
                 paddingHorizontal="$2"
@@ -154,29 +126,13 @@ export function SlotCard({
         </XStack>
         {clientName ? (
           <XStack alignItems="center" gap="$3" minHeight="$9">
-            <YStack
-              width="$9"
-              height="$9"
+            <Avatar
+              name={clientName}
+              source={avatarSource}
+              size="$9"
               borderRadius="$6"
-              backgroundColor="$surfaceMuted"
-              borderWidth={1}
-              borderColor="$border"
-              alignItems="center"
-              justifyContent="center"
-              overflow="hidden"
-            >
-              {avatarSource ? (
-                <Image
-                  source={avatarSource}
-                  style={{ width: '100%', height: '100%' }}
-                  resizeMode="cover"
-                />
-              ) : (
-                <Text fontSize="$4" color="$muted">
-                  {getInitials(clientName)}
-                </Text>
-              )}
-            </YStack>
+              textSize="$4"
+            />
             <YStack gap="$1" flex={1}>
               <Text fontSize="$4" fontWeight="700" color={isMuted ? '$muted' : '$text'}>
                 {clientName}

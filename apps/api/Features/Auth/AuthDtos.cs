@@ -6,9 +6,9 @@ public sealed record RegisterRequest(
     string Role,
     string Name,
     string CityName,
-    string? DistrictName,
-    string? Gender,
-    IReadOnlyList<string>? Specializations);
+    string? DistrictName = null,
+    string? Gender = null,
+    IReadOnlyList<string>? Specializations = null);
 
 public sealed record LoginRequest(string Email, string Password);
 

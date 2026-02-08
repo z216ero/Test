@@ -9,10 +9,9 @@ import {
   shouldShowErrorToast,
   type PresentedError,
 } from '@api/ApiErrorPresenter';
-import { getTrainingTypeLookups } from '@api/lookupsApi';
 import { t } from '@i18n';
 import { onBookingCancelled } from '@notifications/orchestrator';
-import { useAppMutation, useAppQuery } from '@query/hooks';
+import { useAppMutation } from '@query/hooks';
 import { keys } from '@query/keys';
 import { useToast } from '@ui/feedback/useToast';
 import { Banner } from '@ui/feedback/Banner';
@@ -28,7 +27,6 @@ import {
 } from '@app/components/bookings/bookingUtils';
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 import type { BookingsStackParamList } from '@app/navigation/types';
-import { buildLookupMap } from '@app/utils/lookups';
 
 type Props = NativeStackScreenProps<BookingsStackParamList, 'BookingDetails'>;
 
@@ -43,7 +41,6 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
   const {
     slot,
     trainerName,
-    trainerTrainingTypes,
     trainerCityName,
     trainerDistrictName,
     trainerAvatarUrl,
@@ -53,33 +50,7 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
-  const trainingTypesQuery = useAppQuery({
-    queryKey: keys.lookups.trainingTypes(),
-    queryFn: ({ signal }) => getTrainingTypeLookups({ signal }),
-  });
-
-  const trainingTypeOptions = trainingTypesQuery.data ?? [];
-  const trainingTypeLabels = useMemo(
-    () => buildLookupMap(trainingTypeOptions),
-    [trainingTypeOptions]
-  );
-  const trainingTypeOrder = useMemo(
-    () => new Map(trainingTypeOptions.map((item, index) => [item.code, index])),
-    [trainingTypeOptions]
-  );
-  const trainingTypeCode = useMemo(() => {
-    const types = trainerTrainingTypes ?? [];
-    if (types.length === 0) {
-      return null;
-    }
-    return types
-      .slice()
-      .sort((left, right) => {
-        const leftIndex = trainingTypeOrder.get(left) ?? Number.MAX_SAFE_INTEGER;
-        const rightIndex = trainingTypeOrder.get(right) ?? Number.MAX_SAFE_INTEGER;
-        return leftIndex - rightIndex;
-      })[0] ?? null;
-  }, [trainerTrainingTypes, trainingTypeOrder]);
+  const trainingTypeCode = slot.slotType ?? null;
   const isGroupTraining = trainingTypeCode === 'Group';
   const trainingTypeLabel = trainingTypeCode
     ? t(isGroupTraining ? 'bookings.trainingTypeGroup' : 'bookings.trainingTypeIndividual')

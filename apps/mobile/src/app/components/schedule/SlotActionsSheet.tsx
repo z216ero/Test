@@ -1,13 +1,10 @@
 import { Sheet } from '@tamagui/sheet';
-import { useEffect, useMemo, useState } from 'react';
-import { Image } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import type { SlotDto } from '@generated/api';
 import { t } from '@i18n';
 import { formatTimeRangeRu } from '@utils/datetime';
-import { getAccessToken } from '@auth/tokenStorage';
 import { AppIcon } from '@ui/AppIcon';
-import { buildAbsoluteUrl } from '@utils/url';
+import { Avatar, useAuthorizedImageSource } from '@ui/components';
 import {
   canCancelBookedSlot,
   canCancelSlot,
@@ -50,7 +47,6 @@ export function SlotActionsSheet({
   isMarkingNoShow,
   showAttendanceActions,
 }: SlotActionsSheetProps) {
-  const [avatarToken, setAvatarToken] = useState<string | null>(null);
   const statusType = slot ? getUiSlotStatus(slot, nowTs) : null;
   const statusMeta = statusType ? uiSlotStatusMeta[statusType] : null;
   const statusLabel = statusMeta ? t(statusMeta.labelKey) : null;
@@ -59,28 +55,7 @@ export function SlotActionsSheet({
   const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : '';
   const clientName = slot ? getClientName(slot) : null;
   const avatarUrl = slot ? getClientAvatarUrl(slot) : null;
-  const resolvedAvatar = avatarUrl ? buildAbsoluteUrl(avatarUrl) : null;
-  const avatarSource = useMemo(() => {
-    if (!resolvedAvatar || !avatarToken) {
-      return null;
-    }
-    return {
-      uri: resolvedAvatar,
-      headers: { Authorization: `Bearer ${avatarToken}` },
-    };
-  }, [avatarToken, resolvedAvatar]);
-
-  useEffect(() => {
-    let cancelled = false;
-    getAccessToken().then((token) => {
-      if (!cancelled) {
-        setAvatarToken(token);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const avatarSource = useAuthorizedImageSource(avatarUrl);
 
   const canMarkAttendance =
     !!slot?.id
@@ -98,18 +73,6 @@ export function SlotActionsSheet({
 
   const isActionPending =
     isCancelling || isMarkingCompleted || isMarkingNoShow;
-
-  const getInitials = (name?: string | null) => {
-    const value = name?.trim();
-    if (!value) {
-      return t('common.initialsPlaceholder');
-    }
-    const parts = value.split(' ').filter(Boolean);
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    }
-    return value.slice(0, 2).toUpperCase();
-  };
 
   return (
     <Sheet
@@ -136,29 +99,13 @@ export function SlotActionsSheet({
         {slot ? (
           <YStack gap="$4">
             <XStack alignItems="center" gap="$3">
-              <YStack
-                width="$10"
-                height="$10"
+              <Avatar
+                name={clientName}
+                source={avatarSource}
+                size="$10"
                 borderRadius="$7"
-                backgroundColor="$surfaceMuted"
-                borderWidth={1}
-                borderColor="$border"
-                alignItems="center"
-                justifyContent="center"
-                overflow="hidden"
-              >
-                {avatarSource ? (
-                  <Image
-                    source={avatarSource}
-                    style={{ width: '100%', height: '100%' }}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <Text fontSize="$4" color="$muted">
-                    {getInitials(clientName)}
-                  </Text>
-                )}
-              </YStack>
+                textSize="$4"
+              />
               <YStack gap="$1" flex={1}>
                 <Text fontSize="$5" fontWeight="700" color="$text">
                   {statusType === 'available'

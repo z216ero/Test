@@ -3,12 +3,10 @@ import {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, RefreshControl } from 'react-native';
-import { Button, Text, XStack, YStack } from 'tamagui';
-import type { AvailableSlotTrainerDto, SlotDto } from '@generated/api';
-import type { ClientBooking } from '@api/bookingsApi';
+import { XStack, YStack } from 'tamagui';
+import type { SlotDto } from '@generated/api';
 import { getClientUpcomingBookings } from '@api/bookingsApi';
 import { me } from '@api/authApi';
 import { getAvailableSlotsForClient } from '@api/slotsApi';
@@ -17,22 +15,21 @@ import { getGenderLookups, getSpecializationLookups } from '@api/lookupsApi';
 import { t } from '@i18n';
 import { useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
+import { IOSDatePickerCard } from '@ui/components';
 import { Banner } from '@ui/feedback/Banner';
 import { TabScrollView } from '@ui/layout/TabScrollView';
 import { EmptyState } from '@ui/states/EmptyState';
-import { AppIcon } from '@ui/AppIcon';
 import { DateStrip } from '@app/components/schedule/DateStrip';
 import { FilterSheet } from '@app/components/slots/FilterSheet';
-import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 import {
   DEFAULT_CLIENT_SLOTS_FILTERS,
   loadClientSlotsFilters,
   saveClientSlotsFilters,
   type ClientSlotsFilters,
 } from '@app/utils/clientSlotsFilters';
-import { formatTimeRangeRu } from '@utils/datetime';
-import { formatPrice } from '@utils/price';
 import type { SlotsStackParamList } from '@app/navigation/types';
+import { SlotsHeader } from './slots/ui/SlotsHeader';
+import { type SlotGroup, TrainerSlotGroupCard } from './slots/ui/TrainerSlotGroupCard';
 
 const DATE_RANGE_DAYS = 14;
 
@@ -78,48 +75,10 @@ const normalizeFilters = (
   };
 };
 
-const getSlotRange = (slot: SlotDto): { start: number; end: number } | null => {
-  if (!slot.startsAtUtc) {
-    return null;
-  }
-  const start = new Date(slot.startsAtUtc).getTime();
-  if (Number.isNaN(start)) {
-    return null;
-  }
-  const duration = slot.durationMinutes ?? 0;
-  return { start, end: start + duration * 60 * 1000 };
-};
-
-const hasTimeConflict = (slot: SlotDto, bookings: ClientBooking[]): boolean => {
-  const slotRange = getSlotRange(slot);
-  if (!slotRange) {
-    return false;
-  }
-  return bookings.some((booking) => {
-    const bookingRange = booking.slot ? getSlotRange(booking.slot) : null;
-    if (!bookingRange) {
-      return false;
-    }
-    return slotRange.start < bookingRange.end && bookingRange.start < slotRange.end;
-  });
-};
-
-const normalizeStatus = (value?: string | null) => value?.toLowerCase().trim();
-
-const isSlotOpen = (slot: SlotDto) => {
-  const normalized = normalizeStatus(slot.status);
-  return normalized === 'open' || normalized === 'available';
-};
-
 const sortSlotsByStart = (left: SlotDto, right: SlotDto) => {
   const leftTs = left.startsAtUtc ? new Date(left.startsAtUtc).getTime() : 0;
   const rightTs = right.startsAtUtc ? new Date(right.startsAtUtc).getTime() : 0;
   return leftTs - rightTs;
-};
-
-type SlotGroup = {
-  trainer: AvailableSlotTrainerDto;
-  slots: SlotDto[];
 };
 
 type Props = NativeStackScreenProps<SlotsStackParamList, 'SlotsList'>;
@@ -174,8 +133,14 @@ export function SlotsScreen({ navigation }: Props) {
     queryFn: ({ signal }) => me({ signal }),
   });
 
-  const specializationOptions = specializationsQuery.data ?? [];
-  const genderOptions = gendersQuery.data ?? [];
+  const specializationOptions = useMemo(
+    () => specializationsQuery.data ?? [],
+    [specializationsQuery.data]
+  );
+  const genderOptions = useMemo(
+    () => gendersQuery.data ?? [],
+    [gendersQuery.data]
+  );
   const specializationOrder = useMemo(
     () => new Map(specializationOptions.map((item, index) => [item.code, index])),
     [specializationOptions]
@@ -357,130 +322,6 @@ export function SlotsScreen({ navigation }: Props) {
     bookingsQuery.refetch();
   };
 
-  const renderSlotRow = (slot: SlotDto, trainer: AvailableSlotTrainerDto) => {
-    const times = slot.startsAtUtc ? new Date(slot.startsAtUtc) : null;
-    const range = times
-      ? {
-        start: times,
-        end: new Date(
-          times.getTime() + (slot.durationMinutes ?? 0) * 60 * 1000
-        ),
-      }
-      : null;
-    const timeLabel = range
-      ? formatTimeRangeRu(range.start, range.end)
-      : t('common.empty');
-    const priceLabel = formatPrice(
-      slot.trainerPricePerSession ?? trainer.pricePerSession
-    );
-    const conflict = canCheckConflicts && hasTimeConflict(slot, bookings);
-    const startTs = range?.start.getTime() ?? null;
-    const isPast = startTs !== null && startTs <= nowTs;
-    const open = isSlotOpen(slot);
-    const isBookable = Boolean(slot.id) && open && !isPast && !conflict;
-    const statusLabel = conflict
-      ? t('slots.status.conflict')
-      : open && !isPast
-        ? t('slots.status.available')
-        : t('slots.status.unavailable');
-    const statusColor = conflict
-      ? '$danger'
-      : open && !isPast
-        ? '$accent'
-        : '$muted';
-
-    return (
-      <Button
-        key={slot.id ?? `${slot.startsAtUtc ?? 'slot'}-${timeLabel}`}
-        unstyled
-        backgroundColor={isBookable ? '$background' : '$surfaceMuted'}
-        borderRadius="$4"
-        borderWidth={1}
-        borderColor={isBookable ? '$border' : '$surfaceMuted'}
-        padding="$3"
-        alignItems="stretch"
-        onPress={() => {
-          if (!isBookable || !slot.id) {
-            return;
-          }
-          navigation.navigate('ClientSlotDetails', {
-            slot,
-            trainer,
-          });
-        }}
-        disabled={!isBookable}
-      >
-        <XStack justifyContent="space-between" alignItems="center">
-          <Text fontSize="$4" fontWeight="600" color={isBookable ? '$text' : '$muted'}>
-            {timeLabel}
-          </Text>
-          {priceLabel ? (
-            <Text fontSize="$3" color={isBookable ? '$text' : '$muted'}>
-              {priceLabel}
-            </Text>
-          ) : null}
-        </XStack>
-        <Text fontSize="$2" color={statusColor} marginTop="$1">
-          {statusLabel}
-        </Text>
-      </Button>
-    );
-  };
-
-  const renderTrainerCard = (group: SlotGroup, index: number) => {
-    const trainer = group.trainer;
-    const trainerName = trainer.name ?? t('common.empty');
-    const ratingLabel = trainer.rating ? trainer.rating.toFixed(1) : null;
-    const locationParts = [trainer.cityName, trainer.districtName].filter(
-      (value): value is string => !!value && value.trim().length > 0
-    );
-    const locationLabel = locationParts.length > 0 ? locationParts.join(', ') : null;
-
-    return (
-      <YStack
-        key={trainer.id ?? `trainer-${index}`}
-        gap="$3"
-        padding="$4"
-        backgroundColor="$background"
-        borderRadius="$5"
-        borderWidth={1}
-        borderColor="$border"
-      >
-        <XStack alignItems="center" justifyContent="space-between" gap="$3">
-          <XStack alignItems="center" gap="$3" flex={1}>
-            <TrainerAvatar
-              name={trainerName}
-              avatarUrl={trainer.avatarUrl}
-              size="$10"
-            />
-            <YStack gap="$1" flex={1}>
-              <Text fontSize="$4" fontWeight="700" color="$text">
-                {trainerName}
-              </Text>
-              {locationLabel ? (
-                <Text fontSize="$3" color="$muted">
-                  {locationLabel}
-                </Text>
-              ) : null}
-              {ratingLabel ? (
-                <XStack alignItems="center" gap="$2">
-                  <AppIcon name="star" size={14} color="$accent" />
-                  <Text fontSize="$3" color="$muted">
-                    {ratingLabel}
-                  </Text>
-                </XStack>
-              ) : null}
-            </YStack>
-          </XStack>
-        </XStack>
-
-        <YStack gap="$2">
-          {group.slots.map((slot) => renderSlotRow(slot, trainer))}
-        </YStack>
-      </YStack>
-    );
-  };
-
   const renderContent = () => {
     if (!filtersReady || !lookupsReady || slotsQuery.isLoading) {
       return <SlotsSkeleton />;
@@ -506,7 +347,22 @@ export function SlotsScreen({ navigation }: Props) {
       );
     }
 
-    return <YStack gap="$4">{groups.map(renderTrainerCard)}</YStack>;
+    return (
+      <YStack gap="$4">
+        {groups.map((group) => (
+          <TrainerSlotGroupCard
+            key={group.trainer.id ?? `trainer-${group.trainer.name ?? 'unknown'}`}
+            group={group}
+            bookings={bookings}
+            canCheckConflicts={canCheckConflicts}
+            nowTs={nowTs}
+            onOpenSlot={(slot, trainer) => {
+              navigation.navigate('ClientSlotDetails', { slot, trainer });
+            }}
+          />
+        ))}
+      </YStack>
+    );
   };
 
   const showErrorBanner = Boolean(slotsQuery.error);
@@ -527,40 +383,10 @@ export function SlotsScreen({ navigation }: Props) {
         extraBottom={72}
       >
         <YStack gap="$4">
-          <XStack justifyContent="space-between" alignItems="center">
-            <YStack gap="$1">
-              <Text fontSize="$8" fontWeight="700" color="$text">
-                {t('slots.title')}
-              </Text>
-              <Text fontSize="$3" color="$muted">
-                {t('slots.subtitle')}
-              </Text>
-            </YStack>
-            <Button
-              backgroundColor="$background"
-              borderRadius="$4"
-              borderWidth={1}
-              borderColor="$border"
-              minHeight="$9"
-              paddingHorizontal="$3"
-              onPress={() => setSheetOpen(true)}
-            >
-              <XStack alignItems="center" gap="$2">
-                <AppIcon name="settings" size={18} color="$muted" />
-                <Text fontSize="$3" color="$text">
-                  {t('slots.filters.button')}
-                </Text>
-                {hasActiveFilters ? (
-                  <YStack
-                    width={6}
-                    height={6}
-                    borderRadius={3}
-                    backgroundColor="$accent"
-                  />
-                ) : null}
-              </XStack>
-            </Button>
-          </XStack>
+          <SlotsHeader
+            hasActiveFilters={hasActiveFilters}
+            onOpenFilters={() => setSheetOpen(true)}
+          />
 
           <DateStrip
             dates={visibleDates}
@@ -572,31 +398,13 @@ export function SlotsScreen({ navigation }: Props) {
           />
 
           {pickerVisible && Platform.OS === 'ios' ? (
-            <YStack
-              padding="$4"
-              borderWidth={1}
-              borderColor="$border"
-              borderRadius="$4"
-              backgroundColor="$background"
-              gap="$3"
-            >
-              <DateTimePicker
-                value={selectedDate}
-                mode="date"
-                display="inline"
-                minimumDate={todayDate}
-                maximumDate={maxDate}
-                onChange={handleDateChange}
-              />
-              <Button
-                backgroundColor="$surfaceMuted"
-                borderWidth={1}
-                borderColor="$border"
-                onPress={() => setPickerVisible(false)}
-              >
-                {t('common.close')}
-              </Button>
-            </YStack>
+            <IOSDatePickerCard
+              value={selectedDate}
+              minimumDate={todayDate}
+              maximumDate={maxDate}
+              onChange={handleDateChange}
+              onClose={() => setPickerVisible(false)}
+            />
           ) : null}
 
           {showErrorBanner && errorMessage ? (

@@ -151,6 +151,39 @@ public sealed class PushService(
             });
     }
 
+    public async Task NotifySlotCancelledByTrainerToClientsAsync(
+        Guid slotId,
+        Guid trainerId,
+        IReadOnlyCollection<Guid> clientIds,
+        DateTime startsAtUtc,
+        CancellationToken cancellationToken)
+    {
+        await SafeNotifyAsync(
+            PushEventTypes.SlotCancelledByTrainer,
+            async () =>
+            {
+                if (clientIds.Count == 0)
+                {
+                    return;
+                }
+
+                var trainerUserId = await GetTrainerUserIdAsync(trainerId, cancellationToken);
+                foreach (var clientId in clientIds.Distinct())
+                {
+                    var payload = await BuildPayloadAsync(
+                        PushEventTypes.SlotCancelledByTrainer,
+                        slotId,
+                        trainerId,
+                        clientId,
+                        startsAtUtc,
+                        trainerUserId,
+                        cancellationToken);
+
+                    await SafeSendToUserAsync(clientId, UserRoles.Client, payload, cancellationToken);
+                }
+            });
+    }
+
     public async Task NotifyAttendanceMarkedAsync(
         Guid slotId,
         Guid trainerId,

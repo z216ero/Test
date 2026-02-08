@@ -41,6 +41,13 @@ public static class SlotEndpoints
                 errors["durationMinutes"] = new[] { "DurationMinutes must be greater than 0." };
             }
 
+            if (!string.IsNullOrWhiteSpace(request.SlotType)
+                && !string.Equals(request.SlotType, "Individual", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(request.SlotType, "Group", StringComparison.OrdinalIgnoreCase))
+            {
+                errors["slotType"] = new[] { "SlotType must be Individual or Group." };
+            }
+
             if (errors.Count > 0)
             {
                 return Problems.Validation(errors);
@@ -233,6 +240,42 @@ public static class SlotEndpoints
         .Produces<IReadOnlyList<AvailableSlotGroupDto>>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        availableGroup.MapGet("/{slotId:guid}/attendees", async (
+            Guid slotId,
+            HttpContext httpContext,
+            SlotService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            if (!string.Equals(role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
+            {
+                return TypedResults.Problem(
+                    title: "Forbidden",
+                    detail: "Only trainers can view slot attendees.",
+                    statusCode: StatusCodes.Status403Forbidden,
+                    type: "https://errors.trainerapp/forbidden");
+            }
+
+            var result = await service.GetSlotAttendeesAsync(slotId, userId, cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .RequireAuthorization()
+        .Produces<IReadOnlyList<SlotAttendeeDto>>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
 
         return app;
     }

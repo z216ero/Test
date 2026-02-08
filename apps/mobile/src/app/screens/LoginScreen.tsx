@@ -61,6 +61,10 @@ export function LoginScreen({ navigation }: Props) {
       rootNavigation?.reset({ index: 0, routes: [{ name: 'App', params: { role } }] });
     },
     onError: (err) => {
+      if (err instanceof ApiError && err.status === 401) {
+        setError(t('auth.login.invalidCredentials'));
+        return;
+      }
       setError(presentApiError(err).message);
     },
   });

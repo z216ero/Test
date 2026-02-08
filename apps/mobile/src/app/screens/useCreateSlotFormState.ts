@@ -163,6 +163,10 @@ export const useCreateSlotFormState = ({
   const [multiCount, setMultiCount] = useState<number>(MULTI_COUNTS[0]);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [groupEnabled, setGroupEnabled] = useState(false);
+  const [groupSettingsOpen, setGroupSettingsOpen] = useState(false);
+  const [groupCapacityMin, setGroupCapacityMin] = useState(2);
+  const [groupCapacityMax, setGroupCapacityMax] = useState(10);
   const lastInitialRef = useRef<string | null>(null);
 
   const [todayDate, setTodayDate] = useState(() => startOfLocalDay(new Date()));
@@ -343,9 +347,18 @@ export const useCreateSlotFormState = ({
       ? t('createSlot.multiUnavailable', { count: slotCount })
       : null;
 
+  const isGroupCapacityValid =
+    !groupEnabled
+    || (
+      groupCapacityMin >= 2
+      && groupCapacityMax <= 100
+      && groupCapacityMin <= groupCapacityMax
+    );
+
   const canSubmit =
     !!selectedStart
     && selectionAvailable
+    && isGroupCapacityValid
     && !slotsQuery.isLoading
     && !slotsQuery.error;
 
@@ -439,6 +452,9 @@ export const useCreateSlotFormState = ({
     const payloads = ranges.map((range) => ({
       startsAtUtc: range.startLocal.toISOString(),
       durationMinutes: SLOT_DURATION_MINUTES,
+      slotType: groupEnabled ? 'Group' : 'Individual',
+      capacityMin: groupEnabled ? groupCapacityMin : null,
+      capacityMax: groupEnabled ? groupCapacityMax : null,
     }));
 
     try {
@@ -469,6 +485,14 @@ export const useCreateSlotFormState = ({
     multiCount,
     setMultiCount,
     slotCount,
+    groupEnabled,
+    setGroupEnabled,
+    groupSettingsOpen,
+    setGroupSettingsOpen,
+    groupCapacityMin,
+    setGroupCapacityMin,
+    groupCapacityMax,
+    setGroupCapacityMax,
     pickerVisible,
     setPickerVisible,
     handleDateChange,

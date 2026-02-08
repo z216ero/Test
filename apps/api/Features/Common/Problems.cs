@@ -35,27 +35,57 @@ public static class Problems
     public static IResult FromServiceError(ServiceError error)
         => error.StatusCode switch
         {
-            StatusCodes.Status400BadRequest => BadRequest(error.Title, error.Detail),
-            StatusCodes.Status401Unauthorized => Unauthorized(error.Title, error.Detail),
-            StatusCodes.Status404NotFound => NotFound(error.Title, error.Detail),
-            StatusCodes.Status409Conflict => Conflict(error.Title, error.Detail),
-            _ => CreateProblem(error.StatusCode, error.Title, error.Detail, UnknownType)
+            StatusCodes.Status400BadRequest => BadRequest(error.Title, error.Detail, error.Extensions),
+            StatusCodes.Status401Unauthorized => Unauthorized(error.Title, error.Detail, error.Extensions),
+            StatusCodes.Status404NotFound => NotFound(error.Title, error.Detail, error.Extensions),
+            StatusCodes.Status409Conflict => Conflict(error.Title, error.Detail, error.Extensions),
+            _ => CreateProblem(error.StatusCode, error.Title, error.Detail, UnknownType, null, error.Extensions)
         };
+
+    public static IResult BadRequest(
+        string title,
+        string detail,
+        IReadOnlyDictionary<string, object?>? extensions)
+        => CreateProblem(StatusCodes.Status400BadRequest, title, detail, BadRequestType, null, extensions);
+
+    public static IResult Unauthorized(
+        string title,
+        string detail,
+        IReadOnlyDictionary<string, object?>? extensions)
+        => CreateProblem(StatusCodes.Status401Unauthorized, title, detail, UnauthorizedType, null, extensions);
+
+    public static IResult NotFound(
+        string title,
+        string detail,
+        IReadOnlyDictionary<string, object?>? extensions)
+        => CreateProblem(StatusCodes.Status404NotFound, title, detail, NotFoundType, null, extensions);
+
+    public static IResult Conflict(
+        string title,
+        string detail,
+        IReadOnlyDictionary<string, object?>? extensions)
+        => CreateProblem(StatusCodes.Status409Conflict, title, detail, ConflictType, null, extensions);
 
     private static IResult CreateProblem(
         int statusCode,
         string title,
         string detail,
         string type,
-        IDictionary<string, string[]>? errors = null)
+        IDictionary<string, string[]>? errors = null,
+        IReadOnlyDictionary<string, object?>? extensionsData = null)
     {
-        List<KeyValuePair<string, object?>>? extensions = null;
+        var extensions = new List<KeyValuePair<string, object?>>();
         if (errors is not null)
         {
-            extensions = new List<KeyValuePair<string, object?>>
+            extensions.Add(new("errors", errors));
+        }
+
+        if (extensionsData is not null)
+        {
+            foreach (var (key, value) in extensionsData)
             {
-                new("errors", errors)
-            };
+                extensions.Add(new(key, value));
+            }
         }
 
         return TypedResults.Problem(
@@ -63,6 +93,6 @@ public static class Problems
             detail: detail,
             statusCode: statusCode,
             type: type,
-            extensions: extensions);
+            extensions: extensions.Count == 0 ? null : extensions);
     }
 }

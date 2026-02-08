@@ -4,20 +4,27 @@ using Api.Features.Common;
 using Api.Features.Push;
 using Api.Features.Slots;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace Api.Features.Bookings;
 
 public sealed class BookingService(AppDbContext db, PushService pushService)
 {
-    public async Task<ServiceResult<BookingDto>> BookSlotAsync(
+    public BookingService(AppDbContext db)
+        : this(db, CreateNoOpPushService(db))
+    {
+    }
+
+    public async Task<ServiceResult<SlotDto>> BookSlotAsync(
         Guid slotId,
         BookSlotRequest request,
         CancellationToken cancellationToken)
     {
         if (request.ClientId == Guid.Empty)
         {
-            return ServiceResult<BookingDto>.Fail(
+            return ServiceResult<SlotDto>.Fail(
                 StatusCodes.Status400BadRequest,
                 "Invalid client",
                 "ClientId is required.");
@@ -30,68 +37,143 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                 .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
             var slot = await db.TrainingSlots
+                .Include(s => s.Booking)
+                .Include(s => s.Attendees)
+                .Include(s => s.TrainerProfile)
                 .FirstOrDefaultAsync(s => s.Id == slotId, cancellationToken);
             if (slot is null)
             {
-                return ServiceResult<BookingDto>.Fail(
+                return ServiceResult<SlotDto>.Fail(
                     StatusCodes.Status404NotFound,
                     "Slot not found",
                     "Slot does not exist.");
             }
 
-            if (slot.Status != TrainingSlotStatus.Open)
+            if (slot.Status == TrainingSlotStatus.Cancelled)
             {
-                return ServiceResult<BookingDto>.Fail(
+                return ServiceResult<SlotDto>.Fail(
                     StatusCodes.Status409Conflict,
                     "Slot not available",
-                    "Only open slots can be booked.");
+                    "Only active slots can be booked.");
             }
 
-            var existingBooking = await db.Bookings
-                .AnyAsync(b => b.SlotId == slotId, cancellationToken);
-            if (existingBooking)
+            if (slot.StartsAtUtc <= DateTime.UtcNow)
             {
-                return ServiceResult<BookingDto>.Fail(
+                return ServiceResult<SlotDto>.Fail(
                     StatusCodes.Status409Conflict,
-                    "Slot already booked",
-                    "Slot already has a booking.");
+                    "Slot already started",
+                    "You cannot book a slot that already started.");
             }
 
-            var slotStart = slot.StartsAtUtc;
-            var slotEnd = slotStart.AddMinutes(slot.DurationMinutes);
-            var nowUtc = DateTime.UtcNow;
-
-            var hasTimeConflict = await db.Bookings
-                .Include(b => b.Slot)
-                .AnyAsync(b => b.ClientId == request.ClientId
-                    && b.Status == BookingStatus.Booked
-                    && b.Slot != null
-                    && b.Slot.Status == TrainingSlotStatus.Booked
-                    && b.SlotId != slotId
-                    && b.Slot.StartsAtUtc.AddMinutes(b.Slot.DurationMinutes) > nowUtc
-                    && b.Slot.StartsAtUtc < slotEnd
-                    && b.Slot.StartsAtUtc.AddMinutes(b.Slot.DurationMinutes) > slotStart,
-                    cancellationToken);
-
-            if (hasTimeConflict)
+            var conflict = await FindTimeConflictAsync(
+                request.ClientId,
+                slot.Id,
+                slot.StartsAtUtc,
+                slot.StartsAtUtc.AddMinutes(slot.DurationMinutes),
+                cancellationToken);
+            if (conflict is not null)
             {
-                return ServiceResult<BookingDto>.Fail(
+                return ServiceResult<SlotDto>.Fail(
                     StatusCodes.Status409Conflict,
-                    "Time conflict",
-                    "Client already has a booking that overlaps with this time.");
+                    "Booking time conflict",
+                    "У тебя уже есть запись на это время.",
+                    new Dictionary<string, object?>
+                    {
+                        ["errorCode"] = "booking_time_conflict",
+                        ["conflictSlotId"] = conflict.Value.SlotId,
+                        ["conflictStartsAtUtc"] = conflict.Value.StartsAtUtc.ToString("O")
+                    });
             }
 
-            var booking = new Booking
+            if (slot.SlotType == TrainingSlotType.Individual)
             {
-                Id = Guid.NewGuid(),
-                SlotId = slotId,
-                ClientId = request.ClientId,
-                Status = BookingStatus.Booked,
-                CreatedAtUtc = DateTime.UtcNow
-            };
+                if (slot.Status != TrainingSlotStatus.Open)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Slot not available",
+                        "Only open slots can be booked.");
+                }
 
-            slot.Status = TrainingSlotStatus.Booked;
-            db.Bookings.Add(booking);
+                if (slot.Booking is not null)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Slot already booked",
+                        "Slot already has a booking.");
+                }
+
+                var booking = new Booking
+                {
+                    Id = Guid.NewGuid(),
+                    SlotId = slotId,
+                    ClientId = request.ClientId,
+                    Status = BookingStatus.Booked,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+
+                db.Bookings.Add(booking);
+                slot.Status = TrainingSlotStatus.Booked;
+            }
+            else
+            {
+                if (!slot.CapacityMax.HasValue)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Invalid slot configuration",
+                        "Group slot capacity is not configured.");
+                }
+
+                var existingAttendee = slot.Attendees
+                    .FirstOrDefault(a => a.ClientId == request.ClientId);
+
+                if (existingAttendee?.Status == SlotAttendeeStatus.Booked)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Already booked",
+                        "Client is already booked for this slot.");
+                }
+
+                if (existingAttendee?.Status is SlotAttendeeStatus.Completed or SlotAttendeeStatus.NoShow)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Attendance already marked",
+                        "This attendee is already finalized.");
+                }
+
+                var occupiedCount = slot.Attendees.Count(a => a.Status == SlotAttendeeStatus.Booked);
+                if (occupiedCount >= slot.CapacityMax.Value)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Slot full",
+                        "Все места заняты.",
+                        new Dictionary<string, object?>
+                        {
+                            ["errorCode"] = "slot_full"
+                        });
+                }
+
+                if (existingAttendee is not null && existingAttendee.Status == SlotAttendeeStatus.Cancelled)
+                {
+                    existingAttendee.Status = SlotAttendeeStatus.Booked;
+                    existingAttendee.UpdatedAtUtc = DateTime.UtcNow;
+                }
+                else
+                {
+                    db.SlotAttendees.Add(new SlotAttendee
+                    {
+                        Id = Guid.NewGuid(),
+                        SlotId = slot.Id,
+                        ClientId = request.ClientId,
+                        Status = SlotAttendeeStatus.Booked,
+                        CreatedAtUtc = DateTime.UtcNow
+                    });
+                }
+            }
 
             try
             {
@@ -100,7 +182,25 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
             }
             catch (Exception ex) when (IsBookingConflict(ex))
             {
-                return ServiceResult<BookingDto>.Fail(
+                var slotType = await db.TrainingSlots
+                    .AsNoTracking()
+                    .Where(s => s.Id == slotId)
+                    .Select(s => (TrainingSlotType?)s.SlotType)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (slotType == TrainingSlotType.Group)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Slot full",
+                        "Все места заняты.",
+                        new Dictionary<string, object?>
+                        {
+                            ["errorCode"] = "slot_full"
+                        });
+                }
+
+                return ServiceResult<SlotDto>.Fail(
                     StatusCodes.Status409Conflict,
                     "Slot already booked",
                     "Slot already has a booking.");
@@ -109,11 +209,12 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
             await pushService.NotifyBookingCreatedAsync(
                 slot.Id,
                 slot.TrainerId,
-                booking.ClientId,
+                request.ClientId,
                 slot.StartsAtUtc,
                 cancellationToken);
 
-            return ServiceResult<BookingDto>.Success(ToDto(booking));
+            var dto = await BuildSlotDtoAsync(slotId, cancellationToken);
+            return ServiceResult<SlotDto>.Success(dto);
         });
     }
 
@@ -131,6 +232,7 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
 
             var slot = await db.TrainingSlots
                 .Include(s => s.Booking)
+                .Include(s => s.Attendees)
                 .Include(s => s.TrainerProfile)
                 .FirstOrDefaultAsync(s => s.Id == slotId, cancellationToken);
             if (slot is null)
@@ -162,7 +264,6 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
 
             var startsAtUtc = slot.StartsAtUtc;
             var trainerId = slot.TrainerId;
-            var bookingClientId = slot.Booking?.ClientId;
 
             if (isTrainer)
             {
@@ -186,77 +287,74 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                         "Slot does not belong to this trainer.");
                 }
 
-                if (slot.Booking is null)
+                if (slot.SlotType == TrainingSlotType.Individual)
                 {
+                    if (slot.Booking is null)
+                    {
+                        slot.Status = TrainingSlotStatus.Cancelled;
+                    }
+                    else
+                    {
+                        if (slot.Booking.Status == BookingStatus.Cancelled)
+                        {
+                            return ServiceResult<SlotDto>.Fail(
+                                StatusCodes.Status409Conflict,
+                                "Booking already cancelled",
+                                "This booking has already been cancelled.");
+                        }
+
+                        if (slot.Booking.Status is BookingStatus.Completed or BookingStatus.NoShow)
+                        {
+                            return ServiceResult<SlotDto>.Fail(
+                                StatusCodes.Status409Conflict,
+                                "Booking already closed",
+                                "This booking has already been marked as completed or no-show.");
+                        }
+
+                        slot.Booking.Status = BookingStatus.Cancelled;
+                        slot.Status = TrainingSlotStatus.Cancelled;
+                    }
+                }
+                else
+                {
+                    foreach (var attendee in slot.Attendees.Where(a => a.Status != SlotAttendeeStatus.Cancelled))
+                    {
+                        attendee.Status = SlotAttendeeStatus.Cancelled;
+                        attendee.UpdatedAtUtc = DateTime.UtcNow;
+                    }
                     slot.Status = TrainingSlotStatus.Cancelled;
-                    await db.SaveChangesAsync(cancellationToken);
-                    await transaction.CommitAsync(cancellationToken);
+                }
+
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+
+                if (slot.SlotType == TrainingSlotType.Group)
+                {
+                    var clientIds = slot.Attendees
+                        .Select(a => a.ClientId)
+                        .Distinct()
+                        .ToList();
+
+                    await pushService.NotifySlotCancelledByTrainerToClientsAsync(
+                        slot.Id,
+                        trainerId,
+                        clientIds,
+                        startsAtUtc,
+                        cancellationToken);
+                }
+                else
+                {
                     await pushService.NotifySlotCancelledByTrainerAsync(
                         slot.Id,
                         trainerId,
-                        bookingClientId,
+                        slot.Booking?.ClientId,
                         startsAtUtc,
                         cancellationToken);
-
-                    return ServiceResult<SlotDto>.Success(ToSlotDto(slot, slot.TrainerProfile?.PricePerSession));
                 }
-
-                if (slot.Booking.Status == BookingStatus.Cancelled)
-                {
-                    return ServiceResult<SlotDto>.Fail(
-                        StatusCodes.Status409Conflict,
-                        "Booking already cancelled",
-                        "This booking has already been cancelled.");
-                }
-
-                if (slot.Booking.Status == BookingStatus.Completed
-                    || slot.Booking.Status == BookingStatus.NoShow)
-                {
-                    return ServiceResult<SlotDto>.Fail(
-                        StatusCodes.Status409Conflict,
-                        "Booking already closed",
-                        "This booking has already been marked as completed or no-show.");
-                }
-
-                slot.Booking.Status = BookingStatus.Cancelled;
-                slot.Status = TrainingSlotStatus.Cancelled;
             }
             else
             {
-                if (slot.Booking is null)
-                {
-                    return ServiceResult<SlotDto>.Fail(
-                        StatusCodes.Status404NotFound,
-                        "Booking not found",
-                        "Booking does not exist.");
-                }
-
-                if (slot.Booking.ClientId != userId)
-                {
-                    return ServiceResult<SlotDto>.Fail(
-                        StatusCodes.Status403Forbidden,
-                        "Forbidden",
-                        "Booking does not belong to this client.");
-                }
-
-                if (slot.Booking.Status != BookingStatus.Booked)
-                {
-                    return ServiceResult<SlotDto>.Fail(
-                        StatusCodes.Status409Conflict,
-                        "Booking already closed",
-                        "Only booked sessions can be cancelled.");
-                }
-
-                if (slot.Status != TrainingSlotStatus.Booked)
-                {
-                    return ServiceResult<SlotDto>.Fail(
-                        StatusCodes.Status409Conflict,
-                        "Slot not booked",
-                        "Only booked slots can be cancelled.");
-                }
-
-                var now = DateTime.UtcNow;
-                if (slot.StartsAtUtc <= now)
+                if (slot.StartsAtUtc <= DateTime.UtcNow)
                 {
                     return ServiceResult<SlotDto>.Fail(
                         StatusCodes.Status409Conflict,
@@ -264,34 +362,72 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                         "Training has already started.");
                 }
 
-                db.Bookings.Remove(slot.Booking);
-                slot.Booking = null;
-                slot.Status = TrainingSlotStatus.Open;
-            }
+                if (slot.SlotType == TrainingSlotType.Individual)
+                {
+                    if (slot.Booking is null)
+                    {
+                        return ServiceResult<SlotDto>.Fail(
+                            StatusCodes.Status404NotFound,
+                            "Booking not found",
+                            "Booking does not exist.");
+                    }
 
-            await db.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+                    if (slot.Booking.ClientId != userId)
+                    {
+                        return ServiceResult<SlotDto>.Fail(
+                            StatusCodes.Status403Forbidden,
+                            "Forbidden",
+                            "Booking does not belong to this client.");
+                    }
 
-            if (isTrainer)
-            {
-                await pushService.NotifySlotCancelledByTrainerAsync(
-                    slot.Id,
-                    trainerId,
-                    bookingClientId,
-                    startsAtUtc,
-                    cancellationToken);
-            }
-            else if (bookingClientId.HasValue)
-            {
+                    if (slot.Booking.Status != BookingStatus.Booked)
+                    {
+                        return ServiceResult<SlotDto>.Fail(
+                            StatusCodes.Status409Conflict,
+                            "Booking already closed",
+                            "Only booked sessions can be cancelled.");
+                    }
+
+                    db.Bookings.Remove(slot.Booking);
+                    slot.Booking = null;
+                    slot.Status = TrainingSlotStatus.Open;
+                }
+                else
+                {
+                    var attendee = slot.Attendees.FirstOrDefault(a => a.ClientId == userId);
+                    if (attendee is null)
+                    {
+                        return ServiceResult<SlotDto>.Fail(
+                            StatusCodes.Status404NotFound,
+                            "Booking not found",
+                            "Booking does not exist.");
+                    }
+
+                    if (attendee.Status != SlotAttendeeStatus.Booked)
+                    {
+                        return ServiceResult<SlotDto>.Fail(
+                            StatusCodes.Status409Conflict,
+                            "Booking already closed",
+                            "Only booked sessions can be cancelled.");
+                    }
+
+                    attendee.Status = SlotAttendeeStatus.Cancelled;
+                    attendee.UpdatedAtUtc = DateTime.UtcNow;
+                }
+
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+
                 await pushService.NotifyBookingCancelledAsync(
                     slot.Id,
                     trainerId,
-                    bookingClientId.Value,
+                    userId,
                     startsAtUtc,
                     cancellationToken);
             }
 
-            return ServiceResult<SlotDto>.Success(ToSlotDto(slot, slot.TrainerProfile?.PricePerSession));
+            var dto = await BuildSlotDtoAsync(slotId, cancellationToken);
+            return ServiceResult<SlotDto>.Success(dto);
         });
     }
 
@@ -318,6 +454,14 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                 StatusCodes.Status404NotFound,
                 "Slot not found",
                 "Slot does not exist.");
+        }
+
+        if (slot.SlotType == TrainingSlotType.Group)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status409Conflict,
+                "Invalid slot type",
+                "Use attendee attendance endpoints for group slots.");
         }
 
         if (slot.Status != TrainingSlotStatus.Booked)
@@ -366,6 +510,208 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
         return ServiceResult<BookingDto>.Success(ToDto(slot.Booking));
     }
 
+    public async Task<ServiceResult<SlotAttendeeDto>> MarkGroupAttendeeAttendanceAsync(
+        Guid slotId,
+        Guid trainerUserId,
+        Guid clientId,
+        SlotAttendeeStatus status,
+        CancellationToken cancellationToken)
+    {
+        if (status is not SlotAttendeeStatus.Completed and not SlotAttendeeStatus.NoShow)
+        {
+            return ServiceResult<SlotAttendeeDto>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid status",
+                "Only Completed or NoShow are allowed.");
+        }
+
+        var trainerProfileId = await db.TrainerProfiles
+            .AsNoTracking()
+            .Where(t => t.UserId == trainerUserId)
+            .Select(t => (Guid?)t.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (!trainerProfileId.HasValue)
+        {
+            return ServiceResult<SlotAttendeeDto>.Fail(
+                StatusCodes.Status404NotFound,
+                "Trainer profile not found",
+                "Trainer profile is not available for this user.");
+        }
+
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database
+                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+            var slot = await db.TrainingSlots
+                .Include(s => s.Attendees)
+                .FirstOrDefaultAsync(s => s.Id == slotId, cancellationToken);
+            if (slot is null)
+            {
+                return ServiceResult<SlotAttendeeDto>.Fail(
+                    StatusCodes.Status404NotFound,
+                    "Slot not found",
+                    "Slot does not exist.");
+            }
+
+            if (slot.TrainerId != trainerProfileId.Value)
+            {
+                return ServiceResult<SlotAttendeeDto>.Fail(
+                    StatusCodes.Status403Forbidden,
+                    "Forbidden",
+                    "Slot does not belong to this trainer.");
+            }
+
+            if (slot.SlotType != TrainingSlotType.Group)
+            {
+                return ServiceResult<SlotAttendeeDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Invalid slot type",
+                    "Attendee attendance is available only for group slots.");
+            }
+
+            var attendee = slot.Attendees.FirstOrDefault(a => a.ClientId == clientId);
+            if (attendee is null)
+            {
+                return ServiceResult<SlotAttendeeDto>.Fail(
+                    StatusCodes.Status404NotFound,
+                    "Attendee not found",
+                    "Attendee does not exist for this slot.");
+            }
+
+            if (attendee.Status != SlotAttendeeStatus.Booked)
+            {
+                return ServiceResult<SlotAttendeeDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Attendance already marked",
+                    "Only booked attendees can be marked.");
+            }
+
+            var nowUtc = DateTime.UtcNow;
+            if (status == SlotAttendeeStatus.NoShow
+                && nowUtc < slot.StartsAtUtc.AddMinutes(15))
+            {
+                return ServiceResult<SlotAttendeeDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Too early for no-show",
+                    "No-show can be marked only 15 minutes after start.");
+            }
+
+            if (status == SlotAttendeeStatus.Completed && nowUtc < slot.StartsAtUtc)
+            {
+                return ServiceResult<SlotAttendeeDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Too early for completion",
+                    "Complete can be marked only after slot start.");
+            }
+
+            attendee.Status = status;
+            attendee.UpdatedAtUtc = nowUtc;
+
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            await pushService.NotifyAttendanceMarkedAsync(
+                slot.Id,
+                slot.TrainerId,
+                clientId,
+                slot.StartsAtUtc,
+                cancellationToken);
+
+            var user = await db.Users
+                .AsNoTracking()
+                .Where(u => u.Id == clientId)
+                .Select(u => u.Name)
+                .FirstOrDefaultAsync(cancellationToken);
+            var hasAvatar = await db.UserAvatars
+                .AsNoTracking()
+                .AnyAsync(a => a.UserId == clientId, cancellationToken);
+
+            return ServiceResult<SlotAttendeeDto>.Success(new SlotAttendeeDto(
+                clientId,
+                string.IsNullOrWhiteSpace(user) ? "Client" : user,
+                hasAvatar ? $"/users/{clientId}/avatar" : null,
+                attendee.Status.ToString()));
+        });
+    }
+
+    private async Task<(Guid SlotId, DateTime StartsAtUtc)?> FindTimeConflictAsync(
+        Guid clientId,
+        Guid currentSlotId,
+        DateTime requestedStartUtc,
+        DateTime requestedEndUtc,
+        CancellationToken cancellationToken)
+    {
+        var individualConflict = await db.Bookings
+            .AsNoTracking()
+            .Include(b => b.Slot)
+            .Where(b => b.ClientId == clientId
+                && b.Status == BookingStatus.Booked
+                && b.Slot != null
+                && b.SlotId != currentSlotId
+                && b.Slot.Status != TrainingSlotStatus.Cancelled
+                && b.Slot.StartsAtUtc < requestedEndUtc
+                && b.Slot.StartsAtUtc.AddMinutes(b.Slot.DurationMinutes) > requestedStartUtc)
+            .Select(b => new { b.SlotId, b.Slot!.StartsAtUtc })
+            .OrderBy(x => x.StartsAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (individualConflict is not null)
+        {
+            return (individualConflict.SlotId, individualConflict.StartsAtUtc);
+        }
+
+        var attendeeConflict = await db.SlotAttendees
+            .AsNoTracking()
+            .Include(a => a.Slot)
+            .Where(a => a.ClientId == clientId
+                && a.Status == SlotAttendeeStatus.Booked
+                && a.Slot != null
+                && a.SlotId != currentSlotId
+                && a.Slot.Status != TrainingSlotStatus.Cancelled
+                && a.Slot.StartsAtUtc < requestedEndUtc
+                && a.Slot.StartsAtUtc.AddMinutes(a.Slot.DurationMinutes) > requestedStartUtc)
+            .Select(a => new { a.SlotId, a.Slot!.StartsAtUtc })
+            .OrderBy(x => x.StartsAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return attendeeConflict is null
+            ? null
+            : (attendeeConflict.SlotId, attendeeConflict.StartsAtUtc);
+    }
+
+    private async Task<SlotDto> BuildSlotDtoAsync(Guid slotId, CancellationToken cancellationToken)
+    {
+        var slot = await db.TrainingSlots
+            .AsNoTracking()
+            .Include(s => s.Booking)
+            .Include(s => s.Attendees)
+            .Include(s => s.TrainerProfile)
+            .FirstAsync(s => s.Id == slotId, cancellationToken);
+
+        string? clientName = null;
+        string? clientAvatarUrl = null;
+        if (slot.SlotType == TrainingSlotType.Individual && slot.Booking is not null)
+        {
+            var client = await db.Users
+                .AsNoTracking()
+                .Where(u => u.Id == slot.Booking.ClientId)
+                .Select(u => u.Name)
+                .FirstOrDefaultAsync(cancellationToken);
+            clientName = client;
+
+            var hasAvatar = await db.UserAvatars
+                .AsNoTracking()
+                .AnyAsync(a => a.UserId == slot.Booking.ClientId, cancellationToken);
+            if (hasAvatar)
+            {
+                clientAvatarUrl = $"/users/{slot.Booking.ClientId}/avatar";
+            }
+        }
+
+        return SlotService.ToDto(slot, clientName, clientAvatarUrl, slot.TrainerProfile?.PricePerSession);
+    }
+
     private static BookingDto ToDto(Booking booking)
         => new(
             booking.Id,
@@ -373,19 +719,6 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
             booking.ClientId,
             booking.Status.ToString(),
             booking.CreatedAtUtc);
-
-    private static SlotDto ToSlotDto(TrainingSlot slot, int? trainerPricePerSession)
-        => new(
-            slot.Id,
-            slot.TrainerId,
-            slot.StartsAtUtc,
-            slot.DurationMinutes,
-            slot.Status.ToString(),
-            slot.Booking?.Status.ToString(),
-            slot.CreatedAtUtc,
-            null,
-            null,
-            trainerPricePerSession);
 
     private static bool IsBookingConflict(Exception ex)
     {
@@ -405,5 +738,12 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
         }
 
         return null;
+    }
+
+    private static PushService CreateNoOpPushService(AppDbContext dbContext)
+    {
+        var pushOptions = Options.Create(new PushOptions());
+        var messagingClient = new FirebaseMessagingClient(pushOptions, NullLogger<FirebaseMessagingClient>.Instance);
+        return new PushService(dbContext, messagingClient, NullLogger<PushService>.Instance);
     }
 }

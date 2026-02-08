@@ -340,6 +340,45 @@ namespace Api.Migrations
                     b.ToTable("refresh_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("Api.Data.SlotAttendee", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now() at time zone 'utc'");
+
+                    b.Property<Guid>("SlotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Booked");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SlotId");
+
+                    b.HasIndex("ClientId", "Status");
+
+                    b.HasIndex("SlotId", "ClientId")
+                        .IsUnique();
+
+                    b.ToTable("slot_attendees", (string)null);
+                });
+
             modelBuilder.Entity("Api.Data.TrainerProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -404,6 +443,12 @@ namespace Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("CapacityMax")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CapacityMin")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -411,6 +456,13 @@ namespace Api.Migrations
 
                     b.Property<int>("DurationMinutes")
                         .HasColumnType("integer");
+
+                    b.Property<string>("SlotType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Individual");
 
                     b.Property<DateTime>("StartsAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -427,7 +479,10 @@ namespace Api.Migrations
 
                     b.HasIndex("TrainerId", "StartsAtUtc");
 
-                    b.ToTable("training_slots", (string)null);
+                    b.ToTable("training_slots", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_training_slots_slot_type_capacity", "(\"SlotType\" = 'Individual' AND \"CapacityMin\" IS NULL AND \"CapacityMax\" IS NULL) OR (\"SlotType\" = 'Group' AND \"CapacityMin\" IS NOT NULL AND \"CapacityMax\" IS NOT NULL AND \"CapacityMin\" >= 2 AND \"CapacityMin\" <= \"CapacityMax\" AND \"CapacityMax\" <= 100)");
+                        });
                 });
 
             modelBuilder.Entity("Api.Data.UserAvatar", b =>
@@ -653,6 +708,17 @@ namespace Api.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Api.Data.SlotAttendee", b =>
+                {
+                    b.HasOne("Api.Data.TrainingSlot", "Slot")
+                        .WithMany("Attendees")
+                        .HasForeignKey("SlotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Slot");
+                });
+
             modelBuilder.Entity("Api.Data.TrainerProfile", b =>
                 {
                     b.HasOne("Api.Data.City", "City")
@@ -772,6 +838,8 @@ namespace Api.Migrations
 
             modelBuilder.Entity("Api.Data.TrainingSlot", b =>
                 {
+                    b.Navigation("Attendees");
+
                     b.Navigation("Booking");
                 });
 #pragma warning restore 612, 618

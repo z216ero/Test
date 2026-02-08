@@ -1,23 +1,31 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Alert } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   attendanceActionsAvailable,
+  cancelTrainerSlot,
+  getGroupSlotAttendees,
+  markGroupAttendeeCompleted,
+  markGroupAttendeeNoShow,
   markSlotCompleted,
   markSlotNoShow,
 } from '@api/trainerSlotsApi';
 import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
-import type { SlotDto } from '@generated/api';
+import type { SlotAttendeeDto, SlotDto } from '@generated/api';
 import { t } from '@i18n';
-import { useAppMutation } from '@query/hooks';
+import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
 import { useToast } from '@ui/feedback/useToast';
 import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
-import { formatPrice } from '@utils/price';
 import type { ScheduleStackParamList } from '@app/navigation/types';
 import { useQueryClient } from '@tanstack/react-query';
+import { AppIcon } from '@ui/AppIcon';
+import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, 'SlotDetails'>;
+
+const ATTENDEES_POLL_INTERVAL_MS = 10 * 1000;
 
 const getSlotTimes = (slot: SlotDto) => {
   if (!slot.startsAtUtc) {
@@ -58,15 +66,9 @@ const getStatusLabel = (status?: string | null) => {
   }
 };
 
-const getClientName = (slot: SlotDto): string | null => {
-  const candidate = (slot as SlotDto & { clientName?: string | null }).clientName;
-  return candidate ? candidate : null;
-};
-
-const getSlotStatus = (slot: SlotDto): string | null => {
-  return slot.bookingStatus ?? slot.status ?? null;
-};
-
+const normalize = (value?: string | null) => value?.toLowerCase().trim();
+const isGroupSlot = (slot: SlotDto) => normalize(slot.slotType) === 'group';
+const isBookedAttendee = (attendee: SlotAttendeeDto) => normalize(attendee.status) === 'booked';
 
 export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   const { slot } = route.params;
@@ -74,24 +76,39 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
+  const group = isGroupSlot(slot);
   const times = getSlotTimes(slot);
   const dateLabel = times ? formatDateRu(times.start) : '';
-  const timeLabel = times
-    ? formatTimeRangeRu(times.start, times.end)
-    : '';
-  const slotStatus = getSlotStatus(slot);
+  const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : '';
+  const slotStatus = slot.bookingStatus ?? slot.status ?? null;
   const statusLabel = getStatusLabel(slotStatus);
-  const clientName = getClientName(slot);
-  const priceLabel = formatPrice(slot.trainerPricePerSession);
+  const nowTs = Date.now();
+  const startTs = times?.start.getTime() ?? null;
+  const canCompleteNow = startTs !== null && nowTs >= startTs;
+  const canNoShowNow = startTs !== null && nowTs >= startTs + 15 * 60 * 1000;
+  const occupiedCount = slot.occupiedCount ?? 0;
+  const capacityMax = slot.capacityMax ?? null;
 
-  const canMark =
-    attendanceActionsAvailable && slotStatus === 'Booked' && !!slot.id;
+  const attendeesQuery = useAppQuery({
+    queryKey: slot.id ? ['slots', 'attendees', slot.id] as const : ['slots', 'attendees', 'missing'] as const,
+    enabled: group && Boolean(slot.id),
+    queryFn: ({ signal }) => getGroupSlotAttendees(slot.id!, { signal }),
+    refetchInterval: group ? ATTENDEES_POLL_INTERVAL_MS : false,
+    refetchIntervalInBackground: false,
+  });
+
+  const invalidateTrainerData = () => {
+    queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
+    queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+    if (slot.id) {
+      queryClient.invalidateQueries({ queryKey: ['slots', 'attendees', slot.id] });
+    }
+  };
 
   const completeMutation = useAppMutation({
     mutationFn: (slotId: string) => markSlotCompleted(slotId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
-      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+      invalidateTrainerData();
       navigation.goBack();
     },
     onError: (err) => {
@@ -110,8 +127,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   const noShowMutation = useAppMutation({
     mutationFn: (slotId: string) => markSlotNoShow(slotId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
-      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+      invalidateTrainerData();
       navigation.goBack();
     },
     onError: (err) => {
@@ -126,6 +142,73 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
       }
     },
   });
+
+  const cancelMutation = useAppMutation({
+    mutationFn: (slotId: string) => cancelTrainerSlot(slotId),
+    onSuccess: () => {
+      invalidateTrainerData();
+      navigation.goBack();
+    },
+    onError: (err) => {
+      const presented = presentApiError(err);
+      setActionError(presented.message);
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
+    },
+  });
+
+  const attendeeCompleteMutation = useAppMutation({
+    mutationFn: (payload: { slotId: string; clientId: string }) =>
+      markGroupAttendeeCompleted(payload.slotId, payload.clientId),
+    onSuccess: () => {
+      invalidateTrainerData();
+    },
+    onError: (err) => {
+      const presented = presentApiError(err);
+      setActionError(presented.message);
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
+    },
+  });
+
+  const attendeeNoShowMutation = useAppMutation({
+    mutationFn: (payload: { slotId: string; clientId: string }) =>
+      markGroupAttendeeNoShow(payload.slotId, payload.clientId),
+    onSuccess: () => {
+      invalidateTrainerData();
+    },
+    onError: (err) => {
+      const presented = presentApiError(err);
+      setActionError(presented.message);
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
+    },
+  });
+
+  const canMarkIndividual =
+    !group && attendanceActionsAvailable && slotStatus === 'Booked' && !!slot.id;
+
+  const attendees = attendeesQuery.data ?? [];
+  const liveOccupiedCount = group ? attendees.filter(isBookedAttendee).length : occupiedCount;
+  const canMutateAttendee = useMemo(
+    () => Boolean(slot.id) && !attendeeCompleteMutation.isPending && !attendeeNoShowMutation.isPending,
+    [slot.id, attendeeCompleteMutation.isPending, attendeeNoShowMutation.isPending]
+  );
 
   const handleMarkCompleted = () => {
     if (!slot.id) {
@@ -143,6 +226,27 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
     }
     setActionError(null);
     noShowMutation.mutate(slot.id);
+  };
+
+  const handleCancelGroupSlot = () => {
+    if (!slot.id || cancelMutation.isPending) {
+      return;
+    }
+    Alert.alert(
+      t('schedule.actions.cancelSlotConfirmTitle'),
+      t('schedule.actions.cancelSlotConfirmMessage'),
+      [
+        { text: t('profile.personal.cancel'), style: 'cancel' },
+        {
+          text: t('schedule.actions.cancelSlotConfirm'),
+          style: 'destructive',
+          onPress: () => {
+            setActionError(null);
+            cancelMutation.mutate(slot.id as string);
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -177,18 +281,124 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
           <Text fontSize="$3" color="$muted">
             {dateLabel || t('common.empty')}
           </Text>
-          {clientName ? (
-            <Text fontSize="$4" color="$text">
-              {clientName}
-            </Text>
-          ) : null}
-          {priceLabel ? (
-            <Text fontSize="$3" color="$muted">
-              {t('slots.priceLabel', { price: priceLabel })}
-            </Text>
+          {group ? (
+            <XStack alignItems="center" gap="$2">
+              <AppIcon name="users" size={14} color="$muted" />
+              <Text fontSize="$3" color="$muted">
+                {capacityMax ? `${liveOccupiedCount}/${capacityMax}` : `${liveOccupiedCount}`}
+              </Text>
+            </XStack>
           ) : null}
         </YStack>
-        {canMark ? (
+
+        {group ? (
+          <YStack gap="$3">
+            <Text fontSize="$4" fontWeight="700" color="$text">
+              {t('slotDetails.participantsTitle')}
+            </Text>
+            {attendeesQuery.isLoading ? (
+              <Text fontSize="$3" color="$muted">{t('common.loading')}</Text>
+            ) : null}
+            {attendees.map((attendee) => {
+              const attendeeStatus = getStatusLabel(attendee.status);
+              const showActions = isBookedAttendee(attendee);
+              const canShowCompleteAction = showActions && canCompleteNow;
+              const canShowNoShowAction = showActions && canNoShowNow;
+              return (
+                <YStack
+                  key={attendee.clientId ?? `attendee-${attendee.clientName}`}
+                  padding="$3"
+                  borderWidth={1}
+                  borderColor="$border"
+                  borderRadius="$4"
+                  gap="$2"
+                  backgroundColor="$background"
+                >
+                  <XStack justifyContent="space-between" alignItems="center">
+                    <XStack alignItems="center" gap="$3" flex={1}>
+                      <TrainerAvatar
+                        name={attendee.clientName}
+                        avatarUrl={attendee.clientAvatarUrl}
+                        size="$8"
+                      />
+                      <Text fontSize="$4" color="$text" flex={1}>
+                        {attendee.clientName ?? t('common.empty')}
+                      </Text>
+                    </XStack>
+                    <Text fontSize="$3" color="$muted">
+                      {attendeeStatus}
+                    </Text>
+                  </XStack>
+                  {canShowCompleteAction || canShowNoShowAction ? (
+                    <XStack gap="$2">
+                      {canShowCompleteAction ? (
+                        <Button
+                          flex={1}
+                          backgroundColor="$accent"
+                          color="$accentText"
+                          borderRadius="$4"
+                          minHeight="$9"
+                          onPress={() => {
+                            if (!slot.id || !attendee.clientId) {
+                              return;
+                            }
+                            attendeeCompleteMutation.mutate({
+                              slotId: slot.id,
+                              clientId: attendee.clientId,
+                            });
+                          }}
+                          disabled={!canMutateAttendee}
+                        >
+                          {t('slotDetails.markCompleted')}
+                        </Button>
+                      ) : null}
+                      {canShowNoShowAction ? (
+                        <Button
+                          flex={1}
+                          backgroundColor="$background"
+                          borderRadius="$4"
+                          borderWidth={1}
+                          borderColor="$danger"
+                          minHeight="$9"
+                          onPress={() => {
+                            if (!slot.id || !attendee.clientId) {
+                              return;
+                            }
+                            attendeeNoShowMutation.mutate({
+                              slotId: slot.id,
+                              clientId: attendee.clientId,
+                            });
+                          }}
+                          disabled={!canMutateAttendee}
+                        >
+                          <Text color="$danger">{t('slotDetails.markNoShow')}</Text>
+                        </Button>
+                      ) : null}
+                    </XStack>
+                  ) : null}
+                </YStack>
+              );
+            })}
+            <Button
+              backgroundColor="$background"
+              borderRadius="$4"
+              borderWidth={1}
+              borderColor="$primary"
+              minHeight="$9"
+              paddingHorizontal="$4"
+              onPress={handleCancelGroupSlot}
+              disabled={cancelMutation.isPending}
+            >
+              <Text color="$primary">
+                {cancelMutation.isPending
+                  ? t('common.loading')
+                  : t('schedule.actions.cancelSlot')}
+              </Text>
+            </Button>
+          </YStack>
+        ) : null}
+
+        {canMarkIndividual ? (
           <YStack gap="$3">
             <Button
               backgroundColor="$accent"
@@ -221,6 +431,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
             </Button>
           </YStack>
         ) : null}
+
         {actionError ? (
           <Text fontSize="$3" color="$primary">
             {actionError}
@@ -243,6 +454,3 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
     </YStack>
   );
 }
-
-
-
