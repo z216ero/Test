@@ -25,6 +25,7 @@ import { keys } from '@query/keys';
 import { registerPushTokenIfPossible } from '@notifications/pushRegistration';
 import { getDefaultLookupCode } from '@app/utils/lookups';
 import type { LookupItem } from '@api/lookupsApi';
+import { SelectFieldButton } from '@ui/components';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -280,39 +281,23 @@ export function RegisterScreen({ navigation, route }: Props) {
           <Text fontSize="$3" color="$muted">
             {t('auth.register.city')}
           </Text>
-          <Button
-            backgroundColor="$background"
-            borderRadius="$4"
-            borderWidth={1}
-            borderColor="$border"
-            height={44}
-            paddingHorizontal="$3"
-            justifyContent="flex-start"
-            alignItems="center"
+          <SelectFieldButton
+            value={cityName}
+            placeholder={t('auth.register.cityPlaceholder')}
             onPress={() => navigation.navigate('LocationSearch', {
               mode: 'city',
               returnTo: 'Register',
               returnToKey: route.key,
             })}
-          >
-            <Text color={cityName ? '$text' : '$muted'} width="100%" textAlign="left">
-              {cityName || t('auth.register.cityPlaceholder')}
-            </Text>
-          </Button>
+          />
         </YStack>
         <YStack gap="$2">
           <Text fontSize="$3" color="$muted">
             {t('auth.register.district')}
           </Text>
-          <Button
-            backgroundColor="$background"
-            borderRadius="$4"
-            borderWidth={1}
-            borderColor="$border"
-            height={44}
-            paddingHorizontal="$3"
-            justifyContent="flex-start"
-            alignItems="center"
+          <SelectFieldButton
+            value={districtName}
+            placeholder={t('auth.register.districtPlaceholder')}
             onPress={() => {
               if (!selectedCityId) {
                 setError(t('auth.register.selectCityFirst'));
@@ -326,11 +311,7 @@ export function RegisterScreen({ navigation, route }: Props) {
                 returnToKey: route.key,
               });
             }}
-          >
-            <Text color={districtName ? '$text' : '$muted'} width="100%" textAlign="left">
-              {districtName || t('auth.register.districtPlaceholder')}
-            </Text>
-          </Button>
+          />
         </YStack>
         <YStack gap="$2">
           <Text fontSize="$3" color="$muted">

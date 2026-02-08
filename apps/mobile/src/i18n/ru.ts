@@ -76,6 +76,8 @@
   'home.trainer.alertsTitle': 'Напоминания',
   'home.trainer.alertNoShow': 'Клиент не пришёл — можно отметить неявку',
   'home.trainer.alertUpcoming': 'Через 30 минут тренировка',
+  'home.trainer.groupClients': 'Клиентов: {occupied}/{capacity}',
+  'home.trainer.groupClientsOpen': 'Клиентов: {occupied}',
 
   'slots.title': 'Слоты',
   'slots.subtitle': 'Выберите удобное время.',
@@ -98,6 +100,7 @@
   'slots.empty.changeDate': 'Изменить дату',
   'slots.empty.resetFilters': 'Сбросить фильтры',
   'slots.status.available': 'Свободно',
+  'slots.status.bookedByYou': 'Вы записаны',
   'slots.status.conflict': 'Конфликт',
   'slots.status.full': 'Мест нет',
   'slots.status.unavailable': 'Недоступно',
@@ -208,6 +211,8 @@
   'schedule.errorNetwork': 'Сервер недоступен. Попробуй ещё раз.',
 
   'slotDetails.title': 'Детали слота',
+  'slotDetails.participantsTitle': 'Участники',
+  'slotDetails.participants': 'Участники ({occupied}/{capacity})',
   'slotDetails.markCompleted': 'Проведено',
   'slotDetails.markNoShow': 'Неявка',
 

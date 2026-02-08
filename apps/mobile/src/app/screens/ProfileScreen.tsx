@@ -1,41 +1,25 @@
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { logout } from '@api/authApi';
 import { presentApiError } from '@api/ApiErrorPresenter';
 import { getMe } from '@api/homeApi';
 import { clearSession } from '@auth/tokenStorage';
-import { getAccessToken } from '@auth/tokenStorage';
-import { buildAbsoluteUrl } from '@utils/url';
 import { t } from '@i18n';
-import { AppIcon } from '@ui/AppIcon';
-import type { AppIconName } from '@ui/icons';
 import type { ProfileStackParamList, RootStackParamList } from '@app/navigation/types';
 import { TabScrollView } from '@ui/layout/TabScrollView';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
+import { Avatar, useAuthorizedImageSource } from '@ui/components';
+import { ProfileSettingsList, type ProfileSettingsItem } from './profile/ui/ProfileSettingsList';
+import { ProfileTrainerRating } from './profile/ui/ProfileTrainerRating';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
 
-const getInitials = (name?: string | null) => {
-  const value = name?.trim();
-  if (!value) {
-    return t('common.initialsPlaceholder');
-  }
-  const parts = value.split(' ').filter(Boolean);
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }
-  return value.slice(0, 2).toUpperCase();
-};
-
 export function ProfileScreen({ navigation }: Props) {
-  const [avatarToken, setAvatarToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loadingToken, setLoadingToken] = useState(true);
 
   const {
     data: me,
@@ -47,25 +31,6 @@ export function ProfileScreen({ navigation }: Props) {
     queryKey: keys.auth.me(),
     queryFn: ({ signal }) => getMe({ signal }),
   });
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoadingToken(true);
-    getAccessToken()
-      .then((token) => {
-        if (!cancelled) {
-          setAvatarToken(token);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoadingToken(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -90,30 +55,9 @@ export function ProfileScreen({ navigation }: Props) {
     : t('profile.rating.empty');
 
   const name = me?.name?.trim() || t('common.unknownUser');
-  const avatarUrl = useMemo(() => {
-    if (!me?.avatarUrl) {
-      return null;
-    }
-    return buildAbsoluteUrl(me.avatarUrl);
-  }, [me?.avatarUrl]);
+  const avatarSource = useAuthorizedImageSource(me?.avatarUrl);
 
-  const avatarSource = useMemo(() => {
-    if (avatarUrl && avatarToken) {
-      return {
-        uri: avatarUrl,
-        headers: { Authorization: `Bearer ${avatarToken}` },
-      };
-    }
-    return null;
-  }, [avatarUrl, avatarToken]);
-
-  const settingsItems: {
-    id: string;
-    label: string;
-    icon: AppIconName;
-    onPress?: () => void;
-    disabled?: boolean;
-  }[] = [
+  const settingsItems: ProfileSettingsItem[] = [
     {
       id: 'personal',
       label: t('profile.settings.personalInfo'),
@@ -179,29 +123,14 @@ export function ProfileScreen({ navigation }: Props) {
           <YStack gap="$4">
             <XStack alignItems="flex-start" justifyContent="space-between" gap="$4">
               <XStack alignItems="center" gap="$4" flex={1}>
-                <YStack
-                  width="$11"
-                  height="$11"
+                <Avatar
+                  name={me?.name}
+                  source={avatarSource}
+                  size="$11"
                   borderRadius="$6"
                   backgroundColor="$background"
-                  borderWidth={1}
-                  borderColor="$border"
-                  alignItems="center"
-                  justifyContent="center"
-                  overflow="hidden"
-                >
-                  {avatarSource ? (
-                    <Image
-                      source={avatarSource}
-                      style={{ width: '100%', height: '100%' }}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <Text fontSize="$5" color="$muted">
-                      {getInitials(me?.name)}
-                    </Text>
-                  )}
-                </YStack>
+                  textSize="$5"
+                />
                 <YStack gap="$1" flex={1}>
                   <Text fontSize="$6" fontWeight="700" color="$text">
                     {name}
@@ -211,23 +140,14 @@ export function ProfileScreen({ navigation }: Props) {
                   </Text>
                 </YStack>
               </XStack>
-              {role === 'Trainer' ? (
-                <YStack alignItems="flex-end" gap="$1" maxWidth={160}>
-                  {showTrainerRating ? (
-                    <XStack alignItems="center" gap="$1">
-                      <AppIcon name="star" size={16} color="$accent" />
-                      <Text fontSize="$4" fontWeight="700" color="$text">
-                        {trainerRating.toFixed(1)}
-                      </Text>
-                    </XStack>
-                  ) : null}
-                  <Text fontSize="$2" color="$muted" textAlign="right">
-                    {ratingCaption}
-                  </Text>
-                </YStack>
-              ) : null}
+              <ProfileTrainerRating
+                role={role}
+                showTrainerRating={showTrainerRating}
+                trainerRating={trainerRating}
+                ratingCaption={ratingCaption}
+              />
             </XStack>
-            {isLoading || loadingToken ? (
+            {isLoading ? (
               <Text fontSize="$3" color="$muted">
                 {t('common.loading')}
               </Text>
@@ -239,34 +159,7 @@ export function ProfileScreen({ navigation }: Props) {
             ) : null}
           </YStack>
 
-          <YStack gap="$3">
-            {settingsItems.map((item) => (
-              <Button
-                key={item.id}
-                backgroundColor="$background"
-                borderRadius="$5"
-                borderWidth={1}
-                borderColor="$border"
-                padding="$4"
-                minHeight="$11"
-                paddingVertical="$3"
-                justifyContent="flex-start"
-                onPress={item.onPress}
-                disabled={item.disabled}
-                opacity={item.disabled ? 0.5 : 1}
-              >
-                <XStack alignItems="center" gap="$3" flex={1}>
-                  <AppIcon name={item.icon} size={20} color="$muted" />
-                  <Text fontSize="$3" color="$text" flex={1}>
-                    {item.label}
-                  </Text>
-                  <Text fontSize="$3" color="$muted">
-                    {t('common.arrow')}
-                  </Text>
-                </XStack>
-              </Button>
-            ))}
-          </YStack>
+          <ProfileSettingsList items={settingsItems} />
         </YStack>
       </TabScrollView>
       <Button

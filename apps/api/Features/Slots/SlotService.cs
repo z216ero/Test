@@ -595,11 +595,6 @@ public sealed class SlotService(AppDbContext db)
             return SlotAttendeeStatus.NoShow.ToString();
         }
 
-        if (slot.Attendees.Any(a => a.Status == SlotAttendeeStatus.Cancelled))
-        {
-            return SlotAttendeeStatus.Cancelled.ToString();
-        }
-
         return null;
     }
 

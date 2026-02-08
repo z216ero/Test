@@ -1,7 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image } from 'react-native';
-import { Button, Input, Text, XStack, YStack } from 'tamagui';
+import { YStack } from 'tamagui';
 import { launchImageLibrary } from 'react-native-image-picker';
 import type { UpdateUserRequest } from '@generated/api';
 import { patchUsersMe, putUsersMeAvatar } from '@generated/api';
@@ -13,11 +12,7 @@ import {
   getSpecializationLookups,
   getTrainingTypeLookups,
 } from '@api/lookupsApi';
-import { getAccessToken } from '@auth/tokenStorage';
-import { buildAbsoluteUrl } from '@utils/url';
 import { t } from '@i18n';
-import { formInputProps, primaryButtonProps, secondaryButtonProps } from '@ui/formDefaults';
-import { AppIcon } from '@ui/AppIcon';
 import { useToast } from '@ui/feedback/useToast';
 import { TabScrollView } from '@ui/layout/TabScrollView';
 import type { ProfileStackParamList } from '@app/navigation/types';
@@ -26,6 +21,12 @@ import { keys } from '@query/keys';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatPrice } from '@utils/price';
 import { getAnyLookupCode, getDefaultLookupCode } from '@app/utils/lookups';
+import { useAuthorizedImageSource } from '@ui/components';
+import { PersonalInfoActions } from './personal-info/ui/PersonalInfoActions';
+import { PersonalInfoHeader } from './personal-info/ui/PersonalInfoHeader';
+import { PersonalInfoMainSection } from './personal-info/ui/PersonalInfoMainSection';
+import { PersonalInfoPhotoSection } from './personal-info/ui/PersonalInfoPhotoSection';
+import { PersonalInfoTrainerSections } from './personal-info/ui/PersonalInfoTrainerSections';
 
 const getInitials = (name?: string | null) => {
   const value = name?.trim();
@@ -72,7 +73,6 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
   const [pricePerSession, setPricePerSession] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState<SelectedAvatar | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
-  const [avatarToken, setAvatarToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
@@ -102,13 +102,22 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
   });
 
 
-  const genderOptions = gendersQuery.data ?? [];
+  const genderOptions = useMemo(
+    () => gendersQuery.data ?? [],
+    [gendersQuery.data]
+  );
   const userGenderOptions = useMemo(
     () => genderOptions.filter((item) => !item.isAny),
     [genderOptions]
   );
-  const specializationOptions = specializationsQuery.data ?? [];
-  const trainingTypeOptions = trainingTypesQuery.data ?? [];
+  const specializationOptions = useMemo(
+    () => specializationsQuery.data ?? [],
+    [specializationsQuery.data]
+  );
+  const trainingTypeOptions = useMemo(
+    () => trainingTypesQuery.data ?? [],
+    [trainingTypesQuery.data]
+  );
 
   const specializationOrder = useMemo(
     () => new Map(specializationOptions.map((item, index) => [item.code, index])),
@@ -211,42 +220,18 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
   }, [navigation, route.params?.locationSelection]);
 
   useEffect(() => {
-    let cancelled = false;
-    getAccessToken().then((token) => {
-      if (!cancelled) {
-        setAvatarToken(token);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
     if (meError) {
       setError(presentApiError(meError).message);
     }
   }, [meError]);
 
-  const avatarUrl = useMemo(() => {
-    if (!me?.avatarUrl) {
-      return null;
-    }
-    return buildAbsoluteUrl(me.avatarUrl);
-  }, [me?.avatarUrl]);
-
+  const authorizedAvatarSource = useAuthorizedImageSource(me?.avatarUrl);
   const avatarSource = useMemo(() => {
     if (avatarPreviewUri) {
       return { uri: avatarPreviewUri };
     }
-    if (avatarUrl && avatarToken) {
-      return {
-        uri: avatarUrl,
-        headers: { Authorization: `Bearer ${avatarToken}` },
-      };
-    }
-    return null;
-  }, [avatarPreviewUri, avatarToken, avatarUrl]);
+    return authorizedAvatarSource;
+  }, [authorizedAvatarSource, avatarPreviewUri]);
 
   const visibleTrainingTypes = useMemo(() => (
     trainingTypesExpanded
@@ -400,6 +385,34 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
     }
   };
 
+  const handleSelectCity = () => {
+    navigation.navigate('LocationSearch', {
+      mode: 'city',
+      returnTo: 'PersonalInfo',
+      returnToKey: route.key,
+    });
+  };
+
+  const handleSelectDistrict = () => {
+    if (!selectedCityId) {
+      setError(t('profile.personal.cityRequired'));
+      return;
+    }
+    navigation.navigate('LocationSearch', {
+      mode: 'district',
+      cityId: selectedCityId,
+      cityName,
+      returnTo: 'PersonalInfo',
+      returnToKey: route.key,
+    });
+  };
+
+  const priceHint = pricePerSession.trim().length > 0
+    ? t('profile.personal.pricePreview', {
+      price: formatPrice(Number(pricePerSession) * 100) ?? '',
+    })
+    : t('profile.personal.priceEmpty');
+
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
       <TabScrollView
@@ -407,442 +420,55 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
         extraBottomToken={2}
       >
         <YStack gap="$6">
-          <YStack gap="$2">
-            <Text fontSize="$7" fontWeight="700" color="$text">
-              {t('profile.personal.title')}
-            </Text>
-            {isLoading ? (
-              <Text fontSize="$3" color="$muted">
-                {t('common.loading')}
-              </Text>
-            ) : null}
-            {error ? (
-              <Text fontSize="$3" color="$text">
-                {error}
-              </Text>
-            ) : null}
-          </YStack>
-
-          <YStack
-            gap="$3"
-            padding="$4"
-            backgroundColor="$background"
-            borderRadius="$5"
-            borderWidth={1}
-            borderColor="$border"
-          >
-            <Text fontSize="$4" fontWeight="700" color="$text">
-              {t('profile.personal.photo')}
-            </Text>
-            <XStack alignItems="center" gap="$4">
-              <YStack
-                width="$11"
-                height="$11"
-                borderRadius="$6"
-                backgroundColor="$surfaceMuted"
-                alignItems="center"
-                justifyContent="center"
-                overflow="hidden"
-              >
-                {avatarSource ? (
-                  <Image
-                    source={avatarSource}
-                    style={{ width: '100%', height: '100%' }}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <Text fontSize="$5" color="$muted">
-                    {getInitials(name || me?.name)}
-                  </Text>
-                )}
-              </YStack>
-              <Button
-                backgroundColor="$background"
-                borderRadius="$4"
-                borderWidth={1}
-                borderColor="$border"
-                onPress={handlePickPhoto}
-                disabled={saveMutation.isPending}
-                paddingHorizontal="$3"
-                {...secondaryButtonProps}
-              >
-                <Text fontSize="$3" color="$text">
-                  {t('profile.personal.pickPhoto')}
-                </Text>
-              </Button>
-            </XStack>
-          </YStack>
-
-          <YStack
-            gap="$3"
-            padding="$4"
-            backgroundColor="$background"
-            borderRadius="$5"
-            borderWidth={1}
-            borderColor="$border"
-          >
-            <Text fontSize="$4" fontWeight="700" color="$text">
-              {t('profile.personal.main')}
-            </Text>
-            <YStack gap="$2">
-              <Text fontSize="$3" color="$text">
-                {t('profile.personal.name')}
-              </Text>
-              <Input
-                value={name}
-                borderRadius="$4"
-                onChangeText={setName}
-                placeholder={t('profile.personal.name')}
-                {...formInputProps}
-              />
-            </YStack>
-            <YStack gap="$2">
-              <Text fontSize="$3" color="$text">
-                {t('profile.personal.city')}
-              </Text>
-              <Button
-                backgroundColor="$background"
-                borderRadius="$4"
-                borderWidth={1}
-                borderColor="$border"
-                height={44}
-                paddingHorizontal="$3"
-                justifyContent="flex-start"
-                alignItems="center"
-                onPress={() => navigation.navigate('LocationSearch', {
-                  mode: 'city',
-                  returnTo: 'PersonalInfo',
-                  returnToKey: route.key,
-                })}
-              >
-                <Text
-                  color={cityName ? '$text' : '$muted'}
-                  width="100%"
-                  textAlign="left"
-                >
-                  {cityName || t('profile.personal.cityPlaceholder')}
-                </Text>
-              </Button>
-            </YStack>
-            <YStack gap="$2">
-              <Text fontSize="$3" color="$text">
-                {t('profile.personal.district')}
-              </Text>
-              <Button
-                backgroundColor="$background"
-                borderRadius="$4"
-                borderWidth={1}
-                borderColor="$border"
-                height={44}
-                paddingHorizontal="$3"
-                justifyContent="flex-start"
-                alignItems="center"
-                onPress={() => {
-                  if (!selectedCityId) {
-                    setError(t('profile.personal.cityRequired'));
-                    return;
-                  }
-                  navigation.navigate('LocationSearch', {
-                    mode: 'district',
-                    cityId: selectedCityId,
-                    cityName,
-                    returnTo: 'PersonalInfo',
-                    returnToKey: route.key,
-                  });
-                }}
-              >
-                <Text
-                  color={districtName ? '$text' : '$muted'}
-                  width="100%"
-                  textAlign="left"
-                >
-                  {districtName || t('profile.personal.districtPlaceholder')}
-                </Text>
-              </Button>
-            </YStack>
-            <YStack gap="$2">
-              <Text fontSize="$3" color="$text">
-                {t('profile.personal.genderUserLabel')}
-              </Text>
-              <XStack gap="$2" flexWrap="wrap">
-                {userGenderOptions.map((option) => {
-                  const selected = userGender === option.code;
-                  return (
-                    <Button
-                      key={option.code}
-                      unstyled
-                      paddingHorizontal="$3"
-                      paddingVertical="$2"
-                      minHeight="$9"
-                      borderRadius="$4"
-                      backgroundColor={selected ? '$accent' : '$background'}
-                      borderWidth={1}
-                      borderColor={selected ? '$accent' : '$border'}
-                      onPress={() => setUserGender(option.code)}
-                    >
-                      <XStack alignItems="center" gap="$2">
-                        <AppIcon
-                          name="check"
-                          size={16}
-                          color={selected ? '$accentText' : '$muted'}
-                        />
-                        <Text fontSize="$3" color={selected ? '$accentText' : '$text'}>
-                          {option.label}
-                        </Text>
-                      </XStack>
-                    </Button>
-                  );
-                })}
-              </XStack>
-            </YStack>
-            {isTrainer ? (
-              <YStack gap="$2">
-                <Text fontSize="$3" color="$text">
-                  {t('profile.personal.price')}
-                </Text>
-                <Input
-                  value={pricePerSession}
-                  onChangeText={handlePriceChange}
-                  placeholder={t('profile.personal.pricePlaceholder')}
-                  keyboardType="numeric"
-                  {...formInputProps}
-                />
-                {pricePerSession.trim().length > 0 ? (
-                  <Text fontSize="$2" color="$muted">
-                    {t('profile.personal.pricePreview', {
-                      price: formatPrice(Number(pricePerSession) * 100) ?? '',
-                    })}
-                  </Text>
-                ) : (
-                  <Text fontSize="$2" color="$muted">
-                    {t('profile.personal.priceEmpty')}
-                  </Text>
-                )}
-              </YStack>
-            ) : null}
-            {email ? (
-              <YStack gap="$2">
-                <Text fontSize="$3" color="$text">
-                  {t('profile.personal.email')}
-                </Text>
-                <Input
-                  value={email}
-                  borderRadius="$4"
-                  editable={false}
-                  backgroundColor="$surfaceMuted"
-                  color="$muted"
-                  {...formInputProps}
-                />
-              </YStack>
-            ) : null}
-          </YStack>
-
-          {isTrainer ? (
-            <YStack
-              gap="$3"
-              padding="$4"
-              backgroundColor="$background"
-              borderRadius="$5"
-              borderWidth={1}
-              borderColor="$border"
-            >
-              <Text fontSize="$4" fontWeight="700" color="$text">
-                {t('profile.personal.about')}
-              </Text>
-              <Input
-                value={about}
-                onChangeText={setAbout}
-                placeholder={t('profile.personal.aboutPlaceholder')}
-                multiline
-                numberOfLines={4}
-                maxLength={250}
-                {...formInputProps}
-                height={120}
-                textAlignVertical="top"
-              />
-            </YStack>
-          ) : null}
-
-          {isTrainer ? (
-            <YStack
-              gap="$3"
-              padding="$4"
-              backgroundColor="$background"
-              borderRadius="$5"
-              borderWidth={1}
-              borderColor="$border"
-            >
-              <Text fontSize="$4" fontWeight="700" color="$text">
-                {t('profile.personal.specializations')}
-              </Text>
-              <XStack flexWrap="wrap" gap="$2">
-                {specializationOptions.map((option) => {
-                  const selected = specializations.includes(option.code);
-                  return (
-                    <Button
-                      key={option.code}
-                      unstyled
-                      paddingHorizontal="$3"
-                      paddingVertical="$2"
-                      minHeight="$9"
-                      borderRadius="$4"
-                      backgroundColor={selected ? '$accent' : '$background'}
-                      borderWidth={1}
-                      borderColor={selected ? '$accent' : '$border'}
-                      onPress={() => toggleSpecialization(option.code)}
-                    >
-                      <XStack alignItems="center" gap="$2">
-                        <AppIcon
-                          name="check"
-                          size={16}
-                          color={selected ? '$accentText' : '$muted'}
-                        />
-                        <Text fontSize="$3" color={selected ? '$accentText' : '$text'}>
-                          {option.label}
-                        </Text>
-                      </XStack>
-                    </Button>
-                  );
-                })}
-              </XStack>
-            </YStack>
-          ) : null}
-
-          {isTrainer ? (
-            <YStack
-              gap="$3"
-              padding="$4"
-              backgroundColor="$background"
-              borderRadius="$5"
-              borderWidth={1}
-              borderColor="$border"
-            >
-              <Text fontSize="$4" fontWeight="700" color="$text">
-                {t('profile.personal.trainingTypes')}
-              </Text>
-              <XStack flexWrap="wrap" gap="$2">
-                {visibleTrainingTypes.map((option) => {
-                  const selected = trainingTypes.includes(option.code);
-                  return (
-                    <Button
-                      key={option.code}
-                      unstyled
-                      paddingHorizontal="$3"
-                      paddingVertical="$2"
-                      minHeight="$9"
-                      borderRadius="$4"
-                      backgroundColor={selected ? '$accent' : '$background'}
-                      borderWidth={1}
-                      borderColor={selected ? '$accent' : '$border'}
-                      onPress={() => toggleTrainingType(option.code)}
-                    >
-                      <XStack alignItems="center" gap="$2">
-                        <AppIcon
-                          name="check"
-                          size={16}
-                          color={selected ? '$accentText' : '$muted'}
-                        />
-                        <Text fontSize="$3" color={selected ? '$accentText' : '$text'}>
-                          {option.label}
-                        </Text>
-                      </XStack>
-                    </Button>
-                  );
-                })}
-              </XStack>
-              {trainingTypeOptions.length > trainingTypesPreviewCount ? (
-                <Button
-                  minHeight="$2"
-                  backgroundColor="$background"
-                  borderRadius="$4"
-                  borderWidth={1}
-                  borderColor="$border"
-                  onPress={() => setTrainingTypesExpanded((prev) => !prev)}
-                  paddingHorizontal="$3"
-                  {...secondaryButtonProps}
-                >
-                  <Text fontSize="$3" color="$text">
-                    {trainingTypesExpanded
-                      ? t('profile.personal.trainingTypesHide')
-                      : t('profile.personal.trainingTypesShowMore')}
-                  </Text>
-                </Button>
-              ) : null}
-              <YStack gap="$2">
-                <Text fontSize="$4" fontWeight="700" color="$text">
-                  {t('profile.personal.genderLabel')}
-                </Text>
-                <YStack gap="$2">
-                  {genderOptions.map((option) => {
-                    const selected = worksWithGender === option.code;
-                    return (
-                      <Button
-                        key={option.code}
-                        unstyled
-                        backgroundColor="$background"
-                        borderRadius="$4"
-                        borderWidth={1}
-                        borderColor={selected ? '$accent' : '$border'}
-                        padding="$3"
-                        minHeight="$10"
-                        width="100%"
-                        justifyContent="flex-start"
-                        onPress={() => setWorksWithGender(option.code)}
-                      >
-                        <XStack alignItems="center" gap="$3" flex={1}>
-                          <YStack
-                            width="$4"
-                            height="$4"
-                            borderRadius="$10"
-                            borderWidth={1}
-                            borderColor={selected ? '$accent' : '$border'}
-                            backgroundColor={selected ? '$accent' : '$background'}
-                            alignItems="center"
-                            justifyContent="center"
-                          >
-                            {selected ? (
-                              <AppIcon name="check" size={12} color="$accentText" />
-                            ) : null}
-                          </YStack>
-                          <Text fontSize="$3" color="$text">
-                            {option.label}
-                          </Text>
-                        </XStack>
-                      </Button>
-                    );
-                  })}
-                </YStack>
-              </YStack>
-            </YStack>
-          ) : null}
-
-          <YStack gap="$3">
-            <Button
-              backgroundColor="$accent"
-              color="$accentText"
-              borderRadius="$4"
-              onPress={handleSave}
-              disabled={saveMutation.isPending || isLoading}
-              {...primaryButtonProps}
-            >
-              <Text fontSize="$3" color="$accentText">
-                {saveMutation.isPending ? t('common.loading') : t('profile.personal.save')}
-              </Text>
-            </Button>
-            <Button
-              backgroundColor="$background"
-              borderRadius="$4"
-              borderWidth={1}
-              borderColor="$border"
-              onPress={() => navigation.goBack()}
-              disabled={saveMutation.isPending}
-              {...secondaryButtonProps}
-            >
-              <Text fontSize="$3" color="$text">
-                {t('profile.personal.cancel')}
-              </Text>
-            </Button>
-          </YStack>
+          <PersonalInfoHeader
+            isLoading={isLoading}
+            error={error}
+          />
+          <PersonalInfoPhotoSection
+            avatarSource={avatarSource}
+            initials={getInitials(name || me?.name)}
+            onPickPhoto={handlePickPhoto}
+            disabled={saveMutation.isPending}
+          />
+          <PersonalInfoMainSection
+            name={name}
+            onChangeName={setName}
+            cityName={cityName}
+            districtName={districtName}
+            onSelectCity={handleSelectCity}
+            onSelectDistrict={handleSelectDistrict}
+            userGenderOptions={userGenderOptions}
+            userGender={userGender}
+            onSelectUserGender={setUserGender}
+            isTrainer={isTrainer}
+            pricePerSession={pricePerSession}
+            onChangePrice={handlePriceChange}
+            priceHint={priceHint}
+            email={email}
+          />
+          <PersonalInfoTrainerSections
+            isTrainer={isTrainer}
+            about={about}
+            onChangeAbout={setAbout}
+            specializationOptions={specializationOptions}
+            specializations={specializations}
+            onToggleSpecialization={toggleSpecialization}
+            visibleTrainingTypes={visibleTrainingTypes}
+            trainingTypes={trainingTypes}
+            onToggleTrainingType={toggleTrainingType}
+            hasMoreTrainingTypes={trainingTypeOptions.length > trainingTypesPreviewCount}
+            trainingTypesExpanded={trainingTypesExpanded}
+            onToggleTrainingTypesExpanded={() => setTrainingTypesExpanded((prev) => !prev)}
+            genderOptions={genderOptions}
+            worksWithGender={worksWithGender}
+            onSelectWorksWithGender={setWorksWithGender}
+          />
+          <PersonalInfoActions
+            isSaving={saveMutation.isPending}
+            isLoading={isLoading}
+            onSave={handleSave}
+            onCancel={() => navigation.goBack()}
+          />
         </YStack>
       </TabScrollView>
     </YStack>

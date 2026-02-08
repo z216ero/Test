@@ -89,6 +89,7 @@ $RECYCLE.BIN/
 # Local temporary build dirs
 .tmp_*/
 .verify/
+.tmpbuild/
 # Certificates
 **/*.pfx
 **/*.crt

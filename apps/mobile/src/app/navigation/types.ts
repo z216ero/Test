@@ -2,7 +2,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { AvailableSlotTrainerDto, SlotDto } from '@generated/api';
 
 export type ScheduleStackParamList = {
-  ScheduleHome: undefined;
+  ScheduleHome: { initialDateIsoLocal?: string } | undefined;
   SlotDetails: { slot: SlotDto };
 };
 
@@ -71,24 +71,6 @@ export type AuthStackParamList = {
   Login: undefined;
   Register: { locationSelection?: LocationSelection } | undefined;
   LocationSearch: LocationSearchParams;
-};
-
-export type AppStackParamList = {
-  Home: undefined;
-  Trainers: { mode: 'client' | 'trainer'; clientId?: string };
-  AvailableSlots: { trainerId: string; trainerName: string; clientId: string };
-  SlotDetails: {
-    trainerId: string;
-    trainerName: string;
-    slot: SlotDto;
-    clientId: string;
-  };
-  TrainerSlots: { trainerId: string; trainerName: string };
-  CreateSlot: {
-    trainerId: string;
-    trainerName: string;
-    initialDateIsoLocal?: string;
-  };
 };
 
 export type RootStackParamList = {

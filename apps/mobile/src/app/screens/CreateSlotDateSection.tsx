@@ -1,10 +1,9 @@
-import DateTimePicker, {
-  type DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
+import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Platform } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
+import { IOSDatePickerCard } from '@ui/components';
 import { formatDateRu } from '@utils/datetime';
 import { formatWeekdayDate } from './useCreateSlotFormState';
 
@@ -111,30 +110,13 @@ export function CreateSlotDateSection({
         {formatWeekdayDate(selectedDate)}
       </Text>
       {pickerVisible && Platform.OS === 'ios' ? (
-        <YStack
-          padding="$4"
-          borderWidth={1}
-          borderColor="$border"
-          borderRadius="$4"
-          backgroundColor="$background"
-        >
-          <DateTimePicker
-            value={selectedDate}
-            mode="date"
-            display="inline"
-            minimumDate={todayDate}
-            onChange={onChangeDate}
-          />
-          <Button
-            marginTop="$3"
-            backgroundColor="$surfaceMuted"
-            borderWidth={1}
-            borderColor="$border"
-            onPress={onClosePicker}
-          >
-            {t('common.close')}
-          </Button>
-        </YStack>
+        <IOSDatePickerCard
+          value={selectedDate}
+          minimumDate={todayDate}
+          onChange={onChangeDate}
+          onClose={onClosePicker}
+          closeMarginTop="$3"
+        />
       ) : null}
     </YStack>
   );

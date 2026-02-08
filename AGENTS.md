@@ -83,6 +83,12 @@ Infrastructure:
 - No custom design systems in MVP
 - Focus on usability, not visual experiments
 
+## Code structure rules
+- Prefer existing custom shared components first (for mobile: `src/ui/components` and feature `components` folders) before adding new inline UI blocks.
+- If a suitable shared component does not exist, create a small reusable component instead of duplicating markup/logic across screens.
+- Do not create oversized modules: split screens/components/services into smaller focused units when a file starts growing significantly.
+- Treat `400+` lines in one module as unacceptable; refactor earlier into smaller components/hooks/helpers.
+
 ## UI stack & style
 
 - Use Tamagui for all UI components and styling in the mobile app.
