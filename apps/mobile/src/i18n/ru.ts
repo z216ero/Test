@@ -268,6 +268,7 @@
   'profile.settings.bookings': 'Записи',
   'profile.settings.payments': 'Платежи',
   'profile.settings.notifications': 'Уведомления',
+  'profile.settings.darkTheme': 'Тёмная тема',
   'profile.settings.support': 'Помощь и поддержка',
   'profile.rating.basedOn': 'на основе последних {count} тренировок',
   'profile.rating.empty': 'Рейтинг появится после первых тренировок',

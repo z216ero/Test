@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
@@ -6,9 +7,11 @@ import type { AppIconName } from '@ui/icons';
 export type ProfileSettingsItem = {
   id: string;
   label: string;
-  icon: AppIconName;
+  icon?: AppIconName;
   onPress?: () => void;
   disabled?: boolean;
+  rightSlot?: ReactNode;
+  hideArrow?: boolean;
 };
 
 type ProfileSettingsListProps = {
@@ -34,13 +37,17 @@ export function ProfileSettingsList({ items }: ProfileSettingsListProps) {
           opacity={item.disabled ? 0.5 : 1}
         >
           <XStack alignItems="center" gap="$3" flex={1}>
-            <AppIcon name={item.icon} size={20} color="$muted" />
+            {item.icon ? <AppIcon name={item.icon} size={20} color="$muted" /> : null}
             <Text fontSize="$3" color="$text" flex={1}>
               {item.label}
             </Text>
-            <Text fontSize="$3" color="$muted">
-              {t('common.arrow')}
-            </Text>
+            {item.rightSlot ?? (
+              item.hideArrow ? null : (
+                <Text fontSize="$3" color="$muted">
+                  {t('common.arrow')}
+                </Text>
+              )
+            )}
           </XStack>
         </Button>
       ))}

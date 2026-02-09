@@ -2,7 +2,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useMemo } from 'react';
 import type { TextStyle } from 'react-native';
+import { useAppTheme } from '@app/theme/AppThemeContext';
 import { BootstrapScreen } from '@app/screens/BootstrapScreen';
 import { ClientSlotDetailsScreen } from '@app/screens/ClientSlotDetailsScreen';
 import { BookingDetailsScreen } from '@app/screens/BookingDetailsScreen';
@@ -88,10 +90,6 @@ const isTokenValue = <T,>(value: TokenValue<T>): value is { val: T } =>
 const getTokenValue = <T,>(token: TokenValue<T> | undefined): T | undefined =>
   token && isTokenValue(token) ? token.val : token;
 
-const tabActiveColor = getTokenValue(tokens.color.accent) as string;
-const tabInactiveColor = getTokenValue(tokens.color.muted) as string;
-const tabBackground = getTokenValue(tokens.color.background) as string;
-const tabBorder = getTokenValue(tokens.color.border) as string;
 const tabPaddingTop = getTokenValue(tokens.space[2]) as number;
 const tabPaddingBottom = getTokenValue(tokens.space[3]) as number;
 const tabHeight =
@@ -100,25 +98,40 @@ const tabHeight =
   (getTokenValue(tokens.space[2]) as number);
 const tabLabelSize = getTokenValue(tokens.size[2]) as number;
 const tabLabelWeight = config.fonts.body.weight[7] as TextStyle['fontWeight'];
+const lightTabBackground = getTokenValue(tokens.color.background) as string;
+const lightTabBorder = getTokenValue(tokens.color.border) as string;
+const lightTabActive = getTokenValue(tokens.color.accent) as string;
+const lightTabInactive = getTokenValue(tokens.color.muted) as string;
+const darkTabBackground = '#0B1220';
+const darkTabBorder = '#334155';
+const darkTabActive = '#34D399';
+const darkTabInactive = '#94A3B8';
 
-const tabBarScreenOptions: BottomTabNavigationOptions = {
-  headerShown: false,
-  tabBarActiveTintColor: tabActiveColor,
-  tabBarInactiveTintColor: tabInactiveColor,
-  tabBarStyle: {
-    backgroundColor: tabBackground,
-    borderTopColor: tabBorder,
-    borderTopWidth: 1,
-    paddingTop: tabPaddingTop,
-    paddingBottom: tabPaddingBottom,
-    height: tabHeight,
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  tabBarLabelStyle: {
-    fontSize: tabLabelSize,
-    fontWeight: tabLabelWeight,
-  },
+const useTabBarScreenOptions = (): BottomTabNavigationOptions => {
+  const { isDark } = useAppTheme();
+
+  return useMemo(
+    () => ({
+      headerShown: false,
+      tabBarActiveTintColor: isDark ? darkTabActive : lightTabActive,
+      tabBarInactiveTintColor: isDark ? darkTabInactive : lightTabInactive,
+      tabBarStyle: {
+        backgroundColor: isDark ? darkTabBackground : lightTabBackground,
+        borderTopColor: isDark ? darkTabBorder : lightTabBorder,
+        borderTopWidth: 1,
+        paddingTop: tabPaddingTop,
+        paddingBottom: tabPaddingBottom,
+        height: tabHeight,
+        elevation: 0,
+        shadowOpacity: 0,
+      },
+      tabBarLabelStyle: {
+        fontSize: tabLabelSize,
+        fontWeight: tabLabelWeight,
+      },
+    }),
+    [isDark]
+  );
 };
 
 const makeTabIcon = (name: Parameters<typeof AppIcon>[0]['name']) => ({ color }: { color: string }) => (
@@ -145,55 +158,63 @@ const ScheduleTabIcon = ({ color }: { color: string }) => {
   );
 };
 
-const ClientTabsNavigator = () => (
-  <ClientTabs.Navigator screenOptions={tabBarScreenOptions}>
-    <ClientTabs.Screen
-      name="Home"
-      component={HomeScreen}
-      options={{ title: t('tabs.home'), tabBarIcon: makeTabIcon('home') }}
-    />
-    <ClientTabs.Screen
-      name="Slots"
-      component={SlotsStackNavigator}
-      options={{ title: t('tabs.slots'), tabBarIcon: makeTabIcon('calendar') }}
-    />
-    <ClientTabs.Screen
-      name="Bookings"
-      component={BookingsStackNavigator}
-      options={{ title: t('tabs.bookings'), tabBarIcon: makeTabIcon('history') }}
-    />
-    <ClientTabs.Screen
-      name="Profile"
-      component={ProfileStackNavigator}
-      options={{ title: t('tabs.profile'), tabBarIcon: makeTabIcon('user') }}
-    />
-  </ClientTabs.Navigator>
-);
+const ClientTabsNavigator = () => {
+  const tabBarScreenOptions = useTabBarScreenOptions();
 
-const TrainerTabsNavigator = () => (
-  <TrainerTabs.Navigator screenOptions={tabBarScreenOptions}>
-    <TrainerTabs.Screen
-      name="Home"
-      component={HomeScreen}
-      options={{ title: t('tabs.home'), tabBarIcon: makeTabIcon('home') }}
-    />
-    <TrainerTabs.Screen
-      name="Schedule"
-      component={ScheduleStackNavigator}
-      options={{ title: t('tabs.schedule'), tabBarIcon: ScheduleTabIcon }}
-    />
-    <TrainerTabs.Screen
-      name="CreateSlot"
-      component={CreateSlotTabScreen}
-      options={{ title: t('tabs.createSlot'), tabBarIcon: makeTabIcon('plus') }}
-    />
-    <TrainerTabs.Screen
-      name="Profile"
-      component={ProfileStackNavigator}
-      options={{ title: t('tabs.profile'), tabBarIcon: makeTabIcon('user') }}
-    />
-  </TrainerTabs.Navigator>
-);
+  return (
+    <ClientTabs.Navigator screenOptions={tabBarScreenOptions}>
+      <ClientTabs.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{ title: t('tabs.home'), tabBarIcon: makeTabIcon('home') }}
+      />
+      <ClientTabs.Screen
+        name="Slots"
+        component={SlotsStackNavigator}
+        options={{ title: t('tabs.slots'), tabBarIcon: makeTabIcon('calendar') }}
+      />
+      <ClientTabs.Screen
+        name="Bookings"
+        component={BookingsStackNavigator}
+        options={{ title: t('tabs.bookings'), tabBarIcon: makeTabIcon('history') }}
+      />
+      <ClientTabs.Screen
+        name="Profile"
+        component={ProfileStackNavigator}
+        options={{ title: t('tabs.profile'), tabBarIcon: makeTabIcon('user') }}
+      />
+    </ClientTabs.Navigator>
+  );
+};
+
+const TrainerTabsNavigator = () => {
+  const tabBarScreenOptions = useTabBarScreenOptions();
+
+  return (
+    <TrainerTabs.Navigator screenOptions={tabBarScreenOptions}>
+      <TrainerTabs.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{ title: t('tabs.home'), tabBarIcon: makeTabIcon('home') }}
+      />
+      <TrainerTabs.Screen
+        name="Schedule"
+        component={ScheduleStackNavigator}
+        options={{ title: t('tabs.schedule'), tabBarIcon: ScheduleTabIcon }}
+      />
+      <TrainerTabs.Screen
+        name="CreateSlot"
+        component={CreateSlotTabScreen}
+        options={{ title: t('tabs.createSlot'), tabBarIcon: makeTabIcon('plus') }}
+      />
+      <TrainerTabs.Screen
+        name="Profile"
+        component={ProfileStackNavigator}
+        options={{ title: t('tabs.profile'), tabBarIcon: makeTabIcon('user') }}
+      />
+    </TrainerTabs.Navigator>
+  );
+};
 
 type RoleTabsProps = NativeStackScreenProps<RootStackParamList, 'App'>;
 

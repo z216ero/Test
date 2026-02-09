@@ -1,4 +1,4 @@
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { getApp } from '@react-native-firebase/app';
 import {
@@ -13,6 +13,7 @@ import { enableScreens } from 'react-native-screens';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { PortalProvider } from '@tamagui/portal';
 import { RootNavigator } from '@app/navigation/RootNavigator';
+import { AppThemeProvider, useAppTheme } from '@app/theme/AppThemeContext';
 import { queryClient } from '@query/queryClient';
 import { keys } from '@query/keys';
 import { ToastProvider } from '@ui/feedback/ToastProvider';
@@ -23,7 +24,7 @@ import {
 } from '@notifications/pushRegistration';
 import { hydratePushIndicators } from '@notifications/pushIndicators';
 import config from './tamagui.config.cjs';
-import { TamaguiProvider } from '@tamagui/core';
+import { TamaguiProvider, Theme } from '@tamagui/core';
 
 enableScreens();
 
@@ -36,9 +37,12 @@ const getTokenValue = <T,>(token: TokenValue<T> | undefined): T | undefined =>
 
 const baseInsetPadding = (getTokenValue(tokens.space[2]) as number) ?? 8;
 const safeAreaBackground = (getTokenValue(tokens.color.background) as string) ?? '#ffffff';
+const safeAreaBackgroundDark = '#0B1220';
 
-function App() {
+function AppContent() {
+  const { isDark, themeName } = useAppTheme();
   const resumeInvalidateRef = useRef(0);
+  const navigationTheme = isDark ? DarkTheme : DefaultTheme;
 
   useEffect(() => {
     const messaging = getMessaging(getApp());
@@ -89,28 +93,38 @@ function App() {
   return (
     <SafeAreaProvider>
       <TamaguiProvider config={config} defaultTheme="light">
-        <SafeAreaView
-          style={{
-            flex: 1,
-            backgroundColor: safeAreaBackground,
-            paddingTop: baseInsetPadding,
-            paddingBottom: baseInsetPadding,
-          }}
-          edges={{ top: 'additive', bottom: 'additive' }}
-        >
-          <StatusBar barStyle="dark-content" />
-          <PortalProvider shouldAddRootHost>
-            <QueryClientProvider client={queryClient}>
-              <ToastProvider>
-                <NavigationContainer>
-                  <RootNavigator />
-                </NavigationContainer>
-              </ToastProvider>
-            </QueryClientProvider>
-          </PortalProvider>
-        </SafeAreaView>
+        <Theme name={themeName}>
+          <SafeAreaView
+            style={{
+              flex: 1,
+              backgroundColor: isDark ? safeAreaBackgroundDark : safeAreaBackground,
+              paddingTop: baseInsetPadding,
+              paddingBottom: baseInsetPadding,
+            }}
+            edges={{ top: 'additive', bottom: 'additive' }}
+          >
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+            <PortalProvider shouldAddRootHost>
+              <QueryClientProvider client={queryClient}>
+                <ToastProvider>
+                  <NavigationContainer theme={navigationTheme}>
+                    <RootNavigator />
+                  </NavigationContainer>
+                </ToastProvider>
+              </QueryClientProvider>
+            </PortalProvider>
+          </SafeAreaView>
+        </Theme>
       </TamaguiProvider>
     </SafeAreaProvider>
+  );
+}
+
+function App() {
+  return (
+    <AppThemeProvider>
+      <AppContent />
+    </AppThemeProvider>
   );
 }
 
