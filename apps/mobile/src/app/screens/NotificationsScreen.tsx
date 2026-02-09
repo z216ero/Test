@@ -23,7 +23,7 @@ import {
   type NotificationEvent,
 } from '@shared/notifications/eventStore';
 import { onSettingsChanged } from '@notifications/orchestrator';
-import { setPushTokenEnabled } from '@notifications/pushRegistration';
+import { updatePushPreferences } from '@api/pushApi';
 import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Notifications'>;
@@ -110,8 +110,26 @@ export function NotificationsScreen({ navigation }: Props) {
         console.warn('notifications: reschedule failed', err);
       }
     }
-    if (typeof partial.inAppBookingEventsEnabled === 'boolean') {
-      await setPushTokenEnabled(partial.inAppBookingEventsEnabled);
+
+    const shouldSyncPushPreferences =
+      typeof partial.inAppBookingEventsEnabled === 'boolean'
+      || typeof partial.inAppGroupMinCancellationEventsEnabled === 'boolean'
+      || typeof partial.enabled === 'boolean'
+      || typeof partial.reminderOffsetMinutes === 'number';
+
+    if (shouldSyncPushPreferences) {
+      try {
+        await updatePushPreferences({
+          eventsEnabled: next.inAppBookingEventsEnabled,
+          groupMinCancellationEnabled: next.inAppGroupMinCancellationEventsEnabled,
+          reminderEnabled: next.enabled,
+          reminderOffsetMinutes: next.reminderOffsetMinutes,
+        });
+      } catch (err) {
+        if (__DEV__) {
+          console.warn('notifications: push preferences sync failed', err);
+        }
+      }
     }
   };
 
@@ -137,6 +155,7 @@ export function NotificationsScreen({ navigation }: Props) {
     enabled: true,
     reminderOffsetMinutes: 120,
     inAppBookingEventsEnabled: true,
+    inAppGroupMinCancellationEventsEnabled: true,
   };
 
   const role = meQuery.data?.role === 'Trainer' ? 'Trainer' : 'Client';
@@ -276,8 +295,43 @@ export function NotificationsScreen({ navigation }: Props) {
                     borderWidth={1}
                     borderColor="$border"
                   />
-                </Switch>
+                  </Switch>
               </XStack>
+              {role === 'Client' ? (
+                <XStack alignItems="center" justifyContent="space-between">
+                  <YStack flex={1} gap="$1">
+                    <Text fontSize="$3" color="$text">
+                      {t('notifications.inApp.groupMinCancelToggle')}
+                    </Text>
+                    <Text fontSize="$2" color="$muted">
+                      {t('notifications.inApp.groupMinCancelHint')}
+                    </Text>
+                  </YStack>
+                  <Switch
+                    size="$7"
+                    checked={resolvedSettings.inAppGroupMinCancellationEventsEnabled}
+                    onCheckedChange={(value) =>
+                      updateSettings({
+                        inAppGroupMinCancellationEventsEnabled: Boolean(value),
+                      })
+                    }
+                    disabled={loading || !resolvedSettings.inAppBookingEventsEnabled}
+                    backgroundColor={
+                      resolvedSettings.inAppGroupMinCancellationEventsEnabled
+                        ? '$accent'
+                        : '$surfaceMuted'
+                    }
+                    borderWidth={1}
+                    borderColor="$border"
+                  >
+                    <Switch.Thumb
+                      backgroundColor="$background"
+                      borderWidth={1}
+                      borderColor="$border"
+                    />
+                  </Switch>
+                </XStack>
+              ) : null}
             </YStack>
           </YStack>
 

@@ -144,7 +144,7 @@ export function TrainerSlotGroupCard({
           const isPast = startTs !== null && startTs <= nowTs;
           const open = isSlotOpen(slot);
           const groupSlot = isGroupSlot(slot);
-          const isBookedGroupSlot = groupSlot && isBookedByClient(slot, bookings);
+          const isBookedByCurrentClient = isBookedByClient(slot, bookings);
           const occupiedCount = slot.occupiedCount ?? 0;
           const capacityMax = slot.capacityMax ?? null;
           const isFull = slot.isFull ?? (
@@ -152,8 +152,13 @@ export function TrainerSlotGroupCard({
             && capacityMax !== null
             && occupiedCount >= capacityMax
           );
-          const isBookable = Boolean(slot.id) && open && !isPast && !conflict && !isFull && !isBookedGroupSlot;
-          const statusLabel = isBookedGroupSlot
+          const isBookable = Boolean(slot.id)
+            && open
+            && !isPast
+            && !conflict
+            && !isFull
+            && !isBookedByCurrentClient;
+          const statusLabel = isBookedByCurrentClient
             ? t('slots.status.bookedByYou')
             : conflict
             ? t('slots.status.conflict')
@@ -162,7 +167,7 @@ export function TrainerSlotGroupCard({
               : open && !isPast
                 ? t('slots.status.available')
                 : t('slots.status.unavailable');
-          const statusColor = isBookedGroupSlot
+          const statusColor = isBookedByCurrentClient
             ? '$accent'
             : conflict
             ? '$danger'
@@ -179,7 +184,7 @@ export function TrainerSlotGroupCard({
               backgroundColor={isBookable ? '$background' : '$surfaceMuted'}
               borderRadius="$4"
               borderWidth={1}
-              borderColor={isBookedGroupSlot ? '$accent' : isBookable ? '$border' : '$surfaceMuted'}
+              borderColor={isBookedByCurrentClient ? '$accent' : isBookable ? '$border' : '$surfaceMuted'}
               padding="$3"
               alignItems="stretch"
               onPress={() => {
@@ -195,7 +200,7 @@ export function TrainerSlotGroupCard({
                   {timeLabel}
                 </Text>
                 <XStack alignItems="center" gap="$2">
-                  {isBookedGroupSlot ? (
+                  {isBookedByCurrentClient ? (
                     <AppIcon name="check" size={14} color="$accent" />
                   ) : null}
                   {groupSlot ? (

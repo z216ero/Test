@@ -4,6 +4,7 @@ using Api.Features.Bookings;
 using Api.Features.Clients;
 using Api.Features.Health;
 using Api.Features.Lookups;
+using Api.Features.Payments;
 using Api.Features.Push;
 using Api.Features.Slots;
 using Api.Features.Trainers;
@@ -103,12 +104,17 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<TrainerService>();
 builder.Services.AddScoped<SlotService>();
+builder.Services.AddScoped<GroupSlotAutoCancellationService>();
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ClientService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<PushService>();
+builder.Services.AddScoped<TrainingReminderService>();
+builder.Services.AddScoped<PaymentService>();
 builder.Services.AddSingleton<FirebaseMessagingClient>();
+builder.Services.AddHostedService<GroupSlotAutoCancellationWorker>();
+builder.Services.AddHostedService<TrainingReminderWorker>();
 
 var app = builder.Build();
 
@@ -126,6 +132,7 @@ app.MapClientEndpoints();
 app.MapUserEndpoints();
 app.MapPushEndpoints();
 app.MapLookupEndpoints();
+app.MapPaymentEndpoints();
 
 await app.RunAsync();
 

@@ -28,7 +28,7 @@ public sealed class TrainerPriceTests : IClassFixture<ApiPostgresFixture>
             "Password123",
             "Trainer",
             "Trainer Slots",
-            "Strength"));
+            "Москва"));
 
         Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
         var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
@@ -38,11 +38,8 @@ public sealed class TrainerPriceTests : IClassFixture<ApiPostgresFixture>
 
         var updateResponse = await client.PatchAsJsonAsync("/users/me", new UpdateUserRequest(
             "Trainer Slots",
-            "Strength",
-            null,
-            new[] { "Full Body" },
-            "All",
-            180_000));
+            "Москва",
+            PricePerSession: 180_000));
 
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 

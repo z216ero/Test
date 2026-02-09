@@ -5,7 +5,8 @@ public sealed record CreateSlotRequest(
     int DurationMinutes,
     string? SlotType = null,
     int? CapacityMax = null,
-    int? CapacityMin = null);
+    int? CapacityMin = null,
+    bool AutoCancelIfMinNotReached = false);
 
 public sealed record SlotDto(
     Guid Id,

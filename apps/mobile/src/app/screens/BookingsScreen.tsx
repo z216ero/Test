@@ -51,6 +51,7 @@ type CancelContext = {
 };
 
 const NOW_REFRESH_INTERVAL_MS = 60 * 1000;
+const LIVE_REFRESH_INTERVAL_MS = 15 * 1000;
 
 const buildDateKey = (value: Date): string => {
   const month = `${value.getMonth() + 1}`.padStart(2, '0');
@@ -68,11 +69,15 @@ export function BookingsScreen({ navigation }: Props) {
   const upcomingQuery = useAppQuery({
     queryKey: keys.bookings.upcoming(),
     queryFn: ({ signal }) => getClientUpcomingBookings({ signal }),
+    refetchInterval: LIVE_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
   });
 
   const historyQuery = useAppQuery({
     queryKey: keys.bookings.history(),
     queryFn: ({ signal }) => getClientBookingHistory({ signal }),
+    refetchInterval: LIVE_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
   });
 
   useFocusEffect(
@@ -106,8 +111,8 @@ export function BookingsScreen({ navigation }: Props) {
   );
 
   const historyItems = useMemo(
-    () => (historyQuery.data ?? []).filter((item) => isHistoryBooking(item.slot)),
-    [historyQuery.data]
+    () => (historyQuery.data ?? []).filter((item) => isHistoryBooking(item.slot, nowTs)),
+    [historyQuery.data, nowTs]
   );
 
   const historyIds = useMemo(() => {
@@ -228,7 +233,7 @@ export function BookingsScreen({ navigation }: Props) {
     const trainingTypeIcon = isGroupTraining ? 'users' : 'user';
     const times = getSlotTimes(booking.slot);
     const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : t('common.empty');
-    const statusType = getBookingStatusType(booking.slot);
+    const statusType = getBookingStatusType(booking.slot, nowTs);
     const statusMeta = bookingStatusMeta[statusType];
     const statusLabel = t(statusMeta.labelKey);
     const canCancel = booking.slot.id ? canCancelBooking(booking.slot, nowTs) : false;
@@ -248,18 +253,24 @@ export function BookingsScreen({ navigation }: Props) {
         borderWidth={1}
         borderColor="$border"
       >
-        <XStack justifyContent="space-between" alignItems="center">
+        <XStack justifyContent="space-between" alignItems="center" gap="$2">
           <Text fontSize="$4" fontWeight="700" color="$text">
             {timeLabel}
           </Text>
-          <XStack alignItems="center" gap="$2">
+          <XStack alignItems="center" gap="$2" flexShrink={1} minWidth={0}>
             <YStack
               width="$1"
               height="$1"
               borderRadius="$6"
               backgroundColor={statusMeta.color}
             />
-            <Text fontSize="$2" color={statusMeta.color}>
+            <Text
+              fontSize="$2"
+              color={statusMeta.color}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              flexShrink={1}
+            >
               {statusLabel}
             </Text>
           </XStack>

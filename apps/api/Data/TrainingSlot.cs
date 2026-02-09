@@ -10,6 +10,8 @@ public sealed class TrainingSlot
     public TrainingSlotType SlotType { get; set; } = TrainingSlotType.Individual;
     public int? CapacityMax { get; set; }
     public int? CapacityMin { get; set; }
+    public bool AutoCancelIfMinNotReached { get; set; }
+    public DateTime? AutoCancelAtUtc { get; set; }
     public TrainingSlotStatus Status { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public Booking? Booking { get; set; }

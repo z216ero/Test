@@ -8,4 +8,5 @@ public sealed class Booking
     public Guid ClientId { get; set; }
     public BookingStatus Status { get; set; }
     public DateTime CreatedAtUtc { get; set; }
+    public Payment? Payment { get; set; }
 }

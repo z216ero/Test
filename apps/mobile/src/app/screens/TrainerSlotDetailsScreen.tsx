@@ -22,6 +22,10 @@ import type { ScheduleStackParamList } from '@app/navigation/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppIcon } from '@ui/AppIcon';
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
+import {
+  canCancelBookedSlot,
+  canCancelSlot,
+} from '@app/components/schedule/slotHelpers';
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, 'SlotDetails'>;
 
@@ -69,6 +73,7 @@ const getStatusLabel = (status?: string | null) => {
 const normalize = (value?: string | null) => value?.toLowerCase().trim();
 const isGroupSlot = (slot: SlotDto) => normalize(slot.slotType) === 'group';
 const isBookedAttendee = (attendee: SlotAttendeeDto) => normalize(attendee.status) === 'booked';
+const isCancelledAttendee = (attendee: SlotAttendeeDto) => normalize(attendee.status) === 'cancelled';
 
 export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   const { slot } = route.params;
@@ -204,7 +209,18 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
     !group && attendanceActionsAvailable && slotStatus === 'Booked' && !!slot.id;
 
   const attendees = attendeesQuery.data ?? [];
-  const liveOccupiedCount = group ? attendees.filter(isBookedAttendee).length : occupiedCount;
+  const hasAttendeesSnapshot = attendeesQuery.data !== undefined;
+  const hasActiveAttendees = hasAttendeesSnapshot
+    ? attendees.some((attendee) => !isCancelledAttendee(attendee))
+    : occupiedCount > 0;
+  const liveParticipantCount = group
+    ? hasAttendeesSnapshot
+      ? attendees.filter((attendee) => !isCancelledAttendee(attendee)).length
+      : occupiedCount
+    : occupiedCount;
+  const canCancelAsAvailable = canCancelSlot(slot, nowTs);
+  const canCancelAsBooked = canCancelBookedSlot(slot, nowTs) && startTs !== null && nowTs < startTs;
+  const canCancelGroupSlot = Boolean(slot.id) && (hasActiveAttendees ? canCancelAsBooked : canCancelAsAvailable);
   const canMutateAttendee = useMemo(
     () => Boolean(slot.id) && !attendeeCompleteMutation.isPending && !attendeeNoShowMutation.isPending,
     [slot.id, attendeeCompleteMutation.isPending, attendeeNoShowMutation.isPending]
@@ -229,7 +245,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   };
 
   const handleCancelGroupSlot = () => {
-    if (!slot.id || cancelMutation.isPending) {
+    if (!canCancelGroupSlot || !slot.id || cancelMutation.isPending) {
       return;
     }
     Alert.alert(
@@ -285,7 +301,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
             <XStack alignItems="center" gap="$2">
               <AppIcon name="users" size={14} color="$muted" />
               <Text fontSize="$3" color="$muted">
-                {capacityMax ? `${liveOccupiedCount}/${capacityMax}` : `${liveOccupiedCount}`}
+                {capacityMax ? `${liveParticipantCount}/${capacityMax}` : `${liveParticipantCount}`}
               </Text>
             </XStack>
           ) : null}
@@ -379,22 +395,24 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
                 </YStack>
               );
             })}
-            <Button
-              backgroundColor="$background"
-              borderRadius="$4"
-              borderWidth={1}
-              borderColor="$primary"
-              minHeight="$9"
-              paddingHorizontal="$4"
-              onPress={handleCancelGroupSlot}
-              disabled={cancelMutation.isPending}
-            >
-              <Text color="$primary">
-                {cancelMutation.isPending
-                  ? t('common.loading')
-                  : t('schedule.actions.cancelSlot')}
-              </Text>
-            </Button>
+            {canCancelGroupSlot ? (
+              <Button
+                backgroundColor="$background"
+                borderRadius="$4"
+                borderWidth={1}
+                borderColor="$primary"
+                minHeight="$9"
+                paddingHorizontal="$4"
+                onPress={handleCancelGroupSlot}
+                disabled={cancelMutation.isPending}
+              >
+                <Text color="$primary">
+                  {cancelMutation.isPending
+                    ? t('common.loading')
+                    : t('schedule.actions.cancelSlot')}
+                </Text>
+              </Button>
+            ) : null}
           </YStack>
         ) : null}
 

@@ -79,7 +79,10 @@ export function ProfileScreen({ navigation }: Props) {
       id: 'payments',
       label: t('profile.settings.payments'),
       icon: 'creditCard',
-      disabled: true,
+      disabled: role !== 'Trainer',
+      onPress: role === 'Trainer'
+        ? () => navigation.getParent()?.navigate('Payments' as never)
+        : undefined,
     },
     {
       id: 'notifications',

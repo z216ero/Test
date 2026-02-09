@@ -43,6 +43,7 @@ export type UseCreateSlotFormStateArgs = {
 };
 
 export const MULTI_COUNTS = [2, 3, 4] as const;
+const FUTURE_DATE_RANGE_DAYS = 14;
 
 const startOfLocalDay = (value: Date) =>
   new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
@@ -51,6 +52,12 @@ const isSameLocalDay = (left: Date, right: Date) =>
   left.getFullYear() === right.getFullYear()
   && left.getMonth() === right.getMonth()
   && left.getDate() === right.getDate();
+
+const addDays = (value: Date, days: number): Date => {
+  const next = new Date(value);
+  next.setDate(next.getDate() + days);
+  return next;
+};
 
 const parseLocalDate = (value?: string | null): Date | null => {
   if (!value) {
@@ -75,6 +82,16 @@ const resolveDatePreset = (
     return 'tomorrow';
   }
   return 'custom';
+};
+
+const clampDateToRange = (value: Date, minDate: Date, maxDate: Date): Date => {
+  if (value.getTime() < minDate.getTime()) {
+    return minDate;
+  }
+  if (value.getTime() > maxDate.getTime()) {
+    return maxDate;
+  }
+  return value;
 };
 
 export const formatTimeLabel = (value: Date): string =>
@@ -148,8 +165,10 @@ export const useCreateSlotFormState = ({
 }: UseCreateSlotFormStateArgs) => {
   const { showToast } = useToast();
   const [selectedDate, setSelectedDate] = useState(() => {
+    const today = startOfLocalDay(new Date());
+    const maxDate = addDays(today, FUTURE_DATE_RANGE_DAYS);
     const initial = parseLocalDate(initialDateIsoLocal);
-    return initial ?? startOfLocalDay(new Date());
+    return clampDateToRange(initial ?? today, today, maxDate);
   });
   const [datePreset, setDatePreset] = useState<'today' | 'tomorrow' | 'custom'>(() => {
     const today = startOfLocalDay(new Date());
@@ -167,6 +186,7 @@ export const useCreateSlotFormState = ({
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false);
   const [groupCapacityMin, setGroupCapacityMin] = useState(2);
   const [groupCapacityMax, setGroupCapacityMax] = useState(10);
+  const [groupAutoCancelIfMinNotReached, setGroupAutoCancelIfMinNotReached] = useState(false);
   const lastInitialRef = useRef<string | null>(null);
 
   const [todayDate, setTodayDate] = useState(() => startOfLocalDay(new Date()));
@@ -175,13 +195,16 @@ export const useCreateSlotFormState = ({
     next.setDate(next.getDate() + 1);
     return next;
   });
+  const [maxDate, setMaxDate] = useState(() => addDays(startOfLocalDay(new Date()), FUTURE_DATE_RANGE_DAYS));
 
   const recomputeToday = useCallback(() => {
     const nextToday = startOfLocalDay(new Date());
     const nextTomorrow = new Date(nextToday);
     nextTomorrow.setDate(nextToday.getDate() + 1);
+    const nextMax = addDays(nextToday, FUTURE_DATE_RANGE_DAYS);
     setTodayDate(nextToday);
     setTomorrowDate(nextTomorrow);
+    setMaxDate(nextMax);
 
     if (datePreset === 'today') {
       setSelectedDate(nextToday);
@@ -189,6 +212,7 @@ export const useCreateSlotFormState = ({
     if (datePreset === 'tomorrow') {
       setSelectedDate(nextTomorrow);
     }
+    setSelectedDate((current) => clampDateToRange(current, nextToday, nextMax));
   }, [datePreset]);
 
   useFocusEffect(
@@ -208,10 +232,17 @@ export const useCreateSlotFormState = ({
     const today = startOfLocalDay(new Date());
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
-    setSelectedDate(parsed);
-    setDatePreset(resolveDatePreset(parsed, today, tomorrow));
+    const nextMax = addDays(today, FUTURE_DATE_RANGE_DAYS);
+    const clamped = clampDateToRange(parsed, today, nextMax);
+    setSelectedDate(clamped);
+    setDatePreset(resolveDatePreset(clamped, today, tomorrow));
     lastInitialRef.current = initialDateIsoLocal;
   }, [initialDateIsoLocal]);
+
+  useEffect(() => {
+    const nextPreset = resolveDatePreset(selectedDate, todayDate, tomorrowDate);
+    setDatePreset((current) => (current === nextPreset ? current : nextPreset));
+  }, [selectedDate, todayDate, tomorrowDate]);
 
   const dateRange = useMemo(() => {
     const startLocal = startOfLocalDay(selectedDate);
@@ -368,7 +399,7 @@ export const useCreateSlotFormState = ({
     }
 
     if (date) {
-      setSelectedDate(startOfLocalDay(date));
+      setSelectedDate(clampDateToRange(startOfLocalDay(date), todayDate, maxDate));
       setDatePreset('custom');
     }
   };
@@ -379,6 +410,7 @@ export const useCreateSlotFormState = ({
         value: selectedDate,
         mode: 'date',
         minimumDate: todayDate,
+        maximumDate: maxDate,
         onChange: handleDateChange,
       });
       return;
@@ -455,6 +487,7 @@ export const useCreateSlotFormState = ({
       slotType: groupEnabled ? 'Group' : 'Individual',
       capacityMin: groupEnabled ? groupCapacityMin : null,
       capacityMax: groupEnabled ? groupCapacityMax : null,
+      autoCancelIfMinNotReached: groupEnabled ? groupAutoCancelIfMinNotReached : false,
     }));
 
     try {
@@ -463,6 +496,11 @@ export const useCreateSlotFormState = ({
       // handled in mutation callbacks
     }
   };
+
+  const visibleDates = useMemo(
+    () => Array.from({ length: FUTURE_DATE_RANGE_DAYS + 1 }).map((_, index) => addDays(todayDate, index)),
+    [todayDate]
+  );
 
   return {
     datePreset,
@@ -493,12 +531,16 @@ export const useCreateSlotFormState = ({
     setGroupCapacityMin,
     groupCapacityMax,
     setGroupCapacityMax,
+    groupAutoCancelIfMinNotReached,
+    setGroupAutoCancelIfMinNotReached,
     pickerVisible,
     setPickerVisible,
     handleDateChange,
     openDatePicker,
     todayDate,
     tomorrowDate,
+    visibleDates,
+    maxDate,
     isCreating: createMutation.isPending,
   };
 };

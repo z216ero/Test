@@ -1,33 +1,32 @@
 import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Platform } from 'react-native';
-import { Button, Text, XStack, YStack } from 'tamagui';
+import { Text, YStack } from 'tamagui';
 import { t } from '@i18n';
-import { AppIcon } from '@ui/AppIcon';
 import { IOSDatePickerCard } from '@ui/components';
-import { formatDateRu } from '@utils/datetime';
+import { DateStrip } from '@app/components/schedule/DateStrip';
 import { formatWeekdayDate } from './useCreateSlotFormState';
 
 type CreateSlotDateSectionProps = {
-  datePreset: 'today' | 'tomorrow' | 'custom';
+  visibleDates: Date[];
   selectedDate: Date;
   todayDate: Date;
   tomorrowDate: Date;
+  maxDate: Date;
   pickerVisible: boolean;
-  onSelectToday: () => void;
-  onSelectTomorrow: () => void;
+  onSelectDate: (date: Date) => void;
   onPickCustom: () => void;
   onClosePicker: () => void;
   onChangeDate: (event: DateTimePickerEvent, date?: Date) => void;
 };
 
 export function CreateSlotDateSection({
-  datePreset,
+  visibleDates,
   selectedDate,
   todayDate,
   tomorrowDate,
+  maxDate,
   pickerVisible,
-  onSelectToday,
-  onSelectTomorrow,
+  onSelectDate,
   onPickCustom,
   onClosePicker,
   onChangeDate,
@@ -37,75 +36,14 @@ export function CreateSlotDateSection({
       <Text fontSize="$5" fontWeight="700" color="$text">
         {t('createSlot.dateSection')}
       </Text>
-      <XStack gap="$2">
-        <Button
-          height="$11"
-          flex={1}
-          backgroundColor={datePreset === 'today' ? '$surfaceMuted' : '$background'}
-          borderWidth={1}
-          borderColor={datePreset === 'today' ? '$accent' : '$border'}
-          borderRadius="$4"
-          paddingVertical="$3"
-          onPress={onSelectToday}
-        >
-          <YStack alignItems="center" gap="$1">
-            <Text
-              fontSize="$4"
-              fontWeight="700"
-              color={datePreset === 'today' ? '$accent' : '$text'}
-            >
-              {t('createSlot.dateToday')}
-            </Text>
-            <Text fontSize="$3" color="$muted">
-              {formatDateRu(todayDate)}
-            </Text>
-          </YStack>
-        </Button>
-        <Button
-          height="$11"
-          flex={1}
-          backgroundColor={datePreset === 'tomorrow' ? '$surfaceMuted' : '$background'}
-          borderWidth={1}
-          borderColor={datePreset === 'tomorrow' ? '$accent' : '$border'}
-          borderRadius="$4"
-          paddingVertical="$3"
-          onPress={onSelectTomorrow}
-        >
-          <YStack alignItems="center" gap="$1">
-            <Text
-              fontSize="$4"
-              fontWeight="700"
-              color={datePreset === 'tomorrow' ? '$accent' : '$text'}
-            >
-              {t('createSlot.dateTomorrow')}
-            </Text>
-            <Text fontSize="$3" color="$muted">
-              {formatDateRu(tomorrowDate)}
-            </Text>
-          </YStack>
-        </Button>
-        <Button
-          height="$11"
-          flex={1}
-          backgroundColor={datePreset === 'custom' ? '$surfaceMuted' : '$background'}
-          borderWidth={1}
-          borderColor={datePreset === 'custom' ? '$accent' : '$border'}
-          borderRadius="$4"
-          paddingVertical="$3"
-          onPress={onPickCustom}
-        >
-          <XStack alignItems="center" justifyContent="center" gap="$2">
-            <Text
-              fontSize="$3"
-              fontWeight="700"
-              color={datePreset === 'custom' ? '$accent' : '$text'}
-            >
-              {t('createSlot.datePick')}
-            </Text>
-            <AppIcon name="calendar" size={18} color="$muted" />
-          </XStack>
-        </Button>
-      </XStack>
+      <DateStrip
+        dates={visibleDates}
+        selectedDate={selectedDate}
+        todayDate={todayDate}
+        tomorrowDate={tomorrowDate}
+        onSelectDate={onSelectDate}
+        onOpenCalendar={onPickCustom}
+      />
       <Text fontSize="$4" color="$muted">
         {formatWeekdayDate(selectedDate)}
       </Text>
@@ -113,6 +51,7 @@ export function CreateSlotDateSection({
         <IOSDatePickerCard
           value={selectedDate}
           minimumDate={todayDate}
+          maximumDate={maxDate}
           onChange={onChangeDate}
           onClose={onClosePicker}
           closeMarginTop="$3"

@@ -1,5 +1,5 @@
 import { ScrollView } from '@tamagui/scroll-view';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
@@ -49,7 +49,7 @@ export function DateStrip({
   const contentReady = useRef(false);
   const selectedKey = buildDateKey(selectedDate);
 
-  const scrollToSelected = (animated: boolean) => {
+  const scrollToSelected = useCallback((animated: boolean) => {
     const layout = itemLayouts.current[selectedKey];
     const scrollView = scrollRef.current as unknown as { scrollTo?: (opts: { x: number; animated?: boolean }) => void } | null;
     if (!layout || !scrollView?.scrollTo) {
@@ -57,7 +57,7 @@ export function DateStrip({
     }
     const targetX = Math.max(0, layout.x - 16);
     scrollView.scrollTo({ x: targetX, animated });
-  };
+  }, [selectedKey]);
 
   useEffect(() => {
     if (contentReady.current && !didInitialScroll.current) {
@@ -68,7 +68,7 @@ export function DateStrip({
     if (didInitialScroll.current) {
       scrollToSelected(true);
     }
-  }, [selectedKey, dates.length]);
+  }, [dates.length, scrollToSelected]);
 
   return (
     <XStack alignItems="center" gap="$2">

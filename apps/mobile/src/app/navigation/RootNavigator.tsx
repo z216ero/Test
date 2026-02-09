@@ -14,6 +14,7 @@ import { HomeScreen } from '@app/screens/HomeScreen';
 import { LoginScreen } from '@app/screens/LoginScreen';
 import { LocationSearchScreen } from '@app/screens/LocationSearchScreen';
 import { NotificationsScreen } from '@app/screens/NotificationsScreen';
+import { PaymentsScreen } from '@app/screens/PaymentsScreen';
 import { PersonalInfoScreen } from '@app/screens/PersonalInfoScreen';
 import { ProfileScreen } from '@app/screens/ProfileScreen';
 import { RegisterScreen } from '@app/screens/RegisterScreen';
@@ -206,6 +207,11 @@ const TrainerTabsNavigator = () => {
         name="CreateSlot"
         component={CreateSlotTabScreen}
         options={{ title: t('tabs.createSlot'), tabBarIcon: makeTabIcon('plus') }}
+      />
+      <TrainerTabs.Screen
+        name="Payments"
+        component={PaymentsScreen}
+        options={{ title: t('tabs.payments'), tabBarIcon: makeTabIcon('creditCard') }}
       />
       <TrainerTabs.Screen
         name="Profile"

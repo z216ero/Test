@@ -32,6 +32,7 @@ type PushPayload = {
   actorRole?: PushRoleHint;
   trainerName?: string;
   clientName?: string;
+  cancellationReason?: string;
 };
 
 const VALID_TYPES = new Set<PushType>([
@@ -109,6 +110,7 @@ const parsePayload = (
     actorRole: normalizeRoleHint(readString(data.actorRole) ?? null) ?? undefined,
     trainerName: readString(data.trainerName),
     clientName: readString(data.clientName),
+    cancellationReason: readString(data.cancellationReason),
   };
 };
 
@@ -138,6 +140,7 @@ const collectClientKeys = (payload: PushPayload): QueryKey[] => {
     keys.bookings.upcoming(),
     keys.bookings.history(),
     keys.home.upcoming('Client'),
+    keys.slots.available(),
   ];
 
   if (payload.trainerId) {
@@ -235,6 +238,7 @@ export const handleRemoteMessage = async (
 
   const settings = await getNotificationSettings();
   const inAppEventsEnabled = settings.inAppBookingEventsEnabled;
+  const groupMinCancelEventsEnabled = settings.inAppGroupMinCancellationEventsEnabled;
 
   const isTrainerTarget = payload.roleHint === 'Trainer' || payload.roleHint === null;
 
@@ -249,7 +253,12 @@ export const handleRemoteMessage = async (
     }
   }
 
-  if (inAppEventsEnabled) {
+  const isGroupMinCancellationEvent = payload.type === 'slot_cancelled_by_trainer'
+    && payload.cancellationReason === 'min_participants_not_reached';
+  const canAppendEvent = inAppEventsEnabled
+    && (!isGroupMinCancellationEvent || groupMinCancelEventsEnabled);
+
+  if (canAppendEvent) {
     await appendEvent({
       id: payload.eventId,
       type: payload.type,
@@ -261,6 +270,7 @@ export const handleRemoteMessage = async (
       actorRole: payload.actorRole,
       trainerName: payload.trainerName,
       clientName: payload.clientName,
+      cancellationReason: payload.cancellationReason,
     });
   }
 
