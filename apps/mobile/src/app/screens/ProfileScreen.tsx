@@ -1,11 +1,12 @@
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Text, XStack, YStack } from 'tamagui';
+import { Button, Switch, Text, XStack, YStack } from 'tamagui';
 import { logout } from '@api/authApi';
 import { presentApiError } from '@api/ApiErrorPresenter';
 import { getMe } from '@api/homeApi';
 import { clearSession } from '@auth/tokenStorage';
 import { t } from '@i18n';
+import { useAppTheme } from '@app/theme/AppThemeContext';
 import type { ProfileStackParamList, RootStackParamList } from '@app/navigation/types';
 import { TabScrollView } from '@ui/layout/TabScrollView';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -20,6 +21,7 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
 
 export function ProfileScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
+  const { isDark, setThemeName } = useAppTheme();
 
   const {
     data: me,
@@ -77,13 +79,39 @@ export function ProfileScreen({ navigation }: Props) {
       id: 'payments',
       label: t('profile.settings.payments'),
       icon: 'creditCard',
-      disabled: true,
+      disabled: role !== 'Trainer',
+      onPress: role === 'Trainer'
+        ? () => navigation.getParent()?.navigate('Payments' as never)
+        : undefined,
     },
     {
       id: 'notifications',
       label: t('profile.settings.notifications'),
       icon: 'alertCircle',
       onPress: () => navigation.navigate('Notifications'),
+    },
+    {
+      id: 'theme',
+      label: t('profile.settings.darkTheme'),
+      rightSlot: (
+        <Switch
+          size="$7"
+          checked={isDark}
+          onCheckedChange={(value) =>
+            setThemeName(value ? 'dark' : 'light')
+          }
+          backgroundColor={isDark ? '$accent' : '$surfaceMuted'}
+          borderWidth={1}
+          borderColor="$border"
+        >
+          <Switch.Thumb
+            backgroundColor="$background"
+            borderWidth={1}
+            borderColor="$border"
+          />
+        </Switch>
+      ),
+      hideArrow: true,
     },
     {
       id: 'support',

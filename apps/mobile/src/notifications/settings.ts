@@ -4,6 +4,7 @@ export type NotificationSettings = {
   enabled: boolean;
   reminderOffsetMinutes: number;
   inAppBookingEventsEnabled: boolean;
+  inAppGroupMinCancellationEventsEnabled: boolean;
 };
 
 const STORAGE_KEY = 'notifications.settings.v1';
@@ -12,6 +13,7 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   enabled: true,
   reminderOffsetMinutes: 120,
   inAppBookingEventsEnabled: true,
+  inAppGroupMinCancellationEventsEnabled: true,
 };
 
 const coerceSettings = (value: Partial<NotificationSettings> | null): NotificationSettings => ({
@@ -20,6 +22,9 @@ const coerceSettings = (value: Partial<NotificationSettings> | null): Notificati
     value?.reminderOffsetMinutes ?? DEFAULT_SETTINGS.reminderOffsetMinutes,
   inAppBookingEventsEnabled:
     value?.inAppBookingEventsEnabled ?? DEFAULT_SETTINGS.inAppBookingEventsEnabled,
+  inAppGroupMinCancellationEventsEnabled:
+    value?.inAppGroupMinCancellationEventsEnabled
+    ?? DEFAULT_SETTINGS.inAppGroupMinCancellationEventsEnabled,
 });
 
 export const getNotificationSettings = async (): Promise<NotificationSettings> => {

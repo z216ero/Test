@@ -95,6 +95,26 @@ namespace Api.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("PushEventsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("PushGroupMinCancellationEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("PushReminderEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("PushReminderOffsetMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(120);
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -286,6 +306,51 @@ namespace Api.Migrations
                     b.ToTable("districts", (string)null);
                 });
 
+            modelBuilder.Entity("Api.Data.Payment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now() at time zone 'utc'");
+
+                    b.Property<string>("Method")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("PaidAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Pending");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now() at time zone 'utc'");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique();
+
+                    b.ToTable("payments", (string)null);
+                });
+
             modelBuilder.Entity("Api.Data.PushEventDedup", b =>
                 {
                     b.Property<string>("KeyHash")
@@ -303,6 +368,39 @@ namespace Api.Migrations
                     b.HasKey("KeyHash");
 
                     b.ToTable("push_event_dedup", (string)null);
+                });
+
+            modelBuilder.Entity("Api.Data.PushReminderDispatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now() at time zone 'utc'");
+
+                    b.Property<int>("ReminderOffsetMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SlotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SentAtUtc");
+
+                    b.HasIndex("UserId", "SlotId", "ReminderOffsetMinutes")
+                        .IsUnique();
+
+                    b.ToTable("push_reminder_dispatch", (string)null);
                 });
 
             modelBuilder.Entity("Api.Data.RefreshToken", b =>
@@ -443,6 +541,14 @@ namespace Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("AutoCancelAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("AutoCancelIfMinNotReached")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<int?>("CapacityMax")
                         .HasColumnType("integer");
 
@@ -476,6 +582,8 @@ namespace Api.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AutoCancelIfMinNotReached", "AutoCancelAtUtc");
 
                     b.HasIndex("TrainerId", "StartsAtUtc");
 
@@ -697,6 +805,17 @@ namespace Api.Migrations
                     b.Navigation("City");
                 });
 
+            modelBuilder.Entity("Api.Data.Payment", b =>
+                {
+                    b.HasOne("Api.Data.Booking", "Booking")
+                        .WithOne("Payment")
+                        .HasForeignKey("Api.Data.Payment", "BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+                });
+
             modelBuilder.Entity("Api.Data.RefreshToken", b =>
                 {
                     b.HasOne("Api.Data.AppUser", "User")
@@ -824,6 +943,11 @@ namespace Api.Migrations
                     b.Navigation("DeviceTokens");
 
                     b.Navigation("RefreshTokens");
+                });
+
+            modelBuilder.Entity("Api.Data.Booking", b =>
+                {
+                    b.Navigation("Payment");
                 });
 
             modelBuilder.Entity("Api.Data.City", b =>

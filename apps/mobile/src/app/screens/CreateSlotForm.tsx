@@ -1,7 +1,7 @@
 import type { QueryKey } from '@tanstack/react-query';
 import { Sheet } from '@tamagui/sheet';
 import { ScrollView } from '@tamagui/scroll-view';
-import { Button, Input, Text, XStack, YStack } from 'tamagui';
+import { Button, Input, Switch, Text, XStack, YStack } from 'tamagui';
 import type {
   CreateSlotRequest,
   GetTrainersTrainerIdSlotsParams,
@@ -45,8 +45,6 @@ export function CreateSlotForm({
   initialDateIsoLocal,
 }: CreateSlotFormProps) {
   const {
-    datePreset,
-    setDatePreset,
     selectedDate,
     setSelectedDate,
     selectedStart,
@@ -73,12 +71,16 @@ export function CreateSlotForm({
     setGroupCapacityMin,
     groupCapacityMax,
     setGroupCapacityMax,
+    groupAutoCancelIfMinNotReached,
+    setGroupAutoCancelIfMinNotReached,
     pickerVisible,
     setPickerVisible,
     handleDateChange,
     openDatePicker,
     todayDate,
     tomorrowDate,
+    visibleDates,
+    maxDate,
     isCreating,
   } = useCreateSlotFormState({
     buildQueryKey,
@@ -103,19 +105,13 @@ export function CreateSlotForm({
         <YStack padding="$6" gap="$5" paddingBottom="$8">
           <CreateSlotHeader title={title} onBack={onBack} />
           <CreateSlotDateSection
-            datePreset={datePreset}
+            visibleDates={visibleDates}
             selectedDate={selectedDate}
             todayDate={todayDate}
             tomorrowDate={tomorrowDate}
+            maxDate={maxDate}
             pickerVisible={pickerVisible}
-            onSelectToday={() => {
-              setSelectedDate(todayDate);
-              setDatePreset('today');
-            }}
-            onSelectTomorrow={() => {
-              setSelectedDate(tomorrowDate);
-              setDatePreset('tomorrow');
-            }}
+            onSelectDate={setSelectedDate}
             onPickCustom={openDatePicker}
             onClosePicker={() => setPickerVisible(false)}
             onChangeDate={handleDateChange}
@@ -153,7 +149,7 @@ export function CreateSlotForm({
           >
             <XStack justifyContent="space-between" alignItems="center">
               <Text fontSize="$4" fontWeight="700" color="$text">
-                Групповое занятие
+                {t('createSlot.groupTitle')}
               </Text>
               <Button
                 size="$3"
@@ -170,17 +166,17 @@ export function CreateSlotForm({
                 }}
                 disabled={!canCreateGroup}
               >
-                {groupEnabled ? 'Включено' : 'Выключено'}
+                {groupEnabled ? t('common.enabled') : t('common.disabled')}
               </Button>
             </XStack>
             {!canCreateGroup ? (
               <Text fontSize="$3" color="$muted">
-                Включи в профиле, чтобы создавать групповые
+                {t('createSlot.groupEnableProfileHint')}
               </Text>
             ) : null}
             {groupEnabled ? (
               <Text fontSize="$3" color="$muted">
-                min информационный для MVP
+                {t('createSlot.groupHint')}
               </Text>
             ) : null}
           </YStack>
@@ -202,10 +198,10 @@ export function CreateSlotForm({
         <Sheet.Frame padding="$5" gap="$4" backgroundColor="$backgroundSoft">
           <Sheet.Handle />
           <Text fontSize="$5" fontWeight="700" color="$text">
-            Параметры группы
+            {t('createSlot.groupSettingsTitle')}
           </Text>
           <YStack gap="$2">
-            <Text fontSize="$3" color="$text">Min (2-100)</Text>
+            <Text fontSize="$3" color="$text">{t('createSlot.groupCapacityMinLabel')}</Text>
             <Input
               height="50"
               keyboardType="numeric"
@@ -221,7 +217,7 @@ export function CreateSlotForm({
             />
           </YStack>
           <YStack gap="$2">
-            <Text fontSize="$3" color="$text">Max (2-100)</Text>
+            <Text fontSize="$3" color="$text">{t('createSlot.groupCapacityMaxLabel')}</Text>
             <Input
               height="50"
               keyboardType="numeric"
@@ -236,6 +232,28 @@ export function CreateSlotForm({
               }}
             />
           </YStack>
+          <XStack alignItems="center" justifyContent="space-between" gap="$3">
+            <YStack flex={1} gap="$1">
+              <Text fontSize="$3" color="$text">
+                {t('createSlot.groupAutoCancelToggle')}
+              </Text>
+              <Text fontSize="$2" color="$muted">
+                {t('createSlot.groupAutoCancelHint', { minutes: 40 })}
+              </Text>
+            </YStack>
+            <Switch
+              size="$6"
+              checked={groupAutoCancelIfMinNotReached}
+              onCheckedChange={setGroupAutoCancelIfMinNotReached}
+              backgroundColor={groupAutoCancelIfMinNotReached ? '$accent' : '$surfaceMuted'}
+            >
+              <Switch.Thumb
+                backgroundColor="$background"
+                borderWidth={1}
+                borderColor="$border"
+              />
+            </Switch>
+          </XStack>
           <Button
             height="50"
             onPress={() => setGroupSettingsOpen(false)}
@@ -255,4 +273,3 @@ export function CreateSlotForm({
     </YStack>
   );
 }
-

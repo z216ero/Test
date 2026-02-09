@@ -188,6 +188,7 @@ public static class SlotEndpoints
             Gender? clientGender = null;
             int? clientCityId = null;
             int? clientDistrictId = null;
+            Guid? clientUserId = null;
             if (AuthClaims.TryGetUserId(httpContext.User, out var userId))
             {
                 var user = await db.Users
@@ -195,6 +196,7 @@ public static class SlotEndpoints
                     .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
                 if (user is not null && string.Equals(user.Role, UserRoles.Client, StringComparison.OrdinalIgnoreCase))
                 {
+                    clientUserId = userId;
                     clientGender = user.Gender;
 
                     var profile = await db.ClientProfiles
@@ -227,6 +229,7 @@ public static class SlotEndpoints
                 clientCityId,
                 clientDistrictId,
                 districtOnly ?? false,
+                clientUserId,
                 cancellationToken);
 
             if (!result.IsSuccess)

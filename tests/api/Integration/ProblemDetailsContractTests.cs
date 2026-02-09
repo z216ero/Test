@@ -71,7 +71,7 @@ public sealed class ProblemDetailsContractTests : IClassFixture<ApiPostgresFixtu
         var firstResponse = await client.PostAsJsonAsync(
             $"/slots/{slotId}/book",
             new BookSlotRequest(Guid.NewGuid()));
-        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
 
         var secondResponse = await client.PostAsJsonAsync(
             $"/slots/{slotId}/book",

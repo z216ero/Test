@@ -76,7 +76,7 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
   const times = useMemo(() => getSlotTimes(slot), [slot]);
   const dateLabel = times ? formatDateWithWeekdayRu(times.start) : t('common.empty');
   const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : t('common.empty');
-  const statusType = getBookingStatusType(slot);
+  const statusType = getBookingStatusType(slot, nowTs);
   const statusMeta = bookingStatusMeta[statusType];
   const statusLabel = t(statusMeta.labelKey);
 

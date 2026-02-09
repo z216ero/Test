@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Api.Features.Auth;
 using Api.Features.Clients;
 using Api.Features.Trainers;
@@ -27,7 +28,7 @@ public sealed class AuthFlowTests : IClassFixture<ApiPostgresFixture>
             "Password123",
             "Trainer",
             "Trainer One",
-            "Strength"));
+            "Москва"));
 
         Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
 
@@ -50,7 +51,7 @@ public sealed class AuthFlowTests : IClassFixture<ApiPostgresFixture>
             "Password123",
             "Client",
             "Client One",
-            null));
+            "Москва"));
 
         Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
         var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
@@ -81,7 +82,7 @@ public sealed class AuthFlowTests : IClassFixture<ApiPostgresFixture>
             "Password123",
             "Trainer",
             "Duplicate Trainer",
-            null);
+            "Москва");
 
         var first = await client.PostAsJsonAsync("/auth/register", payload);
         var second = await client.PostAsJsonAsync("/auth/register", payload);
@@ -111,7 +112,7 @@ public sealed class AuthFlowTests : IClassFixture<ApiPostgresFixture>
             "Password123",
             "Trainer",
             "Trainer Two",
-            null));
+            "Москва"));
 
         var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
         Assert.NotNull(auth);
@@ -133,7 +134,7 @@ public sealed class AuthFlowTests : IClassFixture<ApiPostgresFixture>
             "Password123",
             "Client",
             "Refresh Client",
-            null));
+            "Москва"));
 
         Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
         var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
@@ -169,7 +170,7 @@ public sealed class AuthFlowTests : IClassFixture<ApiPostgresFixture>
             "Password123",
             "Client",
             "Logout Client",
-            null));
+            "Москва"));
 
         Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
         var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
@@ -190,5 +191,51 @@ public sealed class AuthFlowTests : IClassFixture<ApiPostgresFixture>
             new RefreshRequest(auth.RefreshToken));
 
         Assert.Equal(HttpStatusCode.Unauthorized, refreshResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task PushPreferences_WhenRequested_ReturnDefaultsAndAllowUpdate()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var registerResponse = await client.PostAsJsonAsync("/auth/register", new RegisterRequest(
+            "pushprefs@example.com",
+            "Password123",
+            "Client",
+            "Push Prefs Client",
+            "РњРѕСЃРєРІР°"));
+
+        Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
+        var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.NotNull(auth);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+
+        var getDefaultsResponse = await client.GetAsync("/push/preferences");
+        Assert.Equal(HttpStatusCode.OK, getDefaultsResponse.StatusCode);
+
+        var defaultsPayload = await getDefaultsResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(defaultsPayload.GetProperty("eventsEnabled").GetBoolean());
+        Assert.True(defaultsPayload.GetProperty("groupMinCancellationEnabled").GetBoolean());
+        Assert.True(defaultsPayload.GetProperty("reminderEnabled").GetBoolean());
+        Assert.Equal(120, defaultsPayload.GetProperty("reminderOffsetMinutes").GetInt32());
+
+        var updateResponse = await client.PutAsJsonAsync(
+            "/push/preferences",
+            new
+            {
+                eventsEnabled = false,
+                groupMinCancellationEnabled = false,
+                reminderEnabled = false,
+                reminderOffsetMinutes = 1440
+            });
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+
+        var updatedPayload = await updateResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(updatedPayload.GetProperty("eventsEnabled").GetBoolean());
+        Assert.False(updatedPayload.GetProperty("groupMinCancellationEnabled").GetBoolean());
+        Assert.False(updatedPayload.GetProperty("reminderEnabled").GetBoolean());
+        Assert.Equal(1440, updatedPayload.GetProperty("reminderOffsetMinutes").GetInt32());
     }
 }

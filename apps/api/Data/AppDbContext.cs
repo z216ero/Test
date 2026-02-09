@@ -12,11 +12,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<ClientProfile> ClientProfiles => Set<ClientProfile>();
     public DbSet<TrainingSlot> TrainingSlots => Set<TrainingSlot>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<SlotAttendee> SlotAttendees => Set<SlotAttendee>();
     public DbSet<UserAvatar> UserAvatars => Set<UserAvatar>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
     public DbSet<PushEventDedup> PushEventDedups => Set<PushEventDedup>();
+    public DbSet<PushReminderDispatch> PushReminderDispatches => Set<PushReminderDispatch>();
     public DbSet<City> Cities => Set<City>();
     public DbSet<District> Districts => Set<District>();
 
@@ -36,6 +38,18 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasConversion<string>()
                 .HasMaxLength(12)
                 .HasDefaultValue(Gender.Male)
+                .IsRequired();
+            entity.Property(x => x.PushEventsEnabled)
+                .HasDefaultValue(true)
+                .IsRequired();
+            entity.Property(x => x.PushGroupMinCancellationEnabled)
+                .HasDefaultValue(true)
+                .IsRequired();
+            entity.Property(x => x.PushReminderEnabled)
+                .HasDefaultValue(true)
+                .IsRequired();
+            entity.Property(x => x.PushReminderOffsetMinutes)
+                .HasDefaultValue(120)
                 .IsRequired();
         });
 
@@ -141,6 +155,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsRequired();
             entity.Property(x => x.CapacityMax);
             entity.Property(x => x.CapacityMin);
+            entity.Property(x => x.AutoCancelIfMinNotReached)
+                .HasDefaultValue(false)
+                .IsRequired();
+            entity.Property(x => x.AutoCancelAtUtc);
             entity.Property(x => x.Status)
                 .HasConversion<string>()
                 .HasMaxLength(20)
@@ -148,6 +166,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.CreatedAtUtc)
                 .HasDefaultValueSql("now() at time zone 'utc'");
             entity.HasIndex(x => new { x.TrainerId, x.StartsAtUtc });
+            entity.HasIndex(x => new { x.AutoCancelIfMinNotReached, x.AutoCancelAtUtc });
             entity.ToTable(tb => tb.HasCheckConstraint(
                 "CK_training_slots_slot_type_capacity",
                 "(\"SlotType\" = 'Individual' AND \"CapacityMin\" IS NULL AND \"CapacityMax\" IS NULL) "
@@ -177,6 +196,34 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasOne(x => x.Slot)
                 .WithOne(x => x.Booking)
                 .HasForeignKey<Booking>(x => x.SlotId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.ToTable("payments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Amount)
+                .HasPrecision(12, 2)
+                .IsRequired();
+            entity.Property(x => x.Status)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(PaymentStatus.Pending)
+                .IsRequired();
+            entity.Property(x => x.Method)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+            entity.Property(x => x.PaidAtUtc);
+            entity.Property(x => x.CreatedAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.Property(x => x.UpdatedAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.HasIndex(x => x.BookingId)
+                .IsUnique();
+            entity.HasOne(x => x.Booking)
+                .WithOne(x => x.Payment)
+                .HasForeignKey<Payment>(x => x.BookingId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -277,6 +324,25 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsRequired();
             entity.Property(x => x.CreatedAtUtc)
                 .HasDefaultValueSql("now() at time zone 'utc'");
+        });
+
+        modelBuilder.Entity<PushReminderDispatch>(entity =>
+        {
+            entity.ToTable("push_reminder_dispatch");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.UserId)
+                .IsRequired();
+            entity.Property(x => x.SlotId)
+                .IsRequired();
+            entity.Property(x => x.ReminderOffsetMinutes)
+                .IsRequired();
+            entity.Property(x => x.SentAtUtc)
+                .IsRequired();
+            entity.Property(x => x.CreatedAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.HasIndex(x => new { x.UserId, x.SlotId, x.ReminderOffsetMinutes })
+                .IsUnique();
+            entity.HasIndex(x => x.SentAtUtc);
         });
 
         modelBuilder.Entity<City>(entity =>

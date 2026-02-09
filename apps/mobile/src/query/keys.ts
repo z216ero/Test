@@ -1,4 +1,5 @@
 import type { GetSlotsAvailableParams, GetTrainersTrainerIdSlotsParams } from '@generated/api';
+import type { GetTrainerPaymentsParams } from '@generated/api';
 
 export const keys = {
   auth: {
@@ -25,6 +26,14 @@ export const keys = {
   bookings: {
     upcoming: () => ['bookings', 'upcoming'] as const,
     history: () => ['bookings', 'history'] as const,
+  },
+  payments: {
+    all: () => ['payments'] as const,
+    trainer: (params?: GetTrainerPaymentsParams) =>
+      params
+        ? (['payments', 'trainer', params] as const)
+        : (['payments', 'trainer'] as const),
+    booking: (bookingId: string) => ['payments', 'booking', bookingId] as const,
   },
   slots: {
     available: (params?: GetSlotsAvailableParams) =>

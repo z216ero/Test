@@ -20,6 +20,7 @@ public sealed class ClientService(AppDbContext db)
                 profile.Error.Detail);
         }
 
+        var clientUserId = profile.Value!.UserId;
         var now = DateTime.UtcNow;
 
         var individualBookings = await db.Bookings
@@ -34,7 +35,7 @@ public sealed class ClientService(AppDbContext db)
             .Include(b => b.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.User)
-            .Where(b => b.ClientId == profile.Value!.UserId
+            .Where(b => b.ClientId == clientUserId
                 && b.Slot != null
                 && b.Status == BookingStatus.Booked
                 && b.Slot.Status != TrainingSlotStatus.Cancelled
@@ -54,7 +55,7 @@ public sealed class ClientService(AppDbContext db)
             .Include(a => a.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.User)
-            .Where(a => a.ClientId == profile.Value.UserId
+            .Where(a => a.ClientId == clientUserId
                 && a.Status == SlotAttendeeStatus.Booked
                 && a.Slot != null
                 && a.Slot.Status != TrainingSlotStatus.Cancelled
@@ -99,6 +100,9 @@ public sealed class ClientService(AppDbContext db)
                 profile.Error.Detail);
         }
 
+        var clientUserId = profile.Value!.UserId;
+        var now = DateTime.UtcNow;
+
         var individualBookings = await db.Bookings
             .AsNoTracking()
             .Include(b => b.Slot!)
@@ -111,11 +115,18 @@ public sealed class ClientService(AppDbContext db)
             .Include(b => b.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.User)
-            .Where(b => b.ClientId == profile.Value!.UserId
+            .Where(b => b.ClientId == clientUserId
                 && b.Slot != null
-                && (b.Status == BookingStatus.Completed
+                && (
+                    b.Status == BookingStatus.Completed
                     || b.Status == BookingStatus.NoShow
-                    || b.Status == BookingStatus.Cancelled))
+                    || b.Status == BookingStatus.Cancelled
+                    || (
+                        b.Status == BookingStatus.Booked
+                        && b.Slot.Status != TrainingSlotStatus.Cancelled
+                        && b.Slot.StartsAtUtc <= now
+                    )
+                ))
             .ToListAsync(cancellationToken);
 
         var groupAttendees = await db.SlotAttendees
@@ -131,11 +142,19 @@ public sealed class ClientService(AppDbContext db)
             .Include(a => a.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.User)
-            .Where(a => a.ClientId == profile.Value.UserId
-                && (a.Status == SlotAttendeeStatus.Completed
+            .Where(a => a.ClientId == clientUserId
+                && a.Slot != null
+                && (
+                    a.Status == SlotAttendeeStatus.Completed
                     || a.Status == SlotAttendeeStatus.NoShow
-                    || a.Status == SlotAttendeeStatus.Cancelled)
-                && a.Slot != null)
+                    || a.Status == SlotAttendeeStatus.Cancelled
+                    || (
+                        a.Status == SlotAttendeeStatus.Booked
+                        && a.Slot.Status != TrainingSlotStatus.Cancelled
+                        && a.Slot.StartsAtUtc <= now
+                    )
+                )
+            )
             .ToListAsync(cancellationToken);
 
         var occupiedCounts = await LoadGroupOccupiedCountsAsync(
@@ -293,7 +312,7 @@ public sealed class ClientService(AppDbContext db)
 
         return await db.SlotAttendees
             .AsNoTracking()
-            .Where(a => slotIds.Contains(a.SlotId) && a.Status == SlotAttendeeStatus.Booked)
+            .Where(a => slotIds.Contains(a.SlotId) && a.Status != SlotAttendeeStatus.Cancelled)
             .GroupBy(a => a.SlotId)
             .Select(g => new { SlotId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.SlotId, x => x.Count, cancellationToken);

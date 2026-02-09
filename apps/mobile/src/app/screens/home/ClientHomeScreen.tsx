@@ -19,6 +19,7 @@ import { formatTimeRangeRu } from '@utils/datetime';
 import type { HomeMeState, HomeNavigation, HomeUser } from './types';
 
 const MAX_UPCOMING = 5;
+const LIVE_REFRESH_INTERVAL_MS = 15 * 1000;
 
 const formatWeekdayDateRu = (value?: string | Date): string => {
   if (!value) {
@@ -108,7 +109,10 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
     queryKey: keys.bookings.upcoming(),
     enabled: Boolean(me),
     queryFn: ({ signal }) => getClientUpcomingBookings({ signal }),
+    refetchInterval: LIVE_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
   });
+  const { refetch: refetchUpcoming } = upcomingQuery;
 
   const nowTs = useMemo(() => Date.now(), []);
   const upcomingBookings = useMemo(
@@ -123,8 +127,8 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
   useFocusEffect(
     useCallback(() => {
       refetchMe();
-      upcomingQuery.refetch();
-    }, [refetchMe, upcomingQuery.refetch])
+      refetchUpcoming();
+    }, [refetchMe, refetchUpcoming])
   );
 
   const onRefresh = () => {

@@ -73,6 +73,47 @@ public sealed class PushService(
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<PushPreferencesResponse?> GetPushPreferencesAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        return await db.Users
+            .AsNoTracking()
+            .Where(user => user.Id == userId)
+            .Select(user => new PushPreferencesResponse(
+                user.PushEventsEnabled,
+                user.PushGroupMinCancellationEnabled,
+                user.PushReminderEnabled,
+                user.PushReminderOffsetMinutes))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<PushPreferencesResponse?> UpdatePushPreferencesAsync(
+        Guid userId,
+        UpdatePushPreferencesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var user = await db.Users
+            .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
+
+        if (user is null)
+        {
+            return null;
+        }
+
+        user.PushEventsEnabled = request.EventsEnabled;
+        user.PushGroupMinCancellationEnabled = request.GroupMinCancellationEnabled;
+        user.PushReminderEnabled = request.ReminderEnabled;
+        user.PushReminderOffsetMinutes = request.ReminderOffsetMinutes;
+        await db.SaveChangesAsync(cancellationToken);
+
+        return new PushPreferencesResponse(
+            user.PushEventsEnabled,
+            user.PushGroupMinCancellationEnabled,
+            user.PushReminderEnabled,
+            user.PushReminderOffsetMinutes);
+    }
+
     public async Task NotifyBookingCreatedAsync(
         Guid slotId,
         Guid trainerId,
@@ -92,6 +133,7 @@ public sealed class PushService(
                     clientId,
                     startsAtUtc,
                     trainerUserId,
+                    cancellationReason: null,
                     cancellationToken);
 
                 await SafeSendToUserAsync(trainerUserId, UserRoles.Trainer, payload, cancellationToken);
@@ -117,6 +159,7 @@ public sealed class PushService(
                     clientId,
                     startsAtUtc,
                     trainerUserId,
+                    cancellationReason: null,
                     cancellationToken);
 
                 await SafeSendToUserAsync(trainerUserId, UserRoles.Trainer, payload, cancellationToken);
@@ -128,6 +171,7 @@ public sealed class PushService(
         Guid trainerId,
         Guid? clientId,
         DateTime startsAtUtc,
+        string? cancellationReason,
         CancellationToken cancellationToken)
     {
         await SafeNotifyAsync(
@@ -144,6 +188,7 @@ public sealed class PushService(
                         clientId,
                         startsAtUtc,
                         trainerUserId,
+                        cancellationReason,
                         cancellationToken);
 
                     await SafeSendToUserAsync(clientId.Value, UserRoles.Client, payload, cancellationToken);
@@ -156,6 +201,7 @@ public sealed class PushService(
         Guid trainerId,
         IReadOnlyCollection<Guid> clientIds,
         DateTime startsAtUtc,
+        string? cancellationReason,
         CancellationToken cancellationToken)
     {
         await SafeNotifyAsync(
@@ -177,6 +223,7 @@ public sealed class PushService(
                         clientId,
                         startsAtUtc,
                         trainerUserId,
+                        cancellationReason,
                         cancellationToken);
 
                     await SafeSendToUserAsync(clientId, UserRoles.Client, payload, cancellationToken);
@@ -203,10 +250,50 @@ public sealed class PushService(
                     clientId,
                     startsAtUtc,
                     trainerUserId,
+                    cancellationReason: null,
                     cancellationToken);
 
                 await SafeSendToUserAsync(clientId, UserRoles.Client, payload, cancellationToken);
             });
+    }
+
+    public async Task<bool> TryNotifyTrainingReminderAsync(
+        Guid slotId,
+        Guid trainerId,
+        Guid clientId,
+        DateTime startsAtUtc,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var trainerUserId = await GetTrainerUserIdAsync(trainerId, cancellationToken);
+            var payload = await BuildPayloadAsync(
+                PushEventTypes.TrainingReminder,
+                slotId,
+                trainerId,
+                clientId,
+                startsAtUtc,
+                trainerUserId,
+                cancellationReason: null,
+                cancellationToken);
+
+            var result = await SendToUserInternalAsync(
+                clientId,
+                UserRoles.Client,
+                payload,
+                cancellationToken);
+
+            return result is not PushSendResult.Failed;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Push send failed for reminder. SlotId={SlotId}, ClientId={ClientId}",
+                slotId,
+                clientId);
+            return false;
+        }
     }
 
     private async Task<Guid?> GetTrainerUserIdAsync(
@@ -242,13 +329,14 @@ public sealed class PushService(
             PushEventTypes.BookingCancelled => UserRoles.Client,
             PushEventTypes.SlotCancelledByTrainer => UserRoles.Trainer,
             PushEventTypes.AttendanceMarked => UserRoles.Trainer,
+            PushEventTypes.TrainingReminder => UserRoles.Trainer,
             _ => UserRoles.Client
         };
 
     private static string ResolveActorName(string actorRole, string? trainerName, string? clientName)
         => string.Equals(actorRole, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase)
-            ? trainerName ?? "Тренер"
-            : clientName ?? "Клиент";
+            ? trainerName ?? "\u0422\u0440\u0435\u043D\u0435\u0440"
+            : clientName ?? "\u041A\u043B\u0438\u0435\u043D\u0442";
 
     private async Task<PushPayload> BuildPayloadAsync(
         string eventType,
@@ -257,6 +345,7 @@ public sealed class PushService(
         Guid? clientId,
         DateTime startsAtUtc,
         Guid? trainerUserId,
+        string? cancellationReason,
         CancellationToken cancellationToken)
     {
         var slotDurationMinutes = await db.TrainingSlots
@@ -281,6 +370,7 @@ public sealed class PushService(
             actorRole,
             trainerName,
             clientName,
+            cancellationReason,
             Guid.NewGuid(),
             DateTime.UtcNow);
     }
@@ -298,7 +388,7 @@ public sealed class PushService(
 
         try
         {
-            await SendToUserAsync(userId.Value, roleHint, payload, cancellationToken);
+            await SendToUserInternalAsync(userId.Value, roleHint, payload, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -310,7 +400,7 @@ public sealed class PushService(
         }
     }
 
-    private async Task SendToUserAsync(
+    private async Task<PushSendResult> SendToUserInternalAsync(
         Guid userId,
         string roleHint,
         PushPayload payload,
@@ -324,12 +414,17 @@ public sealed class PushService(
 
         if (tokens.Count == 0)
         {
-            return;
+            return PushSendResult.Skipped;
+        }
+
+        if (!await IsPushAllowedByPreferencesAsync(userId, payload, cancellationToken))
+        {
+            return PushSendResult.Skipped;
         }
 
         if (!await ShouldSendAsync(userId, payload, cancellationToken))
         {
-            return;
+            return PushSendResult.Skipped;
         }
 
         var message = new MulticastMessage
@@ -345,13 +440,68 @@ public sealed class PushService(
         };
 
         var response = await messagingClient.SendMulticastAsync(message, cancellationToken);
-        if (response is not null && response.FailureCount > 0)
+        if (response is null)
+        {
+            return PushSendResult.Failed;
+        }
+
+        var failureCount = response?.FailureCount ?? 0;
+        if (failureCount > 0)
         {
             logger.LogInformation(
                 "Push send completed with {FailureCount} failures for {UserId}.",
-                response.FailureCount,
+                failureCount,
                 userId);
         }
+
+        return (response?.SuccessCount ?? 0) > 0
+            ? PushSendResult.Sent
+            : PushSendResult.Failed;
+    }
+
+    private async Task<bool> IsPushAllowedByPreferencesAsync(
+        Guid userId,
+        PushPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var preferences = await db.Users
+            .AsNoTracking()
+            .Where(user => user.Id == userId)
+            .Select(user => new
+            {
+                user.PushEventsEnabled,
+                user.PushGroupMinCancellationEnabled,
+                user.PushReminderEnabled
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (preferences is null)
+        {
+            return false;
+        }
+
+        if (payload.Type == PushEventTypes.TrainingReminder)
+        {
+            return preferences.PushReminderEnabled;
+        }
+
+        if (!preferences.PushEventsEnabled)
+        {
+            return false;
+        }
+
+        var isGroupMinCancellationEvent = payload.Type == PushEventTypes.SlotCancelledByTrainer
+            && string.Equals(
+                payload.CancellationReason,
+                PushCancellationReasons.MinParticipantsNotReached,
+                StringComparison.Ordinal);
+
+        if (isGroupMinCancellationEvent && !preferences.PushGroupMinCancellationEnabled)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private static Dictionary<string, string> BuildData(string roleHint, PushPayload payload)
@@ -405,6 +555,11 @@ public sealed class PushService(
             data["clientName"] = payload.ClientName;
         }
 
+        if (!string.IsNullOrWhiteSpace(payload.CancellationReason))
+        {
+            data["cancellationReason"] = payload.CancellationReason!;
+        }
+
         data["occurredAtUtc"] = payload.OccurredAtUtc.ToString("O");
 
         return data;
@@ -415,28 +570,33 @@ public sealed class PushService(
         {
             PushEventTypes.BookingCreated => new Notification
             {
-                Title = "Новая запись",
-                Body = "Клиент записался на тренировку"
+                Title = "\u041D\u043E\u0432\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C",
+                Body = "\u041A\u043B\u0438\u0435\u043D\u0442 \u0437\u0430\u043F\u0438\u0441\u0430\u043B\u0441\u044F \u043D\u0430 \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0443"
             },
             PushEventTypes.BookingCancelled => new Notification
             {
-                Title = "Отмена записи",
-                Body = "Клиент отменил тренировку"
+                Title = "\u041E\u0442\u043C\u0435\u043D\u0430 \u0437\u0430\u043F\u0438\u0441\u0438",
+                Body = "\u041A\u043B\u0438\u0435\u043D\u0442 \u043E\u0442\u043C\u0435\u043D\u0438\u043B \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0443"
             },
             PushEventTypes.SlotCancelledByTrainer => new Notification
             {
-                Title = "Тренировка отменена",
-                Body = "Тренер отменил занятие"
+                Title = "\u0422\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
+                Body = "\u0422\u0440\u0435\u043D\u0435\u0440 \u043E\u0442\u043C\u0435\u043D\u0438\u043B \u0437\u0430\u043D\u044F\u0442\u0438\u0435"
             },
             PushEventTypes.AttendanceMarked => new Notification
             {
-                Title = "Обновление тренировки",
-                Body = "Статус тренировки обновлён"
+                Title = "\u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0438",
+                Body = "\u0421\u0442\u0430\u0442\u0443\u0441 \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0438 \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D"
+            },
+            PushEventTypes.TrainingReminder => new Notification
+            {
+                Title = "\u041D\u0430\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u0435 \u043E \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0435",
+                Body = "\u0421\u043A\u043E\u0440\u043E \u043D\u0430\u0447\u043D\u0451\u0442\u0441\u044F \u0432\u0430\u0448\u0430 \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0430"
             },
             _ => new Notification
             {
-                Title = "Уведомление",
-                Body = "Есть обновление по расписанию."
+                Title = "\u0423\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0435",
+                Body = "\u0415\u0441\u0442\u044C \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u043E \u0440\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u044E."
             }
         };
 
@@ -503,6 +663,13 @@ public sealed class PushService(
         }
     }
 
+    private enum PushSendResult
+    {
+        Sent,
+        Skipped,
+        Failed
+    }
+
     private sealed record PushPayload(
         string Type,
         Guid SlotId,
@@ -514,6 +681,8 @@ public sealed class PushService(
         string ActorRole,
         string? TrainerName,
         string? ClientName,
+        string? CancellationReason,
         Guid EventId,
         DateTime OccurredAtUtc);
 }
+

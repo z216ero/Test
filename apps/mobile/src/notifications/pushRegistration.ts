@@ -6,7 +6,7 @@ import {
 } from '@react-native-firebase/messaging';
 import { PermissionsAndroid, Platform } from 'react-native';
 import { getAccessToken } from '@auth/tokenStorage';
-import { disablePushToken, registerPushToken } from '@api/pushApi';
+import { registerPushToken, updatePushPreferences } from '@api/pushApi';
 import { getNotificationSettings } from './settings';
 
 const PLATFORM_ANDROID = 'android' as const;
@@ -36,20 +36,24 @@ const ensurePermission = async (): Promise<boolean> => {
   return permissionPromise;
 };
 
-const registerTokenWithBackend = async (token: string): Promise<void> => {
+const registerTokenWithBackend = async (token: string): Promise<boolean> => {
   const accessToken = await getAccessToken();
   if (!accessToken) {
-    return;
+    return false;
   }
 
   await registerPushToken(token, PLATFORM_ANDROID);
+  return true;
 };
 
-const syncTokenEnabledState = async (token: string): Promise<void> => {
+const syncPushPreferencesFromSettings = async (): Promise<void> => {
   const settings = await getNotificationSettings();
-  if (!settings.inAppBookingEventsEnabled) {
-    await disablePushToken(token);
-  }
+  await updatePushPreferences({
+    eventsEnabled: settings.inAppBookingEventsEnabled,
+    groupMinCancellationEnabled: settings.inAppGroupMinCancellationEventsEnabled,
+    reminderEnabled: settings.enabled,
+    reminderOffsetMinutes: settings.reminderOffsetMinutes,
+  });
 };
 
 export const registerPushTokenIfPossible = async (): Promise<void> => {
@@ -67,8 +71,10 @@ export const registerPushTokenIfPossible = async (): Promise<void> => {
     if (!token) {
       return;
     }
-    await registerTokenWithBackend(token);
-    await syncTokenEnabledState(token);
+    const registered = await registerTokenWithBackend(token);
+    if (registered) {
+      await syncPushPreferencesFromSettings();
+    }
   } catch (err) {
     if (__DEV__) {
       console.warn('push: token registration failed', err);
@@ -80,42 +86,14 @@ export const registerPushTokenRefreshListener = (): (() => void) => {
   const messaging = getMessaging(getApp());
   return onTokenRefresh(messaging, async (token) => {
     try {
-      await registerTokenWithBackend(token);
-      await syncTokenEnabledState(token);
+      const registered = await registerTokenWithBackend(token);
+      if (registered) {
+        await syncPushPreferencesFromSettings();
+      }
     } catch (err) {
       if (__DEV__) {
         console.warn('push: token refresh failed', err);
       }
     }
   });
-};
-
-export const setPushTokenEnabled = async (enabled: boolean): Promise<void> => {
-  if (Platform.OS !== 'android') {
-    return;
-  }
-
-  if (enabled) {
-    const hasPermission = await ensurePermission();
-    if (!hasPermission) {
-      return;
-    }
-  }
-
-  try {
-    const token = await getToken(getMessaging(getApp()));
-    if (!token) {
-      return;
-    }
-    if (enabled) {
-      await registerTokenWithBackend(token);
-      return;
-    }
-    await registerTokenWithBackend(token);
-    await disablePushToken(token);
-  } catch (err) {
-    if (__DEV__) {
-      console.warn('push: token toggle failed', err);
-    }
-  }
 };

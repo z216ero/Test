@@ -26,4 +26,10 @@ public static class PushEventTypes
     public const string BookingCancelled = "booking_cancelled";
     public const string SlotCancelledByTrainer = "slot_cancelled_by_trainer";
     public const string AttendanceMarked = "attendance_marked";
+    public const string TrainingReminder = "training_reminder";
+}
+
+public static class PushCancellationReasons
+{
+    public const string MinParticipantsNotReached = "min_participants_not_reached";
 }

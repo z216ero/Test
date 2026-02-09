@@ -32,6 +32,7 @@ import { SlotsHeader } from './slots/ui/SlotsHeader';
 import { type SlotGroup, TrainerSlotGroupCard } from './slots/ui/TrainerSlotGroupCard';
 
 const DATE_RANGE_DAYS = 14;
+const LIVE_REFRESH_INTERVAL_MS = 15 * 1000;
 
 const startOfLocalDay = (value: Date) =>
   new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
@@ -220,11 +221,15 @@ export function SlotsScreen({ navigation }: Props) {
     enabled: Boolean(slotParams),
     queryFn: ({ signal }) =>
       getAvailableSlotsForClient(slotParams ?? undefined, { signal }),
+    refetchInterval: LIVE_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
   });
 
   const bookingsQuery = useAppQuery({
     queryKey: keys.bookings.upcoming(),
     queryFn: ({ signal }) => getClientUpcomingBookings({ signal }),
+    refetchInterval: LIVE_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
   });
 
   const bookings = bookingsQuery.data ?? [];

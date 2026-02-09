@@ -113,6 +113,26 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                 };
 
                 db.Bookings.Add(booking);
+                if (await db.Payments.AnyAsync(p => p.BookingId == booking.Id, cancellationToken))
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Payment already exists",
+                        "Payment already exists for this booking.");
+                }
+
+                db.Payments.Add(new Payment
+                {
+                    Id = Guid.NewGuid(),
+                    BookingId = booking.Id,
+                    Amount = slot.TrainerProfile?.PricePerSession ?? 0,
+                    Status = PaymentStatus.Pending,
+                    Method = null,
+                    PaidAtUtc = null,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow
+                });
+
                 slot.Status = TrainingSlotStatus.Booked;
             }
             else
@@ -123,6 +143,55 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                         StatusCodes.Status409Conflict,
                         "Invalid slot configuration",
                         "Group slot capacity is not configured.");
+                }
+
+                var nowUtc = DateTime.UtcNow;
+                if (slot.AutoCancelIfMinNotReached
+                    && slot.AutoCancelAtUtc.HasValue
+                    && slot.AutoCancelAtUtc.Value <= nowUtc)
+                {
+                    var minCapacity = slot.CapacityMin;
+                    if (minCapacity.HasValue)
+                    {
+                        var bookedAttendees = slot.Attendees
+                            .Where(attendee => attendee.Status == SlotAttendeeStatus.Booked)
+                            .ToList();
+
+                        if (bookedAttendees.Count < minCapacity.Value)
+                        {
+                            var clientIds = bookedAttendees
+                                .Select(attendee => attendee.ClientId)
+                                .Distinct()
+                                .ToList();
+
+                            foreach (var attendee in bookedAttendees)
+                            {
+                                attendee.Status = SlotAttendeeStatus.Cancelled;
+                                attendee.UpdatedAtUtc = nowUtc;
+                            }
+
+                            slot.Status = TrainingSlotStatus.Cancelled;
+                            slot.AutoCancelAtUtc = null;
+
+                            await db.SaveChangesAsync(cancellationToken);
+                            await transaction.CommitAsync(cancellationToken);
+
+                            await pushService.NotifySlotCancelledByTrainerToClientsAsync(
+                                slot.Id,
+                                slot.TrainerId,
+                                clientIds,
+                                slot.StartsAtUtc,
+                                PushCancellationReasons.MinParticipantsNotReached,
+                                cancellationToken);
+
+                            return ServiceResult<SlotDto>.Fail(
+                                StatusCodes.Status409Conflict,
+                                "Slot auto-cancelled",
+                                "This group slot was cancelled because minimum participants were not reached.");
+                        }
+                    }
+
+                    slot.AutoCancelAtUtc = null;
                 }
 
                 var existingAttendee = slot.Attendees
@@ -182,13 +251,15 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
             }
             catch (Exception ex) when (IsBookingConflict(ex))
             {
-                var slotType = await db.TrainingSlots
-                    .AsNoTracking()
-                    .Where(s => s.Id == slotId)
-                    .Select(s => (TrainingSlotType?)s.SlotType)
-                    .FirstOrDefaultAsync(cancellationToken);
+                if (IsPaymentConflict(ex))
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Payment already exists",
+                        "Payment already exists for this booking.");
+                }
 
-                if (slotType == TrainingSlotType.Group)
+                if (slot.SlotType == TrainingSlotType.Group)
                 {
                     return ServiceResult<SlotDto>.Fail(
                         StatusCodes.Status409Conflict,
@@ -317,12 +388,22 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                 }
                 else
                 {
-                    foreach (var attendee in slot.Attendees.Where(a => a.Status != SlotAttendeeStatus.Cancelled))
+                    var nowUtc = DateTime.UtcNow;
+                    if (slot.StartsAtUtc <= nowUtc)
+                    {
+                        return ServiceResult<SlotDto>.Fail(
+                            StatusCodes.Status409Conflict,
+                            "Slot already started",
+                            "Started group slots cannot be cancelled.");
+                    }
+
+                    foreach (var attendee in slot.Attendees.Where(a => a.Status == SlotAttendeeStatus.Booked))
                     {
                         attendee.Status = SlotAttendeeStatus.Cancelled;
-                        attendee.UpdatedAtUtc = DateTime.UtcNow;
+                        attendee.UpdatedAtUtc = nowUtc;
                     }
                     slot.Status = TrainingSlotStatus.Cancelled;
+                    slot.AutoCancelAtUtc = null;
                 }
 
                 await db.SaveChangesAsync(cancellationToken);
@@ -340,6 +421,7 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                         trainerId,
                         clientIds,
                         startsAtUtc,
+                        cancellationReason: null,
                         cancellationToken);
                 }
                 else
@@ -349,6 +431,7 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                         trainerId,
                         slot.Booking?.ClientId,
                         startsAtUtc,
+                        cancellationReason: null,
                         cancellationToken);
                 }
             }
@@ -725,6 +808,14 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
         var pg = FindPostgresException(ex);
         return pg is not null && (pg.SqlState == PostgresErrorCodes.UniqueViolation
             || pg.SqlState == PostgresErrorCodes.SerializationFailure);
+    }
+
+    private static bool IsPaymentConflict(Exception ex)
+    {
+        var pg = FindPostgresException(ex);
+        return pg is not null
+            && pg.SqlState == PostgresErrorCodes.UniqueViolation
+            && string.Equals(pg.TableName, "payments", StringComparison.OrdinalIgnoreCase);
     }
 
     private static PostgresException? FindPostgresException(Exception ex)

@@ -62,6 +62,7 @@ export type TrainerTabsParamList = {
   Home: undefined;
   Schedule: NavigatorScreenParams<ScheduleStackParamList>;
   CreateSlot: { initialDateIsoLocal?: string } | undefined;
+  Payments: undefined;
   Profile: NavigatorScreenParams<ProfileStackParamList>;
 };
 

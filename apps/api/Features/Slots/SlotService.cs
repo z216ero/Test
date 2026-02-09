@@ -62,6 +62,19 @@ public sealed class SlotService(AppDbContext db)
                 "StartsAtUtc must be in the future.");
         }
 
+        var autoCancelValidation = ValidateGroupAutoCancellation(
+            slotType,
+            request.AutoCancelIfMinNotReached,
+            normalizedStart,
+            nowUtc);
+        if (autoCancelValidation is not null)
+        {
+            return ServiceResult<SlotDto>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid auto-cancellation settings",
+                autoCancelValidation);
+        }
+
         var trainerProfile = await db.TrainerProfiles
             .AsNoTracking()
             .Where(t => t.Id == trainerId)
@@ -107,6 +120,10 @@ public sealed class SlotService(AppDbContext db)
             SlotType = slotType,
             CapacityMin = slotType == TrainingSlotType.Group ? request.CapacityMin : null,
             CapacityMax = slotType == TrainingSlotType.Group ? request.CapacityMax : null,
+            AutoCancelIfMinNotReached = slotType == TrainingSlotType.Group && request.AutoCancelIfMinNotReached,
+            AutoCancelAtUtc = slotType == TrainingSlotType.Group && request.AutoCancelIfMinNotReached
+                ? normalizedStart.AddMinutes(-GroupSlotAutoCancellationService.AutoCancelLeadMinutes)
+                : null,
             Status = TrainingSlotStatus.Open,
             CreatedAtUtc = DateTime.UtcNow
         };
@@ -237,6 +254,7 @@ public sealed class SlotService(AppDbContext db)
         int? clientCityId,
         int? clientDistrictId,
         bool districtOnly,
+        Guid? clientUserId,
         CancellationToken cancellationToken)
     {
         if (fromUtc.HasValue && fromUtc.Value.Kind != DateTimeKind.Utc)
@@ -275,6 +293,7 @@ public sealed class SlotService(AppDbContext db)
 
         var query = db.TrainingSlots
             .AsNoTracking()
+            .Include(s => s.Booking)
             .Include(s => s.Attendees)
             .Include(s => s.TrainerProfile!)
             .ThenInclude(t => t.City)
@@ -282,10 +301,24 @@ public sealed class SlotService(AppDbContext db)
             .ThenInclude(t => t.District)
             .Include(s => s.TrainerProfile!)
             .ThenInclude(t => t.User)
-            .Where(s => s.Status == TrainingSlotStatus.Open
-                && s.StartsAtUtc >= normalizedFrom
+            .Where(s => s.StartsAtUtc >= normalizedFrom
                 && s.StartsAtUtc <= normalizedTo
-                && s.StartsAtUtc >= nowUtc);
+                && s.StartsAtUtc >= nowUtc
+                && (
+                    s.Status == TrainingSlotStatus.Open
+                    || (clientUserId.HasValue
+                        && s.Status == TrainingSlotStatus.Booked
+                        && (
+                            (s.SlotType == TrainingSlotType.Individual
+                                && s.Booking != null
+                                && s.Booking.ClientId == clientUserId.Value
+                                && s.Booking.Status == BookingStatus.Booked)
+                            || (s.SlotType == TrainingSlotType.Group
+                                && s.Attendees.Any(a =>
+                                    a.ClientId == clientUserId.Value
+                                    && a.Status == SlotAttendeeStatus.Booked))
+                        ))
+                ));
 
         if (clientCityId.HasValue)
         {
@@ -565,8 +598,33 @@ public sealed class SlotService(AppDbContext db)
         return null;
     }
 
+    private static string? ValidateGroupAutoCancellation(
+        TrainingSlotType slotType,
+        bool autoCancelIfMinNotReached,
+        DateTime startsAtUtc,
+        DateTime nowUtc)
+    {
+        if (slotType == TrainingSlotType.Individual && autoCancelIfMinNotReached)
+        {
+            return "Auto-cancellation by minimum capacity is available only for group slots.";
+        }
+
+        if (slotType != TrainingSlotType.Group || !autoCancelIfMinNotReached)
+        {
+            return null;
+        }
+
+        var earliestAllowedStart = nowUtc.AddMinutes(GroupSlotAutoCancellationService.AutoCancelLeadMinutes);
+        if (startsAtUtc <= earliestAllowedStart)
+        {
+            return $"Group slot with auto-cancellation must start at least {GroupSlotAutoCancellationService.AutoCancelLeadMinutes} minutes in the future.";
+        }
+
+        return null;
+    }
+
     private static int GetOccupiedCount(TrainingSlot slot)
-        => slot.Attendees.Count(a => a.Status == SlotAttendeeStatus.Booked);
+        => slot.Attendees.Count(a => a.Status != SlotAttendeeStatus.Cancelled);
 
     private static bool ShouldHideFromTrainerList(TrainingSlot slot)
         => slot.SlotType == TrainingSlotType.Group

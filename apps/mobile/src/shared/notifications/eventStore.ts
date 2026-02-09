@@ -12,6 +12,7 @@ export type NotificationEvent = {
   actorRole?: 'Client' | 'Trainer';
   trainerName?: string;
   clientName?: string;
+  cancellationReason?: string;
   title: string;
   description: string;
   isRead: boolean;
@@ -29,6 +30,7 @@ export type NotificationEventInput = {
   actorRole?: 'Client' | 'Trainer';
   trainerName?: string;
   clientName?: string;
+  cancellationReason?: string;
 };
 
 const STORAGE_KEY = 'notification_events_v1';
@@ -86,6 +88,13 @@ export const buildEventText = (input: NotificationEventInput): {
       };
     }
     case 'slot_cancelled_by_trainer': {
+      if (input.cancellationReason === 'min_participants_not_reached') {
+        return {
+          title: 'Групповая тренировка отменена',
+          description: withTime('Не набралось минимальное количество участников'),
+        };
+      }
+
       const name = input.trainerName ?? input.actorName ?? 'Тренер';
       return {
         title: 'Тренировка отменена',
@@ -201,6 +210,7 @@ export const appendEvent = async (
     actorRole: input.actorRole,
     trainerName: input.trainerName,
     clientName: input.clientName,
+    cancellationReason: input.cancellationReason,
     title,
     description,
     isRead: false,
