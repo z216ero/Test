@@ -354,6 +354,12 @@ public sealed class SlotService(AppDbContext db)
                 .Select(avatar => avatar.UserId)
                 .ToHashSetAsync(cancellationToken);
 
+        var trainerIds = slots
+            .Select(slot => slot.TrainerId)
+            .Distinct()
+            .ToList();
+        var trainerRatings = await LoadTrainerRatingsAsync(trainerIds, cancellationToken);
+
         var specializationSet = new HashSet<string>(
             specializations
                 ?.Select(value => value?.Trim())
@@ -393,7 +399,7 @@ public sealed class SlotService(AppDbContext db)
                 trainer.TrainingTypes ?? Array.Empty<string>(),
                 trainer.WorksWithGender.ToString(),
                 trainer.User!.Gender.ToString(),
-                null,
+                trainerRatings.GetValueOrDefault(trainer.Id),
                 trainer.City?.Name,
                 trainer.District?.Name);
 
@@ -411,6 +417,45 @@ public sealed class SlotService(AppDbContext db)
             .ToList();
 
         return ServiceResult<IReadOnlyList<AvailableSlotGroupDto>>.Success(sorted);
+    }
+
+    private async Task<Dictionary<Guid, double?>> LoadTrainerRatingsAsync(
+        IReadOnlyCollection<Guid> trainerIds,
+        CancellationToken cancellationToken)
+    {
+        if (trainerIds.Count == 0)
+        {
+            return [];
+        }
+
+        var ratings = new Dictionary<Guid, double?>();
+        foreach (var trainerId in trainerIds)
+        {
+            var ratingSample = await db.Bookings
+                .AsNoTracking()
+                .Where(b => b.Slot != null
+                    && b.Slot.TrainerId == trainerId
+                    && (b.Status == BookingStatus.Completed || b.Status == BookingStatus.NoShow))
+                .OrderByDescending(b => b.Slot!.StartsAtUtc)
+                .Take(10)
+                .Select(b => b.Status)
+                .ToListAsync(cancellationToken);
+
+            if (ratingSample.Count < 5)
+            {
+                ratings[trainerId] = null;
+                continue;
+            }
+
+            var completedCount = ratingSample.Count(status => status == BookingStatus.Completed);
+            var rating = Math.Round(
+                completedCount / (double)ratingSample.Count * 5,
+                1,
+                MidpointRounding.AwayFromZero);
+            ratings[trainerId] = rating;
+        }
+
+        return ratings;
     }
 
     public async Task<ServiceResult<IReadOnlyList<SlotAttendeeDto>>> GetSlotAttendeesAsync(

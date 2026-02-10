@@ -8,6 +8,8 @@ using Api.Features.Payments;
 using Api.Features.Slots;
 using Api.Features.Trainers;
 using Api.Features.Users;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Api.Tests.Integration;
 
@@ -67,7 +69,7 @@ public sealed class PaymentsFlowTests : IClassFixture<ApiPostgresFixture>
         using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
         using var client = factory.CreateClient();
 
-        var scenario = await CreateBookedPaymentScenarioAsync(client, 200_000);
+        var scenario = await CreateBookedPaymentScenarioAsync(factory, client, 200_000, markCompleted: true);
 
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", scenario.TrainerAuth.AccessToken);
@@ -98,12 +100,30 @@ public sealed class PaymentsFlowTests : IClassFixture<ApiPostgresFixture>
     }
 
     [Fact]
+    public async Task MarkPaid_WhenTrainingNotCompleted_ReturnsConflict()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var scenario = await CreateBookedPaymentScenarioAsync(factory, client, 205_000, markCompleted: false);
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", scenario.TrainerAuth.AccessToken);
+
+        var markPaid = await client.PatchAsJsonAsync(
+            $"/payments/{scenario.Payment.PaymentId}/mark-paid",
+            new MarkPaymentPaidRequest(nameof(PaymentMethod.Cash)));
+
+        Assert.Equal(HttpStatusCode.Conflict, markPaid.StatusCode);
+    }
+
+    [Fact]
     public async Task Refund_WhenPaid_ChangesStatusToRefunded()
     {
         using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
         using var client = factory.CreateClient();
 
-        var scenario = await CreateBookedPaymentScenarioAsync(client, 220_000);
+        var scenario = await CreateBookedPaymentScenarioAsync(factory, client, 220_000, markCompleted: true);
 
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", scenario.TrainerAuth.AccessToken);
@@ -135,7 +155,7 @@ public sealed class PaymentsFlowTests : IClassFixture<ApiPostgresFixture>
         using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
         using var client = factory.CreateClient();
 
-        var ownerScenario = await CreateBookedPaymentScenarioAsync(client, 195_000);
+        var ownerScenario = await CreateBookedPaymentScenarioAsync(factory, client, 195_000, markCompleted: true);
         var anotherTrainer = await RegisterAsync(client, "Trainer");
         var anotherClient = await RegisterAsync(client, "Client");
 
@@ -242,8 +262,10 @@ public sealed class PaymentsFlowTests : IClassFixture<ApiPostgresFixture>
     }
 
     private static async Task<BookedPaymentScenario> CreateBookedPaymentScenarioAsync(
+        ApiWebApplicationFactory factory,
         HttpClient client,
-        int pricePerSession)
+        int pricePerSession,
+        bool markCompleted = false)
     {
         var trainerAuth = await RegisterAsync(client, "Trainer");
         var clientAuth = await RegisterAsync(client, "Client");
@@ -264,8 +286,32 @@ public sealed class PaymentsFlowTests : IClassFixture<ApiPostgresFixture>
             p.ClientId == clientAuth.User.Id
             && p.SlotStartAtUtc == slotStartUtc);
         Assert.NotNull(payment);
+        if (markCompleted)
+        {
+            await MarkBookingCompletedForPaymentAsync(factory, payment!.PaymentId);
+        }
 
         return new BookedPaymentScenario(trainerAuth, clientAuth, payment!);
+    }
+
+    private static async Task MarkBookingCompletedForPaymentAsync(
+        ApiWebApplicationFactory factory,
+        Guid paymentId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var payment = await db.Payments
+            .Include(x => x.Booking)
+            .ThenInclude(x => x!.Slot)
+            .FirstOrDefaultAsync(x => x.Id == paymentId);
+        Assert.NotNull(payment);
+        Assert.NotNull(payment!.Booking);
+        Assert.NotNull(payment.Booking!.Slot);
+
+        payment.Booking.Status = BookingStatus.Completed;
+        payment.Booking.Slot!.StartsAtUtc = DateTime.UtcNow.AddHours(-2);
+        await db.SaveChangesAsync();
     }
 
     private sealed record BookedPaymentScenario(

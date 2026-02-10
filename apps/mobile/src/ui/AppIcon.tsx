@@ -1,5 +1,6 @@
 import type { ComponentType, ReactElement } from 'react';
 import type { LucideProps } from 'lucide-react-native';
+import { useTheme } from 'tamagui';
 import { iconsMap } from './icons';
 import type { AppIconName } from './icons';
 import config from '../../tamagui.config.cjs';
@@ -17,6 +18,7 @@ export function AppIcon({
   color,
   strokeWidth = 1.75,
 }: AppIconProps): ReactElement {
+  const theme = useTheme();
   const IconComponent = iconsMap[name] as ComponentType<LucideProps>;
   type TokenValue<T> = { val?: T } | T;
   const isTokenValue = <T,>(value: TokenValue<T>): value is { val?: T } =>
@@ -34,6 +36,13 @@ export function AppIcon({
     }
     if (color.startsWith('$')) {
       const tokenName = color.slice(1);
+      const themeToken = theme[tokenName as keyof typeof theme];
+      const themeValue = typeof themeToken?.get === 'function'
+        ? themeToken.get()
+        : undefined;
+      if (typeof themeValue === 'string') {
+        return themeValue;
+      }
       const tokenEntry = colorTokens[tokenName];
       const tokenValue = resolveToken(tokenEntry);
       return typeof tokenValue === 'string' ? tokenValue : fallback;

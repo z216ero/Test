@@ -27,7 +27,9 @@ export function PaymentListItem({
   const dateLabel = start ? formatDateRu(start) : t('common.empty');
   const timeLabel = start && end ? formatTimeRangeRu(start, end) : t('common.empty');
   const amountLabel = formatPrice(item.amount ?? null) ?? t('common.empty');
-  const canMarkPaid = status === 'Pending' && !!onMarkPaid;
+  const endTs = end ? new Date(end).getTime() : Number.NaN;
+  const isSessionFinished = !Number.isNaN(endTs) && endTs <= Date.now();
+  const canMarkPaid = status === 'Pending' && !!onMarkPaid && isSessionFinished;
   const methodLabel = status === 'Paid'
     ? paymentMethodLabel(item.method)
     : null;

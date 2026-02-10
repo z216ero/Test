@@ -236,14 +236,21 @@ export const canCancelSlot = (slot: SlotDto, nowTs: number): boolean => {
     && nowTs <= startTs + FREE_SLOT_PAST_GRACE_MS;
 };
 
-export const canCancelBookedSlot = (slot: SlotDto, _nowTs: number): boolean => {
+export const canCancelBookedSlot = (slot: SlotDto, nowTs: number): boolean => {
   if (!isSlotBooked(slot)) {
     return false;
   }
   if (isAttendanceFinalStatus(slot)) {
     return false;
   }
-  return true;
+  const startTs = getStartTimestamp(slot);
+  if (startTs === null) {
+    return false;
+  }
+  if (nowTs >= startTs) {
+    return false;
+  }
+  return nowTs < startTs - CANCEL_FORBIDDEN_WITHIN_MS;
 };
 
 export const isActiveSlotForMainList = (slot: SlotDto, nowTs: number): boolean => {

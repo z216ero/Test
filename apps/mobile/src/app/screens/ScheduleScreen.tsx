@@ -550,8 +550,24 @@ export function ScheduleScreen({ navigation, route }: Props) {
     const visibleSlots = isPastDay
       ? sortedSlots.filter((slot) => getUiSlotStatus(slot, nowTs) !== 'available')
       : activeSlots;
+    const showCompletedTodaySection = isSelectedToday && completedTodaySlots.length > 0;
 
     if (visibleSlots.length === 0) {
+      if (showCompletedTodaySection) {
+        return (
+          <YStack gap="$4">
+            <ScheduleCompletedTodaySection
+              open={completedExpanded}
+              count={completedTodaySlots.length}
+              slots={completedTodaySlots}
+              nowTs={nowTs}
+              onToggle={() => setCompletedExpanded((prev) => !prev)}
+              getHighlight={getHighlightForSlot}
+            />
+          </YStack>
+        );
+      }
+
       return (
         <EmptyState
           title={t('schedule.emptyDay')}
@@ -572,7 +588,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
             highlight={getHighlightForSlot(slot)}
           />
         ))}
-        {isSelectedToday ? (
+        {showCompletedTodaySection ? (
           <ScheduleCompletedTodaySection
             open={completedExpanded}
             count={completedTodaySlots.length}

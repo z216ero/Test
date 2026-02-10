@@ -230,6 +230,70 @@ public sealed class ServiceTests
     }
 
     [Fact]
+    public async Task GetAvailableSlotsAsync_WhenTrainerHasRatingSample_ReturnsTrainerRating()
+    {
+        await using var db = CreateDbContext();
+        var (trainerId, _) = await SeedTrainerAsync(db);
+        var nowUtc = DateTime.UtcNow;
+        var futureSlotId = Guid.NewGuid();
+
+        db.TrainingSlots.Add(new TrainingSlot
+        {
+            Id = futureSlotId,
+            TrainerId = trainerId,
+            StartsAtUtc = nowUtc.AddHours(3),
+            DurationMinutes = 60,
+            SlotType = TrainingSlotType.Individual,
+            Status = TrainingSlotStatus.Open,
+            CreatedAtUtc = nowUtc
+        });
+
+        for (var i = 0; i < 5; i++)
+        {
+            var historicalSlotId = Guid.NewGuid();
+            db.TrainingSlots.Add(new TrainingSlot
+            {
+                Id = historicalSlotId,
+                TrainerId = trainerId,
+                StartsAtUtc = nowUtc.AddDays(-i - 1),
+                DurationMinutes = 60,
+                SlotType = TrainingSlotType.Individual,
+                Status = TrainingSlotStatus.Booked,
+                CreatedAtUtc = nowUtc.AddDays(-i - 2)
+            });
+
+            db.Bookings.Add(new Booking
+            {
+                Id = Guid.NewGuid(),
+                SlotId = historicalSlotId,
+                ClientId = Guid.NewGuid(),
+                Status = i < 4 ? BookingStatus.Completed : BookingStatus.NoShow,
+                CreatedAtUtc = nowUtc.AddDays(-i - 2)
+            });
+        }
+
+        await db.SaveChangesAsync();
+
+        var service = new SlotService(db);
+        var result = await service.GetAvailableSlotsAsync(
+            nowUtc.AddHours(1),
+            nowUtc.AddHours(5),
+            specializations: null,
+            preferredTrainerGender: null,
+            clientGender: null,
+            clientCityId: null,
+            clientDistrictId: null,
+            districtOnly: false,
+            clientUserId: null,
+            cancellationToken: CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var group = Assert.Single(result.Value!);
+        Assert.Equal(trainerId, group.Trainer.Id);
+        Assert.Equal(4.0, group.Trainer.Rating);
+    }
+
+    [Fact]
     public async Task ProcessDueSlotsAsync_WhenGroupBelowMinimum_CancelsSlot()
     {
         await using var db = CreateDbContext();
@@ -481,6 +545,36 @@ public sealed class ServiceTests
 
         var slot = await db.TrainingSlots.FirstAsync(s => s.Id == slotId);
         Assert.Equal(TrainingSlotStatus.Cancelled, slot.Status);
+    }
+
+    [Fact]
+    public async Task CancelSlotAsync_WhenTrainerCancelsWithinThirtyMinutes_ReturnsConflict()
+    {
+        await using var db = CreateDbContext();
+        var (trainerId, trainerUserId) = await SeedTrainerAsync(db);
+        var slotId = Guid.NewGuid();
+
+        db.TrainingSlots.Add(new TrainingSlot
+        {
+            Id = slotId,
+            TrainerId = trainerId,
+            StartsAtUtc = DateTime.UtcNow.AddMinutes(20),
+            DurationMinutes = 60,
+            Status = TrainingSlotStatus.Open,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await db.SaveChangesAsync();
+
+        var service = new BookingService(db);
+        var result = await service.CancelSlotAsync(
+            slotId,
+            trainerUserId,
+            UserRoles.Trainer,
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(StatusCodes.Status409Conflict, result.Error?.StatusCode);
     }
 
     [Fact]
