@@ -92,6 +92,44 @@ public sealed class AuthFlowTests : IClassFixture<ApiPostgresFixture>
     }
 
     [Fact]
+    public async Task Register_WhenPhoneNumberInvalid_ReturnsBadRequest()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/auth/register", new RegisterRequest(
+            "invalid-phone@example.com",
+            "Password123",
+            "Client",
+            "Invalid Phone",
+            "Москва",
+            PhoneNumber: "+1 202 555 0101"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Register_WhenPhoneNumberStartsWith8_NormalizesToPlus7()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/auth/register", new RegisterRequest(
+            "phone-normalize@example.com",
+            "Password123",
+            "Trainer",
+            "Phone Trainer",
+            "Москва",
+            PhoneNumber: "8 (999) 123-45-67"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.NotNull(auth);
+        Assert.Equal("+79991234567", auth!.User.PhoneNumber);
+    }
+
+    [Fact]
     public async Task AuthMe_WithoutToken_ReturnsUnauthorized()
     {
         using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);

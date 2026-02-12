@@ -22,6 +22,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { formatPrice } from '@utils/price';
 import { getAnyLookupCode, getDefaultLookupCode } from '@app/utils/lookups';
 import { useAuthorizedImageSource } from '@ui/components';
+import { normalizeRussianPhoneInput, russianPhoneToE164 } from '@utils/phone';
 import { PersonalInfoActions } from './personal-info/ui/PersonalInfoActions';
 import { PersonalInfoHeader } from './personal-info/ui/PersonalInfoHeader';
 import { PersonalInfoMainSection } from './personal-info/ui/PersonalInfoMainSection';
@@ -61,6 +62,7 @@ const sortByOrder = (values: string[], order: Map<string, number>): string[] => 
 export function PersonalInfoScreen({ navigation, route }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [about, setAbout] = useState('');
   const [cityName, setCityName] = useState('');
   const [districtName, setDistrictName] = useState('');
@@ -156,6 +158,7 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
 
     setName(me.name?.trim() ?? '');
     setEmail(me.email?.trim() ?? '');
+    setPhoneNumber(me.phoneNumber?.trim() ? normalizeRussianPhoneInput(me.phoneNumber) : '');
     setAbout(me.about?.trim() ?? '');
     setCityName(me.cityName?.trim() ?? '');
     setDistrictName(me.districtName?.trim() ?? '');
@@ -310,6 +313,9 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
         name: name.trim(),
         cityName: cityName.trim(),
         districtName: districtName.trim() || null,
+        phoneNumber: phoneNumber.trim()
+          ? russianPhoneToE164(phoneNumber)
+          : null,
         gender: userGender || null,
         about: isTrainer
           ? about.trim() || null
@@ -365,6 +371,10 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
     }
     if (!cityName.trim()) {
       setError(t('profile.personal.cityRequired'));
+      return;
+    }
+    if (phoneNumber.trim().length > 0 && !russianPhoneToE164(phoneNumber)) {
+      setError(t('profile.personal.phoneInvalid'));
       return;
     }
     if (isTrainer && pricePerSession.trim().length > 0) {
@@ -433,6 +443,8 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
           <PersonalInfoMainSection
             name={name}
             onChangeName={setName}
+            phoneNumber={phoneNumber}
+            onChangePhoneNumber={(value) => setPhoneNumber(normalizeRussianPhoneInput(value))}
             cityName={cityName}
             districtName={districtName}
             onSelectCity={handleSelectCity}

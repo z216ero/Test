@@ -29,6 +29,7 @@ public sealed class UserService(AppDbContext db)
         }
 
         user.Name = request.Name.Trim();
+        user.PhoneNumber = NormalizeRussianPhoneNumber(request.PhoneNumber);
         if (!string.IsNullOrWhiteSpace(request.Gender)
             && Enum.TryParse<Gender>(request.Gender, true, out var parsedGender))
         {
@@ -191,6 +192,31 @@ public sealed class UserService(AppDbContext db)
         var culture = CultureInfo.GetCultureInfo("ru-RU");
         var lowered = collapsed.ToLower(culture);
         return culture.TextInfo.ToTitleCase(lowered);
+    }
+
+    private static string? NormalizeRussianPhoneNumber(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = Regex.Replace(value.Trim(), @"[\s\-\(\)]", string.Empty);
+        if (normalized.StartsWith("+7", StringComparison.Ordinal)
+            && normalized.Length == 12
+            && normalized[2..].All(char.IsDigit))
+        {
+            return normalized;
+        }
+
+        if (normalized.StartsWith("8", StringComparison.Ordinal)
+            && normalized.Length == 11
+            && normalized.All(char.IsDigit))
+        {
+            return $"+7{normalized[1..]}";
+        }
+
+        return null;
     }
 
     public async Task<ServiceResult<bool>> UpsertAvatarAsync(

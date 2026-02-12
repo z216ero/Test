@@ -6,7 +6,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, RefreshControl } from 'react-native';
 import { XStack, YStack } from 'tamagui';
-import type { SlotDto } from '@generated/api';
+import type { AvailableSlotTrainerDto, SlotDto } from '@generated/api';
 import { getClientUpcomingBookings } from '@api/bookingsApi';
 import { me } from '@api/authApi';
 import { getAvailableSlotsForClient } from '@api/slotsApi';
@@ -29,6 +29,7 @@ import {
 } from '@app/utils/clientSlotsFilters';
 import type { SlotsStackParamList } from '@app/navigation/types';
 import { SlotsHeader } from './slots/ui/SlotsHeader';
+import { TrainerProfileSheet } from './slots/ui/TrainerProfileSheet';
 import { type SlotGroup, TrainerSlotGroupCard } from './slots/ui/TrainerSlotGroupCard';
 
 const DATE_RANGE_DAYS = 14;
@@ -118,6 +119,8 @@ export function SlotsScreen({ navigation }: Props) {
   const [filtersReady, setFiltersReady] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [trainerProfileSheetOpen, setTrainerProfileSheetOpen] = useState(false);
+  const [selectedTrainer, setSelectedTrainer] = useState<AvailableSlotTrainerDto | null>(null);
 
   const specializationsQuery = useAppQuery({
     queryKey: keys.lookups.specializations(),
@@ -364,6 +367,10 @@ export function SlotsScreen({ navigation }: Props) {
             onOpenSlot={(slot, trainer) => {
               navigation.navigate('ClientSlotDetails', { slot, trainer });
             }}
+            onOpenTrainerProfile={(trainer) => {
+              setSelectedTrainer(trainer);
+              setTrainerProfileSheetOpen(true);
+            }}
           />
         ))}
       </YStack>
@@ -434,6 +441,17 @@ export function SlotsScreen({ navigation }: Props) {
         canFilterDistrict={canFilterDistrict}
         onApply={handleApplyFilters}
         onOpenChange={setSheetOpen}
+      />
+
+      <TrainerProfileSheet
+        open={trainerProfileSheetOpen}
+        trainer={selectedTrainer}
+        onOpenChange={(open) => {
+          setTrainerProfileSheetOpen(open);
+          if (!open) {
+            setSelectedTrainer(null);
+          }
+        }}
       />
     </YStack>
   );

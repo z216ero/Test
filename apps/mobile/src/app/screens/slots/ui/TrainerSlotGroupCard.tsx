@@ -18,6 +18,7 @@ type TrainerSlotGroupCardProps = {
   canCheckConflicts: boolean;
   nowTs: number;
   onOpenSlot: (slot: SlotDto, trainer: AvailableSlotTrainerDto) => void;
+  onOpenTrainerProfile: (trainer: AvailableSlotTrainerDto) => void;
 };
 
 const getSlotRange = (slot: SlotDto): { start: number; end: number } | null => {
@@ -79,6 +80,7 @@ export function TrainerSlotGroupCard({
   canCheckConflicts,
   nowTs,
   onOpenSlot,
+  onOpenTrainerProfile,
 }: TrainerSlotGroupCardProps) {
   const trainer = group.trainer;
   const trainerName = trainer.name ?? t('common.empty');
@@ -96,27 +98,34 @@ export function TrainerSlotGroupCard({
     >
       <XStack alignItems="center" justifyContent="space-between" gap="$3">
         <XStack alignItems="center" gap="$3" flex={1}>
-          <TrainerAvatar
-            name={trainerName}
-            avatarUrl={trainer.avatarUrl}
-            size="$10"
-          />
+          <Button
+            unstyled
+            onPress={() => onOpenTrainerProfile(trainer)}
+          >
+            <TrainerAvatar
+              name={trainerName}
+              avatarUrl={trainer.avatarUrl}
+              size="$10"
+            />
+          </Button>
           <YStack gap="$1" flex={1}>
-            <Text fontSize="$4" fontWeight="700" color="$text">
-              {trainerName}
-            </Text>
+            <XStack alignItems="center" justifyContent="space-between" gap="$2">
+              <Text fontSize="$4" fontWeight="700" color="$text" flex={1} numberOfLines={1}>
+                {trainerName}
+              </Text>
+              {ratingLabel ? (
+                <XStack alignItems="center" gap="$1">
+                  <AppIcon name="star" size={14} color="$accent" />
+                  <Text fontSize="$3" color="$muted" fontWeight="600">
+                    {ratingLabel}
+                  </Text>
+                </XStack>
+              ) : null}
+            </XStack>
             {locationLabel ? (
               <Text fontSize="$3" color="$muted">
                 {locationLabel}
               </Text>
-            ) : null}
-            {ratingLabel ? (
-              <XStack alignItems="center" gap="$2">
-                <AppIcon name="star" size={14} color="$accent" />
-                <Text fontSize="$3" color="$muted">
-                  {ratingLabel}
-                </Text>
-              </XStack>
             ) : null}
           </YStack>
         </XStack>

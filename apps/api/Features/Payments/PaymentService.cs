@@ -188,6 +188,14 @@ public sealed class PaymentService(AppDbContext db)
                 "Refunded payment cannot be marked as paid.");
         }
 
+        if (current.BookingStatus != BookingStatus.Completed)
+        {
+            return ServiceResult<PaymentDto>.Fail(
+                StatusCodes.Status409Conflict,
+                "Training is not completed",
+                "Only completed trainings can be marked as paid.");
+        }
+
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
@@ -342,6 +350,7 @@ public sealed class PaymentService(AppDbContext db)
             p.Booking.Slot!.TrainerId,
             p.Booking.Slot.StartsAtUtc,
             p.Booking.Slot.DurationMinutes,
+            p.Booking.Status,
             p.Amount,
             p.Status,
             p.Method,
@@ -435,6 +444,7 @@ public sealed class PaymentService(AppDbContext db)
         Guid TrainerId,
         DateTime SlotStartAtUtc,
         int SlotDurationMinutes,
+        BookingStatus BookingStatus,
         decimal Amount,
         PaymentStatus Status,
         PaymentMethod? Method,

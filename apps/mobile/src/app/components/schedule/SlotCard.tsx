@@ -1,9 +1,8 @@
-import { Button, Text, XStack, YStack } from 'tamagui';
+import { Button } from 'tamagui';
 import type { SlotDto } from '@generated/api';
 import { t } from '@i18n';
 import { formatTimeRangeRu } from '@utils/datetime';
-import { AppIcon } from '@ui/AppIcon';
-import { Avatar, useAuthorizedImageSource } from '@ui/components';
+import { useAppTheme } from '../../theme/AppThemeContext';
 import {
   getClientAvatarUrl,
   getClientName,
@@ -11,6 +10,8 @@ import {
   getUiSlotStatus,
   uiSlotStatusMeta,
 } from './slotHelpers';
+import { SlotCardIndividual } from './SlotCardIndividual';
+import { SlotCardGroup } from './SlotCardGroup';
 
 type SlotCardProps = {
   slot: SlotDto;
@@ -30,44 +31,43 @@ export function SlotCard({
   variant = 'default',
   highlight = null,
 }: SlotCardProps) {
+  const { isDark } = useAppTheme();
   const statusType = getUiSlotStatus(slot, nowTs);
   const status = uiSlotStatusMeta[statusType];
   const statusLabel = t(status.labelKey);
   const times = getSlotTimes(slot);
   const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : '';
-  const clientName = statusType !== 'available' ? getClientName(slot) : null;
-  const avatarUrl = statusType !== 'available' ? getClientAvatarUrl(slot) : null;
-  const avatarSource = useAuthorizedImageSource(avatarUrl);
+  const isGroup = (slot.slotType ?? '').toLowerCase() === 'group';
+  const clientName = !isGroup && statusType !== 'available' ? getClientName(slot) : null;
+  const avatarUrl = !isGroup && statusType !== 'available' ? getClientAvatarUrl(slot) : null;
 
   const isMuted = variant === 'muted';
   const isNeedsAttention = statusType === 'needs_attention';
-  const resolvedHighlight = isNeedsAttention ? null : highlight;
+  const resolvedHighlight = !isGroup && !isNeedsAttention ? highlight : null;
   const titleColor = isMuted ? '$muted' : '$text';
-  const isGroup = (slot.slotType ?? '').toLowerCase() === 'group';
   const occupiedCount = slot.occupiedCount ?? 0;
   const capacityMax = slot.capacityMax ?? null;
-  const statusColor = status.dotColor;
-  const labelColor = status.labelColor;
+  const darkWarningColor = '#CDA15A';
+  const darkWarningTint = '#1F1B13';
+  const statusColor = isNeedsAttention && isDark ? darkWarningColor : status.dotColor;
+  const labelColor = isNeedsAttention && isDark ? darkWarningColor : status.labelColor;
   const baseBackground = isMuted ? '$surfaceMuted' : '$background';
   const cardBackground = isNeedsAttention && status.backgroundColor
-    ? status.backgroundColor
+    ? isDark ? darkWarningTint : status.backgroundColor
     : baseBackground;
   const borderColor = isNeedsAttention && status.borderColor
-    ? status.borderColor
+    ? isDark ? darkWarningColor : status.borderColor
     : '$border';
   const borderWidth = isNeedsAttention ? 2 : 1;
+  const isGroupFull = isGroup && capacityMax !== null && occupiedCount >= capacityMax;
   const highlightBorderColor = resolvedHighlight
     ? resolvedHighlight.color === 'success'
       ? '$accent'
       : '$danger'
-    : borderColor;
-  const highlightBorderWidth = resolvedHighlight ? 2 : borderWidth;
-  const highlightChipColor = resolvedHighlight
-    ? resolvedHighlight.color === 'success'
+    : isGroupFull
       ? '$accent'
-      : '$danger'
-    : '$accent';
-
+      : borderColor;
+  const highlightBorderWidth = resolvedHighlight || isGroupFull ? 2 : borderWidth;
   return (
     <Button
       onPress={onPress}
@@ -84,63 +84,32 @@ export function SlotCard({
       width="100%"
       position="relative"
     >
-      <YStack gap="$3">
-        <XStack alignItems="center" justifyContent="space-between" width="100%">
-          <Text fontSize="$4" fontWeight="700" color={titleColor}>
-            {timeLabel || t('common.empty')}
-          </Text>
-          <XStack alignItems="center" gap="$2">
-            <AppIcon name={isGroup ? 'users' : 'user'} size={14} color="$muted" />
-            {isGroup && capacityMax ? (
-              <Text fontSize="$2" color={labelColor}>
-                {`${occupiedCount}/${capacityMax}`}
-              </Text>
-            ) : null}
-            {resolvedHighlight ? (
-              <XStack
-                paddingHorizontal="$2"
-                paddingVertical="$1"
-                borderRadius="$3"
-                borderWidth={1}
-                borderColor={highlightChipColor}
-                backgroundColor="$surfaceMuted"
-              >
-                <Text fontSize="$2" fontWeight="700" color={highlightChipColor}>
-                  {resolvedHighlight.chipText}
-                </Text>
-              </XStack>
-            ) : null}
-            <YStack
-              width="$1"
-              height="$1"
-              borderRadius="$6"
-              backgroundColor={statusColor}
-            />
-            {isNeedsAttention ? (
-              <AppIcon name="alertCircle" size={12} color={statusColor} />
-            ) : null}
-            <Text fontSize="$2" color={labelColor}>
-              {statusLabel}
-            </Text>
-          </XStack>
-        </XStack>
-        {clientName ? (
-          <XStack alignItems="center" gap="$3" minHeight="$9">
-            <Avatar
-              name={clientName}
-              source={avatarSource}
-              size="$9"
-              borderRadius="$6"
-              textSize="$4"
-            />
-            <YStack gap="$1" flex={1}>
-              <Text fontSize="$4" fontWeight="700" color={isMuted ? '$muted' : '$text'}>
-                {clientName}
-              </Text>
-            </YStack>
-          </XStack>
-        ) : null}
-      </YStack>
+      {isGroup ? (
+        <SlotCardGroup
+          timeLabel={timeLabel}
+          titleColor={titleColor}
+          statusColor={statusColor}
+          labelColor={labelColor}
+          statusLabel={statusLabel}
+          occupiedCount={occupiedCount}
+          capacityMax={capacityMax}
+          isNeedsAttention={isNeedsAttention}
+          isFull={isGroupFull}
+        />
+      ) : (
+        <SlotCardIndividual
+          timeLabel={timeLabel}
+          titleColor={titleColor}
+          statusColor={statusColor}
+          labelColor={labelColor}
+          statusLabel={statusLabel}
+          isNeedsAttention={isNeedsAttention}
+          isMuted={isMuted}
+          clientName={clientName}
+          avatarUrl={avatarUrl}
+          highlight={resolvedHighlight}
+        />
+      )}
     </Button>
   );
 }

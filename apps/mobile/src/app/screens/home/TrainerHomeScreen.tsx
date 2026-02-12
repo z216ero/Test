@@ -70,6 +70,14 @@ const sortByStart = (a: SlotDto, b: SlotDto) => {
   return aTime - bTime;
 };
 
+const getRoundedMinutesUntil = (startTs: number, nowTs: number): number => {
+  const diffMs = startTs - nowTs;
+  if (diffMs <= 0) {
+    return 0;
+  }
+  return Math.ceil(diffMs / (60 * 1000));
+};
+
 type TrainerHomeScreenProps = {
   navigation: HomeNavigation;
   me: HomeUser;
@@ -195,17 +203,25 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     if (activeBookedSlots.some((slot) => canMarkNoShow(slot, nowTs))) {
       entries.push(t('home.trainer.alertNoShow'));
     }
-    const upcomingSoon = activeBookedSlots.find((slot) => {
-      const startTs = getSlotStartTimestamp(slot);
-      if (startTs === null) {
-        return false;
-      }
-      const diff = startTs - nowTs;
-      return diff > 0 && diff <= UPCOMING_ALERT_WINDOW_MS;
-    });
-    if (upcomingSoon) {
-      entries.push(t('home.trainer.alertUpcoming'));
+    const upcomingSoonMinutes = activeBookedSlots
+      .map((slot) => {
+        const startTs = getSlotStartTimestamp(slot);
+        if (startTs === null) {
+          return null;
+        }
+        const diff = startTs - nowTs;
+        if (diff <= 0 || diff > UPCOMING_ALERT_WINDOW_MS) {
+          return null;
+        }
+        return getRoundedMinutesUntil(startTs, nowTs);
+      })
+      .filter((value): value is number => typeof value === 'number')
+      .sort((left, right) => left - right)[0];
+
+    if (typeof upcomingSoonMinutes === 'number' && upcomingSoonMinutes > 0) {
+      entries.push(t('home.trainer.alertUpcoming', { minutes: upcomingSoonMinutes }));
     }
+
     return entries;
   }, [activeBookedSlots, nowTs]);
 

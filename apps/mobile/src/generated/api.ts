@@ -18,6 +18,8 @@ export interface AuthUserDto {
   /** @nullable */
   email?: string | null;
   /** @nullable */
+  phoneNumber?: string | null;
+  /** @nullable */
   role?: string | null;
   /** @nullable */
   name?: string | null;
@@ -68,6 +70,8 @@ export interface AvailableSlotTrainerDto {
   id?: string;
   /** @nullable */
   name?: string | null;
+  /** @nullable */
+  phoneNumber?: string | null;
   /** @nullable */
   avatarUrl?: string | null;
   /** @nullable */
@@ -255,6 +259,8 @@ export interface RegisterRequest {
   /** @nullable */
   districtName?: string | null;
   /** @nullable */
+  phoneNumber?: string | null;
+  /** @nullable */
   gender?: string | null;
   /** @nullable */
   specializations?: string[] | null;
@@ -337,6 +343,8 @@ export interface UpdateUserRequest {
   cityName?: string | null;
   /** @nullable */
   districtName?: string | null;
+  /** @nullable */
+  phoneNumber?: string | null;
   /** @nullable */
   gender?: string | null;
   /** @nullable */

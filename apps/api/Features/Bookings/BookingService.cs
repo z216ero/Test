@@ -358,6 +358,23 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                         "Slot does not belong to this trainer.");
                 }
 
+                var nowUtc = DateTime.UtcNow;
+                if (slot.StartsAtUtc <= nowUtc)
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Slot already started",
+                        "Started slots cannot be cancelled.");
+                }
+
+                if (slot.StartsAtUtc - nowUtc <= TimeSpan.FromMinutes(30))
+                {
+                    return ServiceResult<SlotDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Too late to cancel",
+                        "Trainer cancellation is not allowed within 30 minutes before start.");
+                }
+
                 if (slot.SlotType == TrainingSlotType.Individual)
                 {
                     if (slot.Booking is null)
@@ -388,15 +405,6 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                 }
                 else
                 {
-                    var nowUtc = DateTime.UtcNow;
-                    if (slot.StartsAtUtc <= nowUtc)
-                    {
-                        return ServiceResult<SlotDto>.Fail(
-                            StatusCodes.Status409Conflict,
-                            "Slot already started",
-                            "Started group slots cannot be cancelled.");
-                    }
-
                     foreach (var attendee in slot.Attendees.Where(a => a.Status == SlotAttendeeStatus.Booked))
                     {
                         attendee.Status = SlotAttendeeStatus.Cancelled;

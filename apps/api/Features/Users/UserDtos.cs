@@ -4,6 +4,7 @@ public sealed record UpdateUserRequest(
     string Name,
     string CityName,
     string? DistrictName = null,
+    string? PhoneNumber = null,
     string? Gender = null,
     string? About = null,
     string[]? Specializations = null,

@@ -26,6 +26,7 @@ import { registerPushTokenIfPossible } from '@notifications/pushRegistration';
 import { getDefaultLookupCode } from '@app/utils/lookups';
 import type { LookupItem } from '@api/lookupsApi';
 import { SelectFieldButton } from '@ui/components';
+import { normalizeRussianPhoneInput, russianPhoneToE164 } from '@utils/phone';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -75,6 +76,7 @@ export function RegisterScreen({ navigation, route }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [cityName, setCityName] = useState('');
   const [districtName, setDistrictName] = useState('');
   const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
@@ -173,6 +175,7 @@ export function RegisterScreen({ navigation, route }: Props) {
       name: string;
       cityName: string;
       districtName?: string | null;
+      phoneNumber?: string | null;
       role: string;
       gender: string;
       specializations?: string[];
@@ -183,6 +186,7 @@ export function RegisterScreen({ navigation, route }: Props) {
         name: payload.name,
         cityName: payload.cityName,
         districtName: payload.districtName ?? null,
+        phoneNumber: payload.phoneNumber ?? null,
         role: payload.role,
         gender: payload.gender,
         specializations: payload.specializations,
@@ -230,6 +234,11 @@ export function RegisterScreen({ navigation, route }: Props) {
       return;
     }
 
+    if (phoneNumber.trim() && !russianPhoneToE164(phoneNumber)) {
+      setError(t('auth.register.phoneInvalid'));
+      return;
+    }
+
     setError(null);
 
     try {
@@ -239,6 +248,9 @@ export function RegisterScreen({ navigation, route }: Props) {
         name: name.trim(),
         cityName: cityName.trim(),
         districtName: districtName.trim() || null,
+        phoneNumber: phoneNumber.trim()
+          ? russianPhoneToE164(phoneNumber)
+          : null,
         role,
         gender,
         specializations: specializationValue,
@@ -276,6 +288,13 @@ export function RegisterScreen({ navigation, route }: Props) {
           value={name}
           onChangeText={setName}
           placeholder={t('common.namePlaceholder')}
+        />
+        <AuthField
+          label={t('auth.register.phone')}
+          value={phoneNumber}
+          onChangeText={(value) => setPhoneNumber(normalizeRussianPhoneInput(value))}
+          keyboardType="numeric"
+          placeholder={t('auth.register.phonePlaceholder')}
         />
         <YStack gap="$2">
           <Text fontSize="$3" color="$muted">

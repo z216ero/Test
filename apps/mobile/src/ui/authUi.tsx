@@ -89,6 +89,7 @@ export function AuthField({ label, ...inputProps }: AuthFieldProps) {
         verticalAlign="center"
         fontSize="$3"
         color="$text"
+        placeholderTextColor="$muted"
         height={40}
         {...inputProps}
       />
