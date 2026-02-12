@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.4",
   "info": {
-    "title": "Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+    "title": "Api",
     "version": "1.0"
   },
   "paths": {
@@ -636,6 +636,85 @@
         }
       }
     },
+    "/bookings/{bookingId}/close": {
+      "patch": {
+        "tags": [
+          "Bookings"
+        ],
+        "parameters": [
+          {
+            "name": "bookingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseBookingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseBookingResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/clients/me": {
       "get": {
         "tags": [
@@ -770,7 +849,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/String<>f__AnonymousType8"
+                  "$ref": "#/components/schemas/String<>f__AnonymousType9"
                 }
               }
             }
@@ -1533,6 +1612,101 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/push/preferences": {
+      "get": {
+        "tags": [
+          "Push"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushPreferencesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Push"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePushPreferencesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushPreferencesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2445,6 +2619,80 @@
         },
         "additionalProperties": false
       },
+      "CloseBookingPaymentDto": {
+        "type": "object",
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "method": {
+            "type": "string",
+            "nullable": true
+          },
+          "paidAtUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CloseBookingPaymentRequest": {
+        "type": "object",
+        "properties": {
+          "markPaid": {
+            "type": "boolean"
+          },
+          "method": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CloseBookingRequest": {
+        "type": "object",
+        "properties": {
+          "attendance": {
+            "type": "string",
+            "nullable": true
+          },
+          "payment": {
+            "$ref": "#/components/schemas/CloseBookingPaymentRequest"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CloseBookingResultDto": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bookingStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "payment": {
+            "$ref": "#/components/schemas/CloseBookingPaymentDto"
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateSlotRequest": {
         "type": "object",
         "properties": {
@@ -2730,6 +2978,25 @@
         },
         "additionalProperties": { }
       },
+      "PushPreferencesResponse": {
+        "type": "object",
+        "properties": {
+          "eventsEnabled": {
+            "type": "boolean"
+          },
+          "groupMinCancellationEnabled": {
+            "type": "boolean"
+          },
+          "reminderEnabled": {
+            "type": "boolean"
+          },
+          "reminderOffsetMinutes": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "RefreshRequest": {
         "type": "object",
         "properties": {
@@ -2832,6 +3099,11 @@
             "type": "string",
             "format": "uuid"
           },
+          "bookingId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
           "startsAtUtc": {
             "type": "string",
             "format": "date-time"
@@ -2891,7 +3163,7 @@
         },
         "additionalProperties": false
       },
-      "String<>f__AnonymousType8": {
+      "String<>f__AnonymousType9": {
         "type": "object",
         "properties": {
           "status": {
@@ -2963,6 +3235,25 @@
           "trainerAvatarUrl": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdatePushPreferencesRequest": {
+        "type": "object",
+        "properties": {
+          "eventsEnabled": {
+            "type": "boolean"
+          },
+          "groupMinCancellationEnabled": {
+            "type": "boolean"
+          },
+          "reminderEnabled": {
+            "type": "boolean"
+          },
+          "reminderOffsetMinutes": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false

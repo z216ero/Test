@@ -68,6 +68,7 @@ Infrastructure:
 - If bookings can race, enforce atomic booking on the server (no double-booking).
 - Always use UTC in DB and API; never store local times in DB.
 - Avoid breaking API contract without updating mobile.
+- For paired action buttons in bottom sheets (Yes/No style), prefer `unstyled` button wrappers with explicit `minHeight` and spacing to avoid overlap/clipping on smaller screens.
 
 ## Business rules
 - All business logic and constraints are defined in docs/domain.md

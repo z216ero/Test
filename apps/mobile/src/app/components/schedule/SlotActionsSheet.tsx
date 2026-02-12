@@ -1,11 +1,13 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Sheet } from '@tamagui/sheet';
-import { Button, Text, XStack, YStack } from 'tamagui';
+import { Button, Switch, Text, XStack, YStack } from 'tamagui';
 import type { SlotDto } from '@generated/api';
 import { t } from '@i18n';
 import { formatTimeRangeRu } from '@utils/datetime';
 import { AppIcon } from '@ui/AppIcon';
-import { Avatar, useAuthorizedImageSource } from '@ui/components';
+import { Avatar, DualActionSelector, useAuthorizedImageSource } from '@ui/components';
 import {
+  CANCEL_FORBIDDEN_WITHIN_MS,
   canCancelBookedSlot,
   canCancelSlot,
   canMarkCompleted,
@@ -19,19 +21,41 @@ import {
   isUiSlotStatusFinal,
   uiSlotStatusMeta,
 } from './slotHelpers';
+import type { PaymentMethod } from '@api/trainerSlotsApi';
 
 type SlotActionsSheetProps = {
   open: boolean;
   slot: SlotDto | null;
   nowTs: number;
   onOpenChange: (open: boolean) => void;
-  onCancelSlot: (slot: SlotDto) => void;
+  onCancelSlot?: (slot: SlotDto) => void;
   onMarkCompleted?: (slot: SlotDto) => void;
   onMarkNoShow?: (slot: SlotDto) => void;
   isCancelling?: boolean;
   isMarkingCompleted?: boolean;
   isMarkingNoShow?: boolean;
+  isClosingBooking?: boolean;
   showAttendanceActions?: boolean;
+  onCloseBooking?: (
+    payload: {
+      slot: SlotDto;
+      attendance: 'Completed' | 'NoShow';
+      markPaid: boolean;
+      method: PaymentMethod | null;
+    }
+  ) => void;
+};
+
+const paymentMethods: PaymentMethod[] = ['Cash', 'Transfer', 'SBP'];
+
+const paymentMethodLabel = (method: PaymentMethod): string => {
+  if (method === 'Cash') {
+    return t('payments.method.cash');
+  }
+  if (method === 'Transfer') {
+    return t('payments.method.transfer');
+  }
+  return t('payments.method.sbp');
 };
 
 export function SlotActionsSheet({
@@ -45,7 +69,9 @@ export function SlotActionsSheet({
   isCancelling,
   isMarkingCompleted,
   isMarkingNoShow,
+  isClosingBooking,
   showAttendanceActions,
+  onCloseBooking,
 }: SlotActionsSheetProps) {
   const statusType = slot ? getUiSlotStatus(slot, nowTs) : null;
   const statusMeta = statusType ? uiSlotStatusMeta[statusType] : null;
@@ -64,22 +90,72 @@ export function SlotActionsSheet({
   const canShowNoShow = !!slot && canMarkAttendance && canMarkNoShow(slot, nowTs);
   const canShowComplete = !!slot && canMarkAttendance && canMarkCompleted(slot, nowTs);
   const canCancelAvailable = !!slot && canCancelSlot(slot, nowTs);
+  const startTs = slot ? getSlotStartTimestamp(slot) : null;
   const canCancelBooked =
     !!slot && statusType !== 'needs_attention' && canCancelBookedSlot(slot, nowTs);
+  const showBookedCancelLockedByTime =
+    !!slot
+    && statusType === 'booked'
+    && !canCancelBooked
+    && startTs !== null
+    && nowTs < startTs
+    && nowTs >= startTs - CANCEL_FORBIDDEN_WITHIN_MS;
   const isPastFreeSlot = !!slot && isFreeSlotPast(slot, nowTs);
   const isFinalAttendance = !!slot && statusType ? isUiSlotStatusFinal(statusType) : false;
-  const startTs = slot ? getSlotStartTimestamp(slot) : null;
   const isBeforeStart = startTs !== null && nowTs < startTs;
 
   const isActionPending =
-    isCancelling || isMarkingCompleted || isMarkingNoShow;
+    isCancelling || isMarkingCompleted || isMarkingNoShow || isClosingBooking;
+  const [selectedAttendance, setSelectedAttendance] = useState<'Completed' | 'NoShow'>('Completed');
+  const [markPaid, setMarkPaid] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('Cash');
+  const isNoShowSelected = selectedAttendance === 'NoShow';
+
+  useEffect(() => {
+    if (!open || !slot?.id) {
+      return;
+    }
+    setSelectedAttendance(canShowNoShow && !canShowComplete ? 'NoShow' : 'Completed');
+    setMarkPaid(false);
+    setSelectedMethod('Cash');
+  }, [open, slot?.id, canShowNoShow, canShowComplete]);
+
+  useEffect(() => {
+    if (isNoShowSelected && markPaid) {
+      setMarkPaid(false);
+    }
+  }, [isNoShowSelected, markPaid]);
+
+  const canUseCloseForm =
+    !!slot?.bookingId
+    && canMarkAttendance
+    && !!onCloseBooking;
+  const noShowAvailableAtTs = startTs !== null
+    ? startTs + 15 * 60 * 1000
+    : null;
+  const noShowMinutesLeft = noShowAvailableAtTs !== null && nowTs < noShowAvailableAtTs
+    ? Math.ceil((noShowAvailableAtTs - nowTs) / (60 * 1000))
+    : 0;
+  const showNoShowLockedHint =
+    canUseCloseForm
+    && !canShowNoShow
+    && noShowMinutesLeft > 0;
+  const canSaveClose = useMemo(() => {
+    if (!canUseCloseForm || isActionPending) {
+      return false;
+    }
+    if (selectedAttendance === 'Completed') {
+      return canShowComplete;
+    }
+    return canShowNoShow;
+  }, [canUseCloseForm, isActionPending, selectedAttendance, canShowComplete, canShowNoShow]);
 
   return (
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
       dismissOnSnapToBottom
-      snapPoints={[45]}
+      snapPoints={[72]}
       dismissOnOverlayPress
     >
       <Sheet.Overlay
@@ -90,8 +166,11 @@ export function SlotActionsSheet({
       />
       <Sheet.Frame
         padding="$5"
+        paddingBottom="$7"
         gap="$4"
         backgroundColor="$backgroundSoft"
+        borderTopWidth={1}
+        borderTopColor="$border"
         borderTopLeftRadius="$6"
         borderTopRightRadius="$6"
       >
@@ -139,6 +218,7 @@ export function SlotActionsSheet({
             {statusType === 'available' ? (
               <YStack gap="$3">
                 {canCancelAvailable ? (
+                  onCancelSlot ? (
                   <Button
                     backgroundColor="$background"
                     borderWidth={1}
@@ -157,6 +237,7 @@ export function SlotActionsSheet({
                       </Text>
                     </XStack>
                   </Button>
+                  ) : null
                 ) : (
                   <XStack
                     padding="$4"
@@ -177,86 +258,212 @@ export function SlotActionsSheet({
 
             {statusType === 'booked' || statusType === 'needs_attention' ? (
               <YStack gap="$3">
-                {canShowComplete && onMarkCompleted ? (
-                  <Button
-                    backgroundColor="$background"
-                    borderWidth={1}
-                    borderColor="$border"
-                    borderRadius="$4"
-                    height="$10"
-                    onPress={() => onMarkCompleted(slot)}
-                    disabled={isActionPending}
-                  >
-                    <XStack alignItems="center" gap="$2">
-                      <AppIcon name="check" size={18} color="$accent" />
-                      <Text color="$text">
-                        {isMarkingCompleted
-                          ? t('common.loading')
-                          : t('slotDetails.markCompleted')}
+                {canUseCloseForm && canShowComplete ? (
+                  <YStack gap="$3">
+                    <Text fontSize="$3" color="$muted">
+                      {t('schedule.close.attendanceTitle')}
+                    </Text>
+                    <DualActionSelector
+                      selectLabel={t('slotDetails.markCompleted')}
+                      cancelLabel={t('slotDetails.markNoShow')}
+                      selectedAction={selectedAttendance === 'Completed' ? 'select' : 'cancel'}
+                      onSelect={() => setSelectedAttendance('Completed')}
+                      onCancel={() => setSelectedAttendance('NoShow')}
+                      selectDisabled={!canShowComplete}
+                      cancelDisabled={!canShowNoShow}
+                      disabled={isActionPending}
+                    />
+                    {showNoShowLockedHint ? (
+                      <Text fontSize="$2" color="$muted">
+                        {t('schedule.close.noShowAvailableIn', { minutes: noShowMinutesLeft })}
                       </Text>
-                    </XStack>
-                  </Button>
-                ) : null}
-                {canMarkAttendance && !isFinalAttendance && isBeforeStart ? (
-                  <XStack
-                    padding="$4"
-                    borderRadius="$4"
-                    backgroundColor="$surfaceMuted"
-                    borderWidth={1}
-                    borderColor="$border"
-                  >
-                    <Text fontSize="$3" color="$muted">
-                      {t('schedule.sheet.completeAfterStart')}
-                    </Text>
-                  </XStack>
-                ) : null}
-                {canShowNoShow && onMarkNoShow ? (
-                  <Button
-                    backgroundColor="$background"
-                    borderWidth={1}
-                    borderColor="$danger"
-                    borderRadius="$4"
-                    height="$10"
-                    onPress={() => onMarkNoShow(slot)}
-                    disabled={isActionPending}
-                  >
-                    <XStack alignItems="center" gap="$2">
-                      <AppIcon name="alertCircle" size={18} color="$danger" />
-                      <Text color="$danger">
-                        {isMarkingNoShow
-                          ? t('common.loading')
-                          : t('slotDetails.markNoShow')}
+                    ) : null}
+                    <XStack
+                      backgroundColor="$background"
+                      borderRadius="$4"
+                      borderWidth={1}
+                      borderColor="$border"
+                      padding="$3"
+                      alignItems="center"
+                      justifyContent="space-between"
+                    >
+                      <Text fontSize="$3" color="$text">
+                        {t('schedule.close.markPaid')}
                       </Text>
+                      <Switch
+                        size="$4"
+                        checked={markPaid}
+                        onCheckedChange={setMarkPaid}
+                        disabled={isActionPending || isNoShowSelected}
+                        backgroundColor={markPaid ? '$accent' : '$surfaceMuted'}
+                        borderWidth={1}
+                        borderColor="$border"
+                      >
+                        <Switch.Thumb
+                          backgroundColor="$background"
+                          borderWidth={1}
+                          borderColor="$border"
+                        />
+                      </Switch>
                     </XStack>
-                  </Button>
+                    {markPaid && !isNoShowSelected ? (
+                      <XStack gap="$2">
+                        {paymentMethods.map((method) => {
+                          const selected = method === selectedMethod;
+                          return (
+                            <Button
+                              key={method}
+                              flex={1}
+                              backgroundColor={selected ? '$background' : '$surfaceMuted'}
+                              borderWidth={1}
+                              borderColor={selected ? '$accent' : '$border'}
+                              borderRadius="$4"
+                              minHeight="$9"
+                              onPress={() => setSelectedMethod(method)}
+                              disabled={isActionPending}
+                            >
+                              <Text color="$text" fontWeight={selected ? '700' : '600'}>
+                                {paymentMethodLabel(method)}
+                              </Text>
+                            </Button>
+                          );
+                        })}
+                      </XStack>
+                    ) : null}
+                    {canMarkAttendance && !isFinalAttendance && isBeforeStart ? (
+                      <XStack
+                        padding="$4"
+                        borderRadius="$4"
+                        backgroundColor="$surfaceMuted"
+                        borderWidth={1}
+                        borderColor="$border"
+                      >
+                        <Text fontSize="$3" color="$muted">
+                          {t('schedule.sheet.completeAfterStart')}
+                        </Text>
+                      </XStack>
+                    ) : null}
+                    {statusType === 'needs_attention' ? (
+                      <XStack
+                        padding="$4"
+                        borderRadius="$4"
+                        backgroundColor="$surfaceMuted"
+                        borderWidth={1}
+                        borderColor="$border"
+                      >
+                        <Text fontSize="$3" color="$muted">
+                          {t('schedule.sheet.attendanceRequired')}
+                        </Text>
+                      </XStack>
+                    ) : null}
+                    <Button
+                      unstyled
+                      onPress={() => onCloseBooking({
+                        slot,
+                        attendance: selectedAttendance,
+                        markPaid: !isNoShowSelected && markPaid,
+                        method: !isNoShowSelected && markPaid ? selectedMethod : null,
+                      })}
+                      disabled={!canSaveClose}
+                    >
+                      <XStack
+                        minHeight="$10"
+                        borderRadius="$4"
+                        backgroundColor="$accent"
+                        alignItems="center"
+                        justifyContent="center"
+                      >
+                        <Text color="$accentText" fontWeight="600">
+                          {isClosingBooking ? t('common.loading') : t('schedule.close.save')}
+                        </Text>
+                      </XStack>
+                    </Button>
+                  </YStack>
+                ) : !canUseCloseForm ? (
+                  <>
+                    {canShowComplete && onMarkCompleted ? (
+                      <Button
+                        backgroundColor="$background"
+                        borderWidth={1}
+                        borderColor="$border"
+                        borderRadius="$4"
+                        height="$10"
+                        onPress={() => onMarkCompleted(slot)}
+                        disabled={isActionPending}
+                      >
+                        <XStack alignItems="center" gap="$2">
+                          <AppIcon name="check" size={18} color="$accent" />
+                          <Text color="$text">
+                            {isMarkingCompleted
+                              ? t('common.loading')
+                              : t('slotDetails.markCompleted')}
+                          </Text>
+                        </XStack>
+                      </Button>
+                    ) : null}
+                    {canMarkAttendance && !isFinalAttendance && isBeforeStart ? (
+                      <XStack
+                        padding="$4"
+                        borderRadius="$4"
+                        backgroundColor="$surfaceMuted"
+                        borderWidth={1}
+                        borderColor="$border"
+                      >
+                        <Text fontSize="$3" color="$muted">
+                          {t('schedule.sheet.completeAfterStart')}
+                        </Text>
+                      </XStack>
+                    ) : null}
+                    {canShowNoShow && onMarkNoShow ? (
+                      <Button
+                        backgroundColor="$background"
+                        borderWidth={1}
+                        borderColor="$danger"
+                        borderRadius="$4"
+                        height="$10"
+                        onPress={() => onMarkNoShow(slot)}
+                        disabled={isActionPending}
+                      >
+                        <XStack alignItems="center" gap="$2">
+                          <AppIcon name="alertCircle" size={18} color="$danger" />
+                          <Text color="$danger">
+                            {isMarkingNoShow
+                              ? t('common.loading')
+                              : t('slotDetails.markNoShow')}
+                          </Text>
+                        </XStack>
+                      </Button>
+                    ) : null}
+                    {!canMarkAttendance ? (
+                      <XStack
+                        padding="$4"
+                        borderRadius="$4"
+                        backgroundColor="$surfaceMuted"
+                        borderWidth={1}
+                        borderColor="$border"
+                      >
+                        <Text fontSize="$3" color="$muted">
+                          {t('schedule.sheet.bookedInfo')}
+                        </Text>
+                      </XStack>
+                    ) : null}
+                    {statusType === 'needs_attention' ? (
+                      <XStack
+                        padding="$4"
+                        borderRadius="$4"
+                        backgroundColor="$surfaceMuted"
+                        borderWidth={1}
+                        borderColor="$border"
+                      >
+                        <Text fontSize="$3" color="$muted">
+                          {t('schedule.sheet.attendanceRequired')}
+                        </Text>
+                      </XStack>
+                    ) : null}
+                  </>
                 ) : null}
-                {!canMarkAttendance ? (
-                  <XStack
-                    padding="$4"
-                    borderRadius="$4"
-                    backgroundColor="$surfaceMuted"
-                    borderWidth={1}
-                    borderColor="$border"
-                  >
-                    <Text fontSize="$3" color="$muted">
-                      {t('schedule.sheet.bookedInfo')}
-                    </Text>
-                  </XStack>
-                ) : null}
-                {statusType === 'needs_attention' ? (
-                  <XStack
-                    padding="$4"
-                    borderRadius="$4"
-                    backgroundColor="$surfaceMuted"
-                    borderWidth={1}
-                    borderColor="$border"
-                  >
-                    <Text fontSize="$3" color="$muted">
-                      {t('schedule.sheet.attendanceRequired')}
-                    </Text>
-                  </XStack>
-                ) : null}
-                {canCancelBooked ? (
+                {canCancelBooked || showBookedCancelLockedByTime ? (
+                  onCancelSlot ? (
                   <Button
                     backgroundColor="$background"
                     borderWidth={1}
@@ -264,7 +471,7 @@ export function SlotActionsSheet({
                     borderRadius="$4"
                     height="$10"
                     onPress={() => onCancelSlot(slot)}
-                    disabled={isActionPending}
+                    disabled={isActionPending || !canCancelBooked}
                   >
                     <XStack alignItems="center" gap="$2">
                       <AppIcon name="trash" size={18} color="$primary" />
@@ -275,6 +482,12 @@ export function SlotActionsSheet({
                       </Text>
                     </XStack>
                   </Button>
+                  ) : null
+                ) : null}
+                {showBookedCancelLockedByTime ? (
+                  <Text fontSize="$2" color="$muted">
+                    {t('schedule.sheet.cancelUnavailable')}
+                  </Text>
                 ) : null}
               </YStack>
             ) : null}
@@ -294,14 +507,22 @@ export function SlotActionsSheet({
             ) : null}
 
             <Button
-              backgroundColor="$surfaceMuted"
-              borderWidth={1}
-              borderColor="$border"
-              borderRadius="$4"
-              height="$10"
+              unstyled
               onPress={() => onOpenChange(false)}
             >
-              <Text color="$text">{t('profile.personal.cancel')}</Text>
+              <XStack
+                minHeight="$10"
+                borderRadius="$4"
+                borderWidth={1}
+                borderColor="$border"
+                backgroundColor="$surfaceMuted"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Text color="$text" fontWeight="600">
+                  {t('profile.personal.cancel')}
+                </Text>
+              </XStack>
             </Button>
           </YStack>
         ) : null}
@@ -309,5 +530,3 @@ export function SlotActionsSheet({
     </Sheet>
   );
 }
-
-

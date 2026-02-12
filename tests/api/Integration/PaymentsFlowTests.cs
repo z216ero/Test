@@ -64,6 +64,157 @@ public sealed class PaymentsFlowTests : IClassFixture<ApiPostgresFixture>
     }
 
     [Fact]
+    public async Task CloseBooking_WhenMarkPaidFalse_ClosesBookingAndKeepsPaymentPending()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var scenario = await CreateBookedPaymentScenarioAsync(factory, client, 210_000, markCompleted: false);
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", scenario.TrainerAuth.AccessToken);
+
+        var closeResponse = await client.PatchAsJsonAsync(
+            $"/bookings/{scenario.Payment.BookingId}/close",
+            new CloseBookingRequest(
+                nameof(BookingStatus.Completed),
+                new CloseBookingPaymentRequest(false, null)));
+
+        Assert.Equal(HttpStatusCode.OK, closeResponse.StatusCode);
+        var payload = await closeResponse.Content.ReadFromJsonAsync<CloseBookingResultDto>();
+        Assert.NotNull(payload);
+        Assert.Equal(scenario.Payment.BookingId, payload!.BookingId);
+        Assert.Equal(nameof(BookingStatus.Completed), payload.BookingStatus);
+        Assert.Equal(nameof(PaymentStatus.Pending), payload.Payment.Status);
+        Assert.Null(payload.Payment.Method);
+        Assert.Null(payload.Payment.PaidAtUtc);
+    }
+
+    [Fact]
+    public async Task CloseBooking_WhenMarkPaidTrue_ClosesBookingAndMarksPaymentPaid()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var scenario = await CreateBookedPaymentScenarioAsync(factory, client, 215_000, markCompleted: false);
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", scenario.TrainerAuth.AccessToken);
+
+        var closeResponse = await client.PatchAsJsonAsync(
+            $"/bookings/{scenario.Payment.BookingId}/close",
+            new CloseBookingRequest(
+                nameof(BookingStatus.Completed),
+                new CloseBookingPaymentRequest(true, nameof(PaymentMethod.SBP))));
+
+        Assert.Equal(HttpStatusCode.OK, closeResponse.StatusCode);
+        var payload = await closeResponse.Content.ReadFromJsonAsync<CloseBookingResultDto>();
+        Assert.NotNull(payload);
+        Assert.Equal(nameof(BookingStatus.Completed), payload!.BookingStatus);
+        Assert.Equal(nameof(PaymentStatus.Paid), payload.Payment.Status);
+        Assert.Equal(nameof(PaymentMethod.SBP), payload.Payment.Method);
+        Assert.NotNull(payload.Payment.PaidAtUtc);
+    }
+
+    [Fact]
+    public async Task CloseBooking_WhenRepeated_ReturnsConflict()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var scenario = await CreateBookedPaymentScenarioAsync(factory, client, 205_000, markCompleted: false);
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", scenario.TrainerAuth.AccessToken);
+
+        var first = await client.PatchAsJsonAsync(
+            $"/bookings/{scenario.Payment.BookingId}/close",
+            new CloseBookingRequest(
+                nameof(BookingStatus.Completed),
+                new CloseBookingPaymentRequest(false, null)));
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        var second = await client.PatchAsJsonAsync(
+            $"/bookings/{scenario.Payment.BookingId}/close",
+            new CloseBookingRequest(
+                nameof(BookingStatus.NoShow),
+                new CloseBookingPaymentRequest(true, nameof(PaymentMethod.Cash))));
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+    }
+
+    [Fact]
+    public async Task CloseBooking_WhenBookingCancelled_ReturnsConflict()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var scenario = await CreateBookedPaymentScenarioAsync(factory, client, 190_000, markCompleted: false);
+        await SetBookingStatusAsync(factory, scenario.Payment.BookingId, BookingStatus.Cancelled);
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", scenario.TrainerAuth.AccessToken);
+
+        var closeResponse = await client.PatchAsJsonAsync(
+            $"/bookings/{scenario.Payment.BookingId}/close",
+            new CloseBookingRequest(
+                nameof(BookingStatus.Completed),
+                new CloseBookingPaymentRequest(false, null)));
+
+        Assert.Equal(HttpStatusCode.Conflict, closeResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task CloseBooking_WhenMarkPaidTrueWithoutMethod_ReturnsBadRequest()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var scenario = await CreateBookedPaymentScenarioAsync(factory, client, 225_000, markCompleted: false);
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", scenario.TrainerAuth.AccessToken);
+
+        var closeResponse = await client.PatchAsJsonAsync(
+            $"/bookings/{scenario.Payment.BookingId}/close",
+            new CloseBookingRequest(
+                nameof(BookingStatus.Completed),
+                new CloseBookingPaymentRequest(true, null)));
+
+        Assert.Equal(HttpStatusCode.BadRequest, closeResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task CloseBooking_WhenUserIsNotOwnerTrainer_ReturnsNotFound()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var scenario = await CreateBookedPaymentScenarioAsync(factory, client, 200_000, markCompleted: false);
+        var anotherTrainer = await RegisterAsync(client, "Trainer");
+        var anotherClient = await RegisterAsync(client, "Client");
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", anotherTrainer.AccessToken);
+
+        var closeByAnotherTrainer = await client.PatchAsJsonAsync(
+            $"/bookings/{scenario.Payment.BookingId}/close",
+            new CloseBookingRequest(
+                nameof(BookingStatus.Completed),
+                new CloseBookingPaymentRequest(false, null)));
+        Assert.Equal(HttpStatusCode.NotFound, closeByAnotherTrainer.StatusCode);
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", anotherClient.AccessToken);
+
+        var closeByClient = await client.PatchAsJsonAsync(
+            $"/bookings/{scenario.Payment.BookingId}/close",
+            new CloseBookingRequest(
+                nameof(BookingStatus.Completed),
+                new CloseBookingPaymentRequest(false, null)));
+        Assert.Equal(HttpStatusCode.NotFound, closeByClient.StatusCode);
+    }
+
+    [Fact]
     public async Task MarkPaid_IsIdempotentForSameMethod_AndConflictsForDifferentMethod()
     {
         using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
@@ -97,6 +248,33 @@ public sealed class PaymentsFlowTests : IClassFixture<ApiPostgresFixture>
             $"/payments/{scenario.Payment.PaymentId}/mark-paid",
             new MarkPaymentPaidRequest(nameof(PaymentMethod.Cash)));
         Assert.Equal(HttpStatusCode.Conflict, methodConflict.StatusCode);
+    }
+
+    [Fact]
+    public async Task MarkPaid_WhenBookingClosedWithoutImmediatePayment_MarksPaidSuccessfully()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var scenario = await CreateBookedPaymentScenarioAsync(factory, client, 200_000, markCompleted: false);
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", scenario.TrainerAuth.AccessToken);
+
+        var closeResponse = await client.PatchAsJsonAsync(
+            $"/bookings/{scenario.Payment.BookingId}/close",
+            new CloseBookingRequest(
+                nameof(BookingStatus.Completed),
+                new CloseBookingPaymentRequest(false, null)));
+        Assert.Equal(HttpStatusCode.OK, closeResponse.StatusCode);
+
+        var markPaid = await client.PatchAsJsonAsync(
+            $"/payments/{scenario.Payment.PaymentId}/mark-paid",
+            new MarkPaymentPaidRequest(nameof(PaymentMethod.Transfer)));
+        Assert.Equal(HttpStatusCode.OK, markPaid.StatusCode);
+        var dto = await markPaid.Content.ReadFromJsonAsync<PaymentDto>();
+        Assert.NotNull(dto);
+        Assert.Equal(nameof(PaymentStatus.Paid), dto!.Status);
+        Assert.Equal(nameof(PaymentMethod.Transfer), dto.Method);
     }
 
     [Fact]
@@ -311,6 +489,19 @@ public sealed class PaymentsFlowTests : IClassFixture<ApiPostgresFixture>
 
         payment.Booking.Status = BookingStatus.Completed;
         payment.Booking.Slot!.StartsAtUtc = DateTime.UtcNow.AddHours(-2);
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task SetBookingStatusAsync(
+        ApiWebApplicationFactory factory,
+        Guid bookingId,
+        BookingStatus status)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var booking = await db.Bookings.FirstOrDefaultAsync(x => x.Id == bookingId);
+        Assert.NotNull(booking);
+        booking!.Status = status;
         await db.SaveChangesAsync();
     }
 
