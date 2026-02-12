@@ -48,7 +48,7 @@ const BookingsStack = createNativeStackNavigator<BookingsStackParamList>();
 
 const AuthStackNavigator = () => (
   <AuthStack.Navigator>
-    <AuthStack.Screen name="Login" component={LoginScreen} options={{ title: t('auth.login.title') }} />
+    <AuthStack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
     <AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: t('auth.register.title') }} />
     <AuthStack.Screen name="LocationSearch" component={LocationSearchScreen} options={{ headerShown: false }} />
   </AuthStack.Navigator>

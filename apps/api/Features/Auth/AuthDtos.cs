@@ -7,6 +7,7 @@ public sealed record RegisterRequest(
     string Name,
     string CityName,
     string? DistrictName = null,
+    string? PhoneNumber = null,
     string? Gender = null,
     IReadOnlyList<string>? Specializations = null);
 
@@ -15,6 +16,7 @@ public sealed record LoginRequest(string Email, string Password);
 public sealed record AuthUserDto(
     Guid Id,
     string Email,
+    string? PhoneNumber,
     string Role,
     string Name,
     string Gender,

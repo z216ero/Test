@@ -7,7 +7,7 @@ import { login, me } from '@api/authApi';
 import { presentApiError } from '@api/ApiErrorPresenter';
 import { ApiError } from '@api/core';
 import { t } from '@i18n';
-import { XStack } from 'tamagui';
+import { XStack, YStack } from 'tamagui';
 import {
   AuthCard,
   AuthError,
@@ -89,38 +89,40 @@ export function LoginScreen({ navigation }: Props) {
 
   return (
     <AuthScreen>
-      <XStack justifyContent="center">
-        <AppIcon name="user" size={28} color="$muted" />
-      </XStack>
-      <AuthHeader title={t('auth.login.title')} subtitle={t('auth.login.subtitle')} />
-      <AuthCard>
-        <AuthField
-          label={t('auth.login.email')}
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          placeholder={t('common.emailPlaceholder')}
+      <YStack flex={1} justifyContent="center" gap="$6">
+        <XStack justifyContent="center">
+          <AppIcon name="user" size={28} color="$muted" />
+        </XStack>
+        <AuthHeader title={t('auth.login.title')} subtitle={t('auth.login.subtitle')} />
+        <AuthCard>
+          <AuthField
+            label={t('auth.login.email')}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            placeholder={t('common.emailPlaceholder')}
+          />
+          <AuthField
+            label={t('auth.login.password')}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            placeholder={t('common.passwordPlaceholder')}
+          />
+          {error ? <AuthError message={error} /> : null}
+          <AuthPrimaryButton onPress={handleLogin} disabled={loginMutation.isPending}>
+            {loginMutation.isPending ? t('auth.login.loading') : t('auth.login.cta')}
+          </AuthPrimaryButton>
+        </AuthCard>
+        <AuthFooter
+          text={t('common.noAccount')}
+          actionText={t('auth.login.secondary')}
+          onPress={() => navigation.navigate('Register')}
+          variant="column"
         />
-        <AuthField
-          label={t('auth.login.password')}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder={t('common.passwordPlaceholder')}
-        />
-        {error ? <AuthError message={error} /> : null}
-        <AuthPrimaryButton onPress={handleLogin} disabled={loginMutation.isPending}>
-          {loginMutation.isPending ? t('auth.login.loading') : t('auth.login.cta')}
-        </AuthPrimaryButton>
-      </AuthCard>
-      <AuthFooter
-        text={t('common.noAccount')}
-        actionText={t('auth.login.secondary')}
-        onPress={() => navigation.navigate('Register')}
-        variant="column"
-      />
+      </YStack>
     </AuthScreen>
   );
 }

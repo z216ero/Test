@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Project
-- Stack: React Native (mobile), ASP.NET Core Minimal API (api), .NET Aspire (local orchestration), PostgreSQL (db via docker-compose).
+- Stack: React Native (mobile), ASP.NET Core Minimal API (api), .NET Aspire (local orchestration), PostgreSQL.
 - Repo layout (expected):
   - apps/api/            -> Minimal API
   - apps/apphost/        -> Aspire AppHost
@@ -17,8 +17,6 @@
 ## Dev environment tips
 - Prefer running the whole stack via Aspire:
   - `dotnet run --project apps/apphost`
-- DB locally via docker-compose:
-  - `docker compose -f infra/compose.yml up -d`
 - Mobile:
   - install deps from repo root or `apps/mobile` (use the lockfile you find: npm/yarn/pnpm)
   - Android emulator uses `10.0.2.2` instead of `localhost` for API base URL
@@ -39,7 +37,6 @@ Frontend (mobile):
 
 Infrastructure:
 - PostgreSQL 15+
-- Docker and docker-compose (for local infra only)
 - .NET Aspire (latest compatible with .NET 10)
             
 ## Contract-first API usage

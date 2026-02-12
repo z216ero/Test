@@ -2,6 +2,7 @@ import { Button, Text, XStack, YStack } from 'tamagui';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
 import { FormInput, SelectFieldButton } from '@ui/components';
+import { useAppTheme } from '@app/theme/AppThemeContext';
 
 type LookupOption = {
   code: string;
@@ -11,6 +12,8 @@ type LookupOption = {
 type PersonalInfoMainSectionProps = {
   name: string;
   onChangeName: (value: string) => void;
+  phoneNumber: string;
+  onChangePhoneNumber: (value: string) => void;
   cityName: string;
   districtName: string;
   onSelectCity: () => void;
@@ -28,6 +31,8 @@ type PersonalInfoMainSectionProps = {
 export function PersonalInfoMainSection({
   name,
   onChangeName,
+  phoneNumber,
+  onChangePhoneNumber,
   cityName,
   districtName,
   onSelectCity,
@@ -41,6 +46,8 @@ export function PersonalInfoMainSection({
   priceHint,
   email,
 }: PersonalInfoMainSectionProps) {
+  const { isDark } = useAppTheme();
+
   return (
     <YStack
       gap="$3"
@@ -61,6 +68,17 @@ export function PersonalInfoMainSection({
           value={name}
           onChangeText={onChangeName}
           placeholder={t('profile.personal.name')}
+        />
+      </YStack>
+      <YStack gap="$2">
+        <Text fontSize="$3" color="$text">
+          {t('profile.personal.phone')}
+        </Text>
+        <FormInput
+          value={phoneNumber}
+          onChangeText={onChangePhoneNumber}
+          placeholder={t('profile.personal.phonePlaceholder')}
+          keyboardType="numeric"
         />
       </YStack>
       <YStack gap="$2">
@@ -127,6 +145,8 @@ export function PersonalInfoMainSection({
             value={pricePerSession}
             onChangeText={onChangePrice}
             placeholder={t('profile.personal.pricePlaceholder')}
+            color={isDark ? '#FFFFFF' : '#0F172A'}
+            placeholderTextColor={isDark ? '#FFFFFF' : '#64748B'}
             keyboardType="numeric"
           />
           <Text fontSize="$2" color="$muted">

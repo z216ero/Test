@@ -3,6 +3,7 @@ import { t } from '@i18n';
 import { secondaryButtonProps } from '@ui/formDefaults';
 import { AppIcon } from '@ui/AppIcon';
 import { FormInput } from '@ui/components';
+import { useAppTheme } from '@app/theme/AppThemeContext';
 
 type LookupOption = {
   code: string;
@@ -77,6 +78,8 @@ export function PersonalInfoTrainerSections({
   worksWithGender,
   onSelectWorksWithGender,
 }: PersonalInfoTrainerSectionsProps) {
+  const { isDark } = useAppTheme();
+
   if (!isTrainer) {
     return null;
   }
@@ -98,6 +101,8 @@ export function PersonalInfoTrainerSections({
           value={about}
           onChangeText={onChangeAbout}
           placeholder={t('profile.personal.aboutPlaceholder')}
+          color={isDark ? '#FFFFFF' : '#0F172A'}
+          placeholderTextColor={isDark ? '#FFFFFF' : '#64748B'}
           multiline
           numberOfLines={4}
           maxLength={250}

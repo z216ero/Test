@@ -34,6 +34,7 @@ public sealed record SlotAttendeeDto(
 public sealed record AvailableSlotTrainerDto(
     Guid Id,
     string Name,
+    string? PhoneNumber,
     string? AvatarUrl,
     int? PricePerSession,
     IReadOnlyList<string> TrainingTypes,

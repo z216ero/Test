@@ -46,6 +46,63 @@ public sealed class UserProfileTests : IClassFixture<ApiPostgresFixture>
     }
 
     [Fact]
+    public async Task PatchUsersMe_WhenPhoneNumberStartsWith8_NormalizesToPlus7()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var registerResponse = await client.PostAsJsonAsync("/auth/register", new RegisterRequest(
+            "client-phone-update@example.com",
+            "Password123",
+            "Client",
+            "Client Phone",
+            "Москва"));
+
+        Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
+        var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.NotNull(auth);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+
+        var response = await client.PatchAsJsonAsync("/users/me", new UpdateUserRequest(
+            "Client Phone",
+            "Москва",
+            PhoneNumber: "8 (999) 123-45-67"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updated = await response.Content.ReadFromJsonAsync<AuthUserDto>();
+        Assert.NotNull(updated);
+        Assert.Equal("+79991234567", updated!.PhoneNumber);
+    }
+
+    [Fact]
+    public async Task PatchUsersMe_WhenPhoneNumberInvalid_ReturnsBadRequest()
+    {
+        using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);
+        using var client = factory.CreateClient();
+
+        var registerResponse = await client.PostAsJsonAsync("/auth/register", new RegisterRequest(
+            "client-phone-invalid@example.com",
+            "Password123",
+            "Client",
+            "Client Invalid Phone",
+            "Москва"));
+
+        Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
+        var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.NotNull(auth);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+
+        var response = await client.PatchAsJsonAsync("/users/me", new UpdateUserRequest(
+            "Client Invalid Phone",
+            "Москва",
+            PhoneNumber: "+1 202 555 0101"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task PatchUsersMe_WhenTrainer_UpdatesSpecialization()
     {
         using var factory = new ApiWebApplicationFactory(_fixture.ConnectionString);

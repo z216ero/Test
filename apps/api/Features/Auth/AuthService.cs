@@ -27,6 +27,7 @@ public sealed class AuthService(
         var normalizedDistrictName = string.IsNullOrWhiteSpace(request.DistrictName)
             ? null
             : NormalizeLocationName(request.DistrictName);
+        var normalizedPhoneNumber = NormalizeRussianPhoneNumber(request.PhoneNumber);
 
         var strategy = db.Database.CreateExecutionStrategy();
         ServiceResult<AuthResponse>? result = null;
@@ -50,6 +51,7 @@ public sealed class AuthService(
                 UserName = request.Email.Trim(),
                 Name = request.Name.Trim(),
                 Role = normalizedRole,
+                PhoneNumber = normalizedPhoneNumber,
                 Gender = Enum.TryParse<Gender>(request.Gender, true, out var parsedGender)
                     ? parsedGender
                     : Gender.Male
@@ -353,6 +355,7 @@ public sealed class AuthService(
         return new AuthUserDto(
             user.Id,
             user.Email ?? string.Empty,
+            user.PhoneNumber,
             user.Role,
             user.Name,
             user.Gender.ToString(),
@@ -483,5 +486,30 @@ public sealed class AuthService(
         var culture = CultureInfo.GetCultureInfo("ru-RU");
         var lowered = collapsed.ToLower(culture);
         return culture.TextInfo.ToTitleCase(lowered);
+    }
+
+    private static string? NormalizeRussianPhoneNumber(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = Regex.Replace(value.Trim(), @"[\s\-\(\)]", string.Empty);
+        if (normalized.StartsWith("+7", StringComparison.Ordinal)
+            && normalized.Length == 12
+            && normalized[2..].All(char.IsDigit))
+        {
+            return normalized;
+        }
+
+        if (normalized.StartsWith("8", StringComparison.Ordinal)
+            && normalized.Length == 11
+            && normalized.All(char.IsDigit))
+        {
+            return $"+7{normalized[1..]}";
+        }
+
+        return null;
     }
 }

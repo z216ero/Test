@@ -2,6 +2,7 @@ using Api.Data;
 using Api.Features.Auth;
 using Api.Features.Common;
 using Api.Features.Lookups;
+using System.Text.RegularExpressions;
 
 namespace Api.Features.Users;
 
@@ -55,6 +56,12 @@ public static class UserEndpoints
                 && request.DistrictName.Trim().Length > 120)
             {
                 errors["districtName"] = new[] { "DistrictName must be at most 120 characters." };
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.PhoneNumber)
+                && !IsValidRussianPhoneNumber(request.PhoneNumber))
+            {
+                errors["phoneNumber"] = new[] { "PhoneNumber must be a valid Russian number starting with +7 or 8." };
             }
 
             string? normalizedAbout = null;
@@ -206,6 +213,9 @@ public static class UserEndpoints
                 DistrictName = string.IsNullOrWhiteSpace(request.DistrictName)
                     ? null
                     : request.DistrictName.Trim(),
+                PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber)
+                    ? null
+                    : request.PhoneNumber.Trim(),
                 Gender = normalizedGender,
                 About = normalizedAbout,
                 Specializations = normalizedSpecializations,
@@ -389,5 +399,23 @@ public static class UserEndpoints
         }
 
         return (collected.ToArray(), null);
+    }
+
+    private static bool IsValidRussianPhoneNumber(string value)
+    {
+        var normalized = Regex.Replace(value.Trim(), @"[\s\-\(\)]", string.Empty);
+        if (normalized.StartsWith("+7", StringComparison.Ordinal))
+        {
+            return normalized.Length == 12
+                && normalized[2..].All(char.IsDigit);
+        }
+
+        if (normalized.StartsWith("8", StringComparison.Ordinal))
+        {
+            return normalized.Length == 11
+                && normalized.All(char.IsDigit);
+        }
+
+        return false;
     }
 }

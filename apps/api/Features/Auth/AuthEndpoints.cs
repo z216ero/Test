@@ -2,6 +2,7 @@ using Api.Data;
 using Api.Features.Common;
 using Api.Features.Lookups;
 using Microsoft.AspNetCore.Authorization;
+using System.Text.RegularExpressions;
 
 namespace Api.Features.Auth;
 
@@ -54,6 +55,12 @@ public static class AuthEndpoints
                 errors["districtName"] = new[] { "DistrictName must be at most 120 characters." };
             }
 
+            if (!string.IsNullOrWhiteSpace(request.PhoneNumber)
+                && !IsValidRussianPhoneNumber(request.PhoneNumber))
+            {
+                errors["phoneNumber"] = new[] { "PhoneNumber must be a valid Russian number starting with +7 or 8." };
+            }
+
             if (!LookupCatalog.IsValidRole(request.Role))
             {
                 errors["role"] = new[] { "Role must be Trainer or Client." };
@@ -83,7 +90,10 @@ public static class AuthEndpoints
                 CityName = request.CityName.Trim(),
                 DistrictName = string.IsNullOrWhiteSpace(request.DistrictName)
                     ? null
-                    : request.DistrictName.Trim()
+                    : request.DistrictName.Trim(),
+                PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber)
+                    ? null
+                    : request.PhoneNumber.Trim()
             };
 
             var result = await service.RegisterAsync(normalized, cancellationToken);
@@ -228,5 +238,23 @@ public static class AuthEndpoints
         .ProducesProblem(StatusCodes.Status401Unauthorized);
 
         return app;
+    }
+
+    private static bool IsValidRussianPhoneNumber(string value)
+    {
+        var normalized = Regex.Replace(value.Trim(), @"[\s\-\(\)]", string.Empty);
+        if (normalized.StartsWith("+7", StringComparison.Ordinal))
+        {
+            return normalized.Length == 12
+                && normalized[2..].All(char.IsDigit);
+        }
+
+        if (normalized.StartsWith("8", StringComparison.Ordinal))
+        {
+            return normalized.Length == 11
+                && normalized.All(char.IsDigit);
+        }
+
+        return false;
     }
 }

@@ -15,12 +15,14 @@ import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
 import { Avatar, useAuthorizedImageSource } from '@ui/components';
 import { ProfileSettingsList, type ProfileSettingsItem } from './profile/ui/ProfileSettingsList';
+import { ProfileSupportSheet } from './profile/ui/ProfileSupportSheet';
 import { ProfileTrainerRating } from './profile/ui/ProfileTrainerRating';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
 
 export function ProfileScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
   const { isDark, setThemeName } = useAppTheme();
 
   const {
@@ -117,6 +119,7 @@ export function ProfileScreen({ navigation }: Props) {
       id: 'support',
       label: t('profile.settings.support'),
       icon: 'info',
+      onPress: () => setIsSupportOpen(true),
     },
   ];
 
@@ -204,6 +207,10 @@ export function ProfileScreen({ navigation }: Props) {
           {t('profile.logout')}
         </Text>
       </Button>
+      <ProfileSupportSheet
+        open={isSupportOpen}
+        onOpenChange={setIsSupportOpen}
+      />
     </YStack>
   );
 }

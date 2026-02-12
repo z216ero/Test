@@ -1,9 +1,11 @@
 import { Sheet } from '@tamagui/sheet';
-import { Text, XStack, YStack } from 'tamagui';
+import Clipboard from '@react-native-clipboard/clipboard';
+import { Button, Text, XStack, YStack } from 'tamagui';
 import type { AvailableSlotTrainerDto } from '@generated/api';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
+import { useToast } from '@ui/feedback/useToast';
 
 type TrainerProfileSheetProps = {
   open: boolean;
@@ -47,12 +49,28 @@ export function TrainerProfileSheet({
   trainer,
   onOpenChange,
 }: TrainerProfileSheetProps) {
+  const { showToast } = useToast();
   const trainerName = trainer?.name?.trim() || t('common.empty');
   const location = buildLocation(trainer);
   const trainingTypes = buildTrainingTypes(trainer);
+  const phoneNumber = trainer?.phoneNumber?.trim() || '';
+  const formattedPhoneNumber = formatRussianPhoneNumber(phoneNumber);
   const rating = typeof trainer?.rating === 'number'
     ? trainer.rating.toFixed(1)
     : null;
+  const canCopyPhone = formattedPhoneNumber !== t('common.empty');
+
+  const handleCopyPhone = () => {
+    if (!canCopyPhone) {
+      return;
+    }
+
+    Clipboard.setString(formattedPhoneNumber);
+    showToast({
+      type: 'success',
+      title: t('slots.trainerSheet.phoneCopied'),
+    });
+  };
 
   return (
     <Sheet
@@ -110,6 +128,27 @@ export function TrainerProfileSheet({
         >
           <YStack gap="$1">
             <Text fontSize="$2" color="$muted">
+              {t('slots.trainerSheet.phone')}
+            </Text>
+            <XStack alignItems="center" justifyContent="space-between" gap="$2">
+              <Text fontSize="$3" color="$text" flex={1}>
+                {formattedPhoneNumber}
+              </Text>
+              <Button
+                size="$3"
+                circular
+                chromeless
+                disabled={!canCopyPhone}
+                onPress={handleCopyPhone}
+                accessibilityLabel={t('slots.trainerSheet.copyPhone')}
+              >
+                <AppIcon name="copy" size={16} color="$muted" />
+              </Button>
+            </XStack>
+          </YStack>
+
+          <YStack gap="$1">
+            <Text fontSize="$2" color="$muted">
               {t('slots.trainerSheet.location')}
             </Text>
             <Text fontSize="$3" color="$text">
@@ -148,3 +187,18 @@ export function TrainerProfileSheet({
     </Sheet>
   );
 }
+
+const formatRussianPhoneNumber = (value: string): string => {
+  const normalized = value.replace(/[\s\-()]/g, '');
+  const digits = normalized.startsWith('+7')
+    ? normalized.slice(2)
+    : normalized.startsWith('8')
+      ? normalized.slice(1)
+      : '';
+
+  if (!/^\d{10}$/.test(digits)) {
+    return t('common.empty');
+  }
+
+  return `+7 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 8)}-${digits.slice(8, 10)}`;
+};

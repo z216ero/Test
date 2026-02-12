@@ -394,6 +394,7 @@ public sealed class SlotService(AppDbContext db)
             var trainerDto = new AvailableSlotTrainerDto(
                 trainer.Id,
                 trainer.User!.Name,
+                trainer.User!.PhoneNumber,
                 avatarUrl,
                 trainer.PricePerSession,
                 trainer.TrainingTypes ?? Array.Empty<string>(),
