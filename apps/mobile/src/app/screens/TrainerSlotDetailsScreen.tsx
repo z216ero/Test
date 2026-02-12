@@ -5,11 +5,10 @@ import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   attendanceActionsAvailable,
   cancelTrainerSlot,
+  closeTrainerBooking,
   getGroupSlotAttendees,
   markGroupAttendeeCompleted,
   markGroupAttendeeNoShow,
-  markSlotCompleted,
-  markSlotNoShow,
 } from '@api/trainerSlotsApi';
 import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
 import type { SlotAttendeeDto, SlotDto } from '@generated/api';
@@ -111,7 +110,8 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   };
 
   const completeMutation = useAppMutation({
-    mutationFn: (slotId: string) => markSlotCompleted(slotId),
+    mutationFn: (payload: { bookingId: string }) =>
+      closeTrainerBooking(payload.bookingId, 'Completed', { markPaid: false, method: null }),
     onSuccess: () => {
       invalidateTrainerData();
       navigation.goBack();
@@ -130,7 +130,8 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   });
 
   const noShowMutation = useAppMutation({
-    mutationFn: (slotId: string) => markSlotNoShow(slotId),
+    mutationFn: (payload: { bookingId: string }) =>
+      closeTrainerBooking(payload.bookingId, 'NoShow', { markPaid: false, method: null }),
     onSuccess: () => {
       invalidateTrainerData();
       navigation.goBack();
@@ -206,7 +207,11 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   });
 
   const canMarkIndividual =
-    !group && attendanceActionsAvailable && slotStatus === 'Booked' && !!slot.id;
+    !group
+    && attendanceActionsAvailable
+    && slotStatus === 'Booked'
+    && !!slot.id
+    && !!slot.bookingId;
 
   const attendees = attendeesQuery.data ?? [];
   const hasAttendeesSnapshot = attendeesQuery.data !== undefined;
@@ -227,21 +232,21 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   );
 
   const handleMarkCompleted = () => {
-    if (!slot.id) {
+    if (!slot.id || !slot.bookingId) {
       setActionError(t('errors.generic'));
       return;
     }
     setActionError(null);
-    completeMutation.mutate(slot.id);
+    completeMutation.mutate({ bookingId: slot.bookingId! });
   };
 
   const handleMarkNoShow = () => {
-    if (!slot.id) {
+    if (!slot.id || !slot.bookingId) {
       setActionError(t('errors.generic'));
       return;
     }
     setActionError(null);
-    noShowMutation.mutate(slot.id);
+    noShowMutation.mutate({ bookingId: slot.bookingId! });
   };
 
   const handleCancelGroupSlot = () => {

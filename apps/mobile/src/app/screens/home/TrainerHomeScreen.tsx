@@ -1,13 +1,13 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { type QueryKey, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, RefreshControl } from 'react-native';
+import { RefreshControl } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   attendanceActionsAvailable,
+  closeTrainerBooking,
   getMyTrainerSlots,
-  markSlotCompleted,
-  markSlotNoShow,
+  type PaymentMethod,
 } from '@api/trainerSlotsApi';
 import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
 import type { SlotDto } from '@generated/api';
@@ -19,6 +19,7 @@ import { useAuthorizedImageSource } from '@ui/components';
 import { useToast } from '@ui/feedback/useToast';
 import { useTabBarPadding } from '@ui/layout/useTabBarPadding';
 import { TabScrollView } from '@ui/layout/TabScrollView';
+import { SlotActionsSheet } from '@app/components/schedule/SlotActionsSheet';
 import { formatTimeRangeRu } from '@utils/datetime';
 import {
   canMarkCompleted,
@@ -97,6 +98,8 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
 
   const [todayDate, setTodayDate] = useState(() => startOfLocalDay(new Date()));
   const [nowTs, setNowTs] = useState(() => Date.now());
+  const [activeSlot, setActiveSlot] = useState<SlotDto | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const dateRange = useMemo(() => {
     const startLocal = startOfLocalDay(todayDate);
@@ -280,59 +283,50 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
 
   type SlotsSnapshot = Array<[QueryKey, SlotDto[] | undefined]>;
 
-  const completeMutation = useAppMutation<unknown, unknown, string, { snapshot: SlotsSnapshot }>({
-    mutationFn: (slotId: string) => markSlotCompleted(slotId),
-    onMutate: async (slotId) => {
-      await queryClient.cancelQueries({ queryKey: keys.trainerSlots.mine() });
-      const snapshot = queryClient.getQueriesData<SlotDto[]>({ queryKey: keys.trainerSlots.mine() });
-      updateSlotsCache(slotId, (slot) => ({
-        ...slot,
-        bookingStatus: 'Completed',
-      }));
-      return { snapshot };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
-    },
-    onError: (error, _variables, context) => {
-      if (context?.snapshot) {
-        rollbackSlotsCache(context.snapshot);
-      }
-      const presented = presentApiError(error);
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message: presented.message,
-        });
-      }
-    },
-  });
+  type CloseBookingVariables = {
+    slotId: string;
+    bookingId: string;
+    attendance: 'Completed' | 'NoShow';
+    markPaid: boolean;
+    method: PaymentMethod | null;
+  };
 
-  const noShowMutation = useAppMutation<unknown, unknown, string, { snapshot: SlotsSnapshot }>({
-    mutationFn: (slotId: string) => markSlotNoShow(slotId),
-    onMutate: async (slotId) => {
+  const closeBookingMutation = useAppMutation<unknown, unknown, CloseBookingVariables, { snapshot: SlotsSnapshot }>({
+    mutationFn: ({ bookingId, attendance, markPaid, method }: CloseBookingVariables) =>
+      closeTrainerBooking(bookingId, attendance, { markPaid, method }),
+    onMutate: async ({ slotId, attendance }) => {
       await queryClient.cancelQueries({ queryKey: keys.trainerSlots.mine() });
       const snapshot = queryClient.getQueriesData<SlotDto[]>({ queryKey: keys.trainerSlots.mine() });
       updateSlotsCache(slotId, (slot) => ({
         ...slot,
-        bookingStatus: 'NoShow',
+        bookingStatus: attendance,
       }));
       return { snapshot };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
+      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+      queryClient.invalidateQueries({ queryKey: keys.payments.all() });
+      setSheetOpen(false);
+      setActiveSlot(null);
     },
     onError: (error, _variables, context) => {
       if (context?.snapshot) {
         rollbackSlotsCache(context.snapshot);
       }
       const presented = presentApiError(error);
+      const message = presented.kind === 'conflict'
+        ? t('schedule.close.errorConflict')
+        : presented.kind === 'notFound'
+          ? t('schedule.close.errorNotFound')
+          : presented.kind === 'network' || presented.kind === 'timeout'
+            ? t('schedule.errorNetwork')
+            : presented.message;
       if (shouldShowErrorToast(presented)) {
         showToast({
           type: 'error',
           title: presented.title,
-          message: presented.message,
+          message,
         });
       }
     },
@@ -347,35 +341,12 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     isMeFetching || trainerSlotsQuery.isFetching,
   [isMeFetching, trainerSlotsQuery.isFetching]);
 
-  const handleMarkCompleted = (slot: SlotDto) => {
-    if (!slot.id || completeMutation.isPending) {
+  const handleOpenActions = (slot: SlotDto) => {
+    if (!slot.id || !slot.bookingId || closeBookingMutation.isPending) {
       return;
     }
-    if (!canMarkCompleted(slot, nowTs)) {
-      return;
-    }
-    completeMutation.mutate(slot.id);
-  };
-
-  const handleMarkNoShow = (slot: SlotDto) => {
-    if (!slot.id || noShowMutation.isPending) {
-      return;
-    }
-    if (!canMarkNoShow(slot, nowTs)) {
-      return;
-    }
-    Alert.alert(
-      t('schedule.actions.noShowConfirmTitle'),
-      t('schedule.actions.noShowConfirmMessage'),
-      [
-        { text: t('profile.personal.cancel'), style: 'cancel' },
-        {
-          text: t('schedule.actions.noShowConfirm'),
-          style: 'destructive',
-          onPress: () => noShowMutation.mutate(slot.id as string),
-        },
-      ]
-    );
+    setActiveSlot(slot);
+    setSheetOpen(true);
   };
 
   const handleCreateSlot = () => {
@@ -426,8 +397,7 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
             nowTs={nowTs}
             showAttendanceActions={attendanceActionsAvailable}
             onRetry={onRefresh}
-            onMarkCompleted={handleMarkCompleted}
-            onMarkNoShow={handleMarkNoShow}
+            onOpenActions={handleOpenActions}
             onGoToSchedule={() => {
               const initialDateIsoLocal = highlightSlot?.startsAtUtc
                 ? toStartOfLocalDayIso(highlightSlot.startsAtUtc)
@@ -449,6 +419,44 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
           <TrainerHomeAlertsCard alerts={alerts} />
         </YStack>
       </TabScrollView>
+      <SlotActionsSheet
+        open={sheetOpen}
+        slot={activeSlot}
+        nowTs={nowTs}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSheetOpen(false);
+            setActiveSlot(null);
+            return;
+          }
+          setSheetOpen(open);
+        }}
+        onMarkCompleted={undefined}
+        onMarkNoShow={undefined}
+        onCloseBooking={({ slot, attendance, markPaid, method }) => {
+          if (!slot.id || !slot.bookingId || closeBookingMutation.isPending) {
+            return;
+          }
+          if (attendance === 'Completed' && !canMarkCompleted(slot, nowTs)) {
+            return;
+          }
+          if (attendance === 'NoShow' && !canMarkNoShow(slot, nowTs)) {
+            return;
+          }
+          closeBookingMutation.mutate({
+            slotId: slot.id,
+            bookingId: slot.bookingId,
+            attendance,
+            markPaid,
+            method,
+          });
+        }}
+        isCancelling={false}
+        isMarkingCompleted={false}
+        isMarkingNoShow={false}
+        isClosingBooking={closeBookingMutation.isPending}
+        showAttendanceActions={attendanceActionsAvailable}
+      />
       <Button
         position="absolute"
         left="$6"

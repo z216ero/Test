@@ -1,7 +1,7 @@
 import { Button, Text, XStack, YStack } from 'tamagui';
 import type { SlotDto } from '@generated/api';
 import { t } from '@i18n';
-import { canMarkCompleted, canMarkNoShow } from '@app/components/schedule/slotHelpers';
+import { canMarkCompleted } from '@app/components/schedule/slotHelpers';
 import { Avatar } from '@ui/components';
 
 type AvatarSource = {
@@ -22,8 +22,7 @@ type TrainerNowNextCardProps = {
   nowTs: number;
   showAttendanceActions: boolean;
   onRetry: () => void;
-  onMarkCompleted: (slot: SlotDto) => void;
-  onMarkNoShow: (slot: SlotDto) => void;
+  onOpenActions: (slot: SlotDto) => void;
   onGoToSchedule: () => void;
 };
 
@@ -40,8 +39,7 @@ export function TrainerNowNextCard({
   nowTs,
   showAttendanceActions,
   onRetry,
-  onMarkCompleted,
-  onMarkNoShow,
+  onOpenActions,
   onGoToSchedule,
 }: TrainerNowNextCardProps) {
   const sectionTitle = t('home.trainer.sectionTitle');
@@ -157,7 +155,7 @@ export function TrainerNowNextCard({
         </YStack>
       </XStack>
       {currentSlot && showAttendanceActions ? (
-        <XStack gap="$3" flexWrap="wrap">
+        <XStack>
           {canMarkCompleted(currentSlot, nowTs) ? (
             <Button
               flex={1}
@@ -165,22 +163,9 @@ export function TrainerNowNextCard({
               backgroundColor="$accent"
               color="$accentText"
               borderRadius="$5"
-              onPress={() => onMarkCompleted(currentSlot)}
+              onPress={() => onOpenActions(currentSlot)}
             >
               {t('slotDetails.markCompleted')}
-            </Button>
-          ) : null}
-          {canMarkNoShow(currentSlot, nowTs) ? (
-            <Button
-              flex={1}
-              minHeight="$9"
-              backgroundColor="$surfaceMuted"
-              borderRadius="$5"
-              borderWidth={1}
-              borderColor="$border"
-              onPress={() => onMarkNoShow(currentSlot)}
-            >
-              {t('slotDetails.markNoShow')}
             </Button>
           ) : null}
         </XStack>

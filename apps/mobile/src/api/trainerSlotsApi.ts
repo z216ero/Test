@@ -1,5 +1,6 @@
 import type {
   BookingDto,
+  CloseBookingResultDto,
   CreateSlotRequest,
   GetTrainersTrainerIdSlotsParams,
   SlotDto,
@@ -12,6 +13,7 @@ import {
   postSlotsSlotIdAttendeesClientIdComplete,
   postSlotsSlotIdAttendeesClientIdNoShow,
   getTrainersTrainerIdSlots,
+  patchBookingsBookingIdClose,
   postSlotsSlotIdCancel,
   postSlotsSlotIdComplete,
   postSlotsSlotIdNoShow,
@@ -24,6 +26,8 @@ import { ApiTimeoutError } from './fetcher';
 export class TrainerSlotsOverlapError extends ApiError {}
 export class TrainerSlotsNotFoundError extends ApiError {}
 export class TrainerSlotsConflictError extends ApiError {}
+export type AttendanceCloseStatus = 'Completed' | 'NoShow';
+export type PaymentMethod = 'Cash' | 'Transfer' | 'SBP';
 
 const mapCreateSlotError = (error: unknown): Error => {
   if (error instanceof ApiTimeoutError) {
@@ -214,6 +218,30 @@ export const cancelTrainerSlot = async (
   try {
     const response = await postSlotsSlotIdCancel(slotId, options);
     return unwrap<SlotDto>(response, t('errors.generic'));
+  } catch (error) {
+    throw mapAttendanceError(error);
+  }
+};
+
+export const closeTrainerBooking = async (
+  bookingId: string,
+  attendance: AttendanceCloseStatus,
+  payment: { markPaid: boolean; method: PaymentMethod | null },
+  options?: RequestInit
+): Promise<CloseBookingResultDto> => {
+  try {
+    const response = await patchBookingsBookingIdClose(
+      bookingId,
+      {
+        attendance,
+        payment: {
+          markPaid: payment.markPaid,
+          method: payment.method,
+        },
+      },
+      options
+    );
+    return unwrap<CloseBookingResultDto>(response, t('errors.generic'));
   } catch (error) {
     throw mapAttendanceError(error);
   }

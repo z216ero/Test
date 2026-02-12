@@ -334,6 +334,7 @@ public sealed class ClientService(AppDbContext db)
         return new SlotDto(
             slot.Id,
             slot.TrainerId,
+            slot.Booking?.Id,
             slot.StartsAtUtc,
             slot.DurationMinutes,
             slot.SlotType.ToString(),

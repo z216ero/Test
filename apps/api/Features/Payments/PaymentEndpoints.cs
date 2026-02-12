@@ -25,9 +25,13 @@ public static class PaymentEndpoints
                 return Problems.Unauthorized("Unauthorized", "Authentication is required.");
             }
 
+            var normalizedStatus = string.IsNullOrWhiteSpace(status)
+                ? nameof(PaymentStatus.Pending)
+                : status;
+
             var result = await service.GetTrainerPaymentsAsync(
                 userId,
-                status,
+                normalizedStatus,
                 from,
                 to,
                 cancellationToken);

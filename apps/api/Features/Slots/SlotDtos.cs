@@ -11,6 +11,7 @@ public sealed record CreateSlotRequest(
 public sealed record SlotDto(
     Guid Id,
     Guid TrainerId,
+    Guid? BookingId,
     DateTime StartsAtUtc,
     int DurationMinutes,
     string SlotType,

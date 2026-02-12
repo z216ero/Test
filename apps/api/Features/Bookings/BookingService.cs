@@ -601,6 +601,128 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
         return ServiceResult<BookingDto>.Success(ToDto(slot.Booking));
     }
 
+    public async Task<ServiceResult<CloseBookingResultDto>> CloseBookingAsync(
+        Guid bookingId,
+        Guid trainerUserId,
+        string? role,
+        BookingStatus attendance,
+        bool markPaid,
+        PaymentMethod? paymentMethod,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
+        {
+            return ServiceResult<CloseBookingResultDto>.Fail(
+                StatusCodes.Status404NotFound,
+                "Booking not found",
+                "Booking does not exist.");
+        }
+
+        var trainerProfileId = await db.TrainerProfiles
+            .AsNoTracking()
+            .Where(t => t.UserId == trainerUserId)
+            .Select(t => (Guid?)t.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (!trainerProfileId.HasValue)
+        {
+            return ServiceResult<CloseBookingResultDto>.Fail(
+                StatusCodes.Status404NotFound,
+                "Booking not found",
+                "Booking does not exist.");
+        }
+
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database
+                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+            var booking = await db.Bookings
+                .Include(b => b.Slot)
+                .Include(b => b.Payment)
+                .FirstOrDefaultAsync(b => b.Id == bookingId, cancellationToken);
+            if (booking is null || booking.Slot is null || booking.Slot.TrainerId != trainerProfileId.Value)
+            {
+                return ServiceResult<CloseBookingResultDto>.Fail(
+                    StatusCodes.Status404NotFound,
+                    "Booking not found",
+                    "Booking does not exist.");
+            }
+
+            if (booking.Status == BookingStatus.Cancelled)
+            {
+                return ServiceResult<CloseBookingResultDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Invalid booking state",
+                    "Cancelled booking cannot be closed.");
+            }
+
+            if (booking.Status is BookingStatus.Completed or BookingStatus.NoShow)
+            {
+                return ServiceResult<CloseBookingResultDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Booking already closed",
+                    "This booking has already been closed.");
+            }
+
+            if (booking.Status != BookingStatus.Booked)
+            {
+                return ServiceResult<CloseBookingResultDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Invalid booking state",
+                    "Only booked sessions can be closed.");
+            }
+
+            var payment = booking.Payment;
+            if (payment is null)
+            {
+                return ServiceResult<CloseBookingResultDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Invalid payment state",
+                    "Payment is missing for this booking.");
+            }
+
+            if (payment.Status == PaymentStatus.Refunded && markPaid)
+            {
+                return ServiceResult<CloseBookingResultDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Invalid payment state",
+                    "Refunded payment cannot be marked as paid.");
+            }
+
+            if (markPaid && payment.Status == PaymentStatus.Paid)
+            {
+                if (payment.Method != paymentMethod)
+                {
+                    return ServiceResult<CloseBookingResultDto>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "Payment method conflict",
+                        "Payment is already marked with another method.");
+                }
+            }
+
+            var nowUtc = DateTime.UtcNow;
+            booking.Status = attendance;
+
+            if (markPaid)
+            {
+                if (payment.Status == PaymentStatus.Pending)
+                {
+                    payment.Status = PaymentStatus.Paid;
+                    payment.Method = paymentMethod;
+                    payment.PaidAtUtc = nowUtc;
+                }
+
+                payment.UpdatedAtUtc = nowUtc;
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return ServiceResult<CloseBookingResultDto>.Success(ToCloseResultDto(booking, payment));
+        });
+    }
+
     public async Task<ServiceResult<SlotAttendeeDto>> MarkGroupAttendeeAttendanceAsync(
         Guid slotId,
         Guid trainerUserId,
@@ -810,6 +932,18 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
             booking.ClientId,
             booking.Status.ToString(),
             booking.CreatedAtUtc);
+
+    private static CloseBookingResultDto ToCloseResultDto(Booking booking, Payment payment)
+        => new(
+            booking.Id,
+            booking.Status.ToString(),
+            new CloseBookingPaymentDto(
+                payment.Id,
+                payment.Amount,
+                payment.Status.ToString(),
+                payment.Method?.ToString(),
+                payment.PaidAtUtc,
+                payment.UpdatedAtUtc));
 
     private static bool IsBookingConflict(Exception ex)
     {

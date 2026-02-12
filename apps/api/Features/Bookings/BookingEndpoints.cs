@@ -202,6 +202,85 @@ public static class BookingEndpoints
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict);
 
+        var bookingsGroup = app.MapGroup("/bookings").WithTags("Bookings");
+
+        bookingsGroup.MapPatch("/{bookingId:guid}/close", async (
+            Guid bookingId,
+            CloseBookingRequest? request,
+            HttpContext httpContext,
+            BookingService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            if (request is null)
+            {
+                return Problems.BadRequest(
+                    "Invalid request",
+                    "Request body is required.");
+            }
+
+            if (!Enum.TryParse<BookingStatus>(request.Attendance, true, out var attendance)
+                || attendance is not BookingStatus.Completed and not BookingStatus.NoShow)
+            {
+                var errors = new Dictionary<string, string[]>
+                {
+                    ["attendance"] = new[] { "Attendance must be Completed or NoShow." }
+                };
+                return Problems.Validation(errors);
+            }
+
+            var paymentRequest = request.Payment ?? new CloseBookingPaymentRequest(false, null);
+            if (paymentRequest.MarkPaid)
+            {
+                if (!Enum.TryParse<PaymentMethod>(paymentRequest.Method, true, out _))
+                {
+                    var errors = new Dictionary<string, string[]>
+                    {
+                        ["payment.method"] = new[] { "Method must be Cash, Transfer or SBP when markPaid is true." }
+                    };
+                    return Problems.Validation(errors);
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(paymentRequest.Method))
+            {
+                var errors = new Dictionary<string, string[]>
+                {
+                    ["payment.method"] = new[] { "Method must be null when markPaid is false." }
+                };
+                return Problems.Validation(errors);
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            var parsedMethod = paymentRequest.MarkPaid
+                ? Enum.Parse<PaymentMethod>(paymentRequest.Method!, true)
+                : (PaymentMethod?)null;
+
+            var result = await service.CloseBookingAsync(
+                bookingId,
+                userId,
+                role,
+                attendance,
+                paymentRequest.MarkPaid,
+                parsedMethod,
+                cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .RequireAuthorization()
+        .Produces<CloseBookingResultDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
+
         return app;
     }
 }

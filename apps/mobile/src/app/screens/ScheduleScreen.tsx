@@ -10,9 +10,9 @@ import { Button, Text, YStack } from 'tamagui';
 import {
   attendanceActionsAvailable,
   cancelTrainerSlot,
+  closeTrainerBooking,
   getMyTrainerSlots,
-  markSlotCompleted,
-  markSlotNoShow,
+  type PaymentMethod,
 } from '@api/trainerSlotsApi';
 import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
 import type { SlotDto } from '@generated/api';
@@ -386,6 +386,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+      queryClient.invalidateQueries({ queryKey: keys.payments.all() });
       refetch();
       closeSheet();
     },
@@ -413,60 +414,28 @@ export function ScheduleScreen({ navigation, route }: Props) {
     },
   });
 
-  const completeMutation = useAppMutation<unknown, unknown, string, SlotsContext>({
-    mutationFn: (slotId: string) => markSlotCompleted(slotId),
-    onMutate: async (slotId) => {
-      await queryClient.cancelQueries({ queryKey: keys.trainerSlots.mine() });
-      const snapshot = queryClient.getQueriesData<SlotDto[]>({ queryKey: keys.trainerSlots.mine() });
-      const activeSlotSnapshot = activeSlot;
-      updateSlotsCache(slotId, (slot) => ({
-        ...slot,
-        bookingStatus: 'Completed',
-      }));
-      setActiveSlot((current) =>
-        current && current.id === slotId
-          ? { ...current, bookingStatus: 'Completed' }
-          : current
-      );
-      return { snapshot, activeSlot: activeSlotSnapshot };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
-      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
-      refetch();
-      closeSheet();
-    },
-    onError: (err, _variables, context) => {
-      if (context?.snapshot) {
-        rollbackSlotsCache(context.snapshot);
-      }
-      if (context?.activeSlot) {
-        setActiveSlot(context.activeSlot);
-      }
-      const presented = presentApiError(err);
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message: presented.message,
-        });
-      }
-    },
-  });
+  type CloseBookingVariables = {
+    slotId: string;
+    bookingId: string;
+    attendance: 'Completed' | 'NoShow';
+    markPaid: boolean;
+    method: PaymentMethod | null;
+  };
 
-  const noShowMutation = useAppMutation<unknown, unknown, string, SlotsContext>({
-    mutationFn: (slotId: string) => markSlotNoShow(slotId),
-    onMutate: async (slotId) => {
+  const closeBookingMutation = useAppMutation<unknown, unknown, CloseBookingVariables, SlotsContext>({
+    mutationFn: ({ bookingId, attendance, markPaid, method }: CloseBookingVariables) =>
+      closeTrainerBooking(bookingId, attendance, { markPaid, method }),
+    onMutate: async ({ slotId, attendance }) => {
       await queryClient.cancelQueries({ queryKey: keys.trainerSlots.mine() });
       const snapshot = queryClient.getQueriesData<SlotDto[]>({ queryKey: keys.trainerSlots.mine() });
       const activeSlotSnapshot = activeSlot;
       updateSlotsCache(slotId, (slot) => ({
         ...slot,
-        bookingStatus: 'NoShow',
+        bookingStatus: attendance,
       }));
       setActiveSlot((current) =>
         current && current.id === slotId
-          ? { ...current, bookingStatus: 'NoShow' }
+          ? { ...current, bookingStatus: attendance }
           : current
       );
       return { snapshot, activeSlot: activeSlotSnapshot };
@@ -485,11 +454,18 @@ export function ScheduleScreen({ navigation, route }: Props) {
         setActiveSlot(context.activeSlot);
       }
       const presented = presentApiError(err);
+      const message = presented.kind === 'conflict'
+        ? t('schedule.close.errorConflict')
+        : presented.kind === 'notFound'
+          ? t('schedule.close.errorNotFound')
+          : presented.kind === 'network' || presented.kind === 'timeout'
+            ? t('schedule.errorNetwork')
+            : presented.message;
       if (shouldShowErrorToast(presented)) {
         showToast({
           type: 'error',
           title: presented.title,
-          message: presented.message,
+          message,
         });
       }
     },
@@ -683,38 +659,30 @@ export function ScheduleScreen({ navigation, route }: Props) {
           }
         }}
         onCancelSlot={confirmCancelSlot}
-        onMarkCompleted={(slot) => {
-          if (!slot.id || completeMutation.isPending) {
+        onMarkCompleted={undefined}
+        onMarkNoShow={undefined}
+        onCloseBooking={({ slot, attendance, markPaid, method }) => {
+          if (!slot.id || !slot.bookingId || closeBookingMutation.isPending) {
             return;
           }
-          if (!canMarkCompleted(slot, nowTs)) {
+          if (attendance === 'Completed' && !canMarkCompleted(slot, nowTs)) {
             return;
           }
-          completeMutation.mutate(slot.id);
-        }}
-        onMarkNoShow={(slot) => {
-          if (!slot.id || noShowMutation.isPending) {
+          if (attendance === 'NoShow' && !canMarkNoShow(slot, nowTs)) {
             return;
           }
-          if (!canMarkNoShow(slot, nowTs)) {
-            return;
-          }
-          Alert.alert(
-            t('schedule.actions.noShowConfirmTitle'),
-            t('schedule.actions.noShowConfirmMessage'),
-            [
-              { text: t('profile.personal.cancel'), style: 'cancel' },
-              {
-                text: t('schedule.actions.noShowConfirm'),
-                style: 'destructive',
-                onPress: () => noShowMutation.mutate(slot.id as string),
-              },
-            ]
-          );
+          closeBookingMutation.mutate({
+            slotId: slot.id,
+            bookingId: slot.bookingId,
+            attendance,
+            markPaid,
+            method,
+          });
         }}
         isCancelling={cancelMutation.isPending}
-        isMarkingCompleted={completeMutation.isPending}
-        isMarkingNoShow={noShowMutation.isPending}
+        isMarkingCompleted={false}
+        isMarkingNoShow={false}
+        isClosingBooking={closeBookingMutation.isPending}
         showAttendanceActions={attendanceActionsAvailable}
       />
     </YStack>
