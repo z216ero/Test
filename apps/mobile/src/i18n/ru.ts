@@ -97,6 +97,9 @@
   'home.trainer.alertUpcoming': 'Через {minutes} мин тренировка',
   'home.trainer.groupClients': 'Клиентов: {occupied}/{capacity}',
   'home.trainer.groupClientsOpen': 'Клиентов: {occupied}',
+  'home.trainer.attendanceCard.title': 'Требуют отметки',
+  'home.trainer.attendanceCard.count': '{count} тренировок ждут итог',
+  'home.trainer.attendanceCard.empty': 'Все тренировки отмечены',
 
   'slots.title': 'Слоты',
   'slots.subtitle': 'Выберите удобное время.',
@@ -276,6 +279,10 @@
   'schedule.toast.cancelled': 'Слот отменён',
   'schedule.errorChanged': 'Слот уже изменён. Обнови расписание.',
   'schedule.errorNetwork': 'Сервер недоступен. Попробуй ещё раз.',
+  'attendanceQueue.title': 'Требуют отметки',
+  'attendanceQueue.sortAsc': 'Сначала ранние',
+  'attendanceQueue.sortDesc': 'Сначала поздние',
+  'attendanceQueue.empty': 'Нет тренировок, требующих отметки',
 
   'slotDetails.title': 'Детали слота',
   'slotDetails.participantsTitle': 'Участники',

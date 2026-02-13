@@ -9,6 +9,7 @@ type TrainerAvatarProps = {
   avatarUrl?: string | null;
   size?: number | string;
   trainerProfile?: AvailableSlotTrainerDto | null;
+  disableProfileSheet?: boolean;
 };
 
 export function TrainerAvatar({
@@ -16,6 +17,7 @@ export function TrainerAvatar({
   avatarUrl,
   size = '$9',
   trainerProfile,
+  disableProfileSheet = false,
 }: TrainerAvatarProps) {
   const avatarSource = useAuthorizedImageSource(avatarUrl);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -30,7 +32,7 @@ export function TrainerAvatar({
     />
   );
 
-  if (!trainerProfile) {
+  if (!trainerProfile || disableProfileSheet) {
     return avatar;
   }
 

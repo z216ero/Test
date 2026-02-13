@@ -33,12 +33,14 @@ import {
 } from '@app/components/schedule/slotHelpers';
 import type { HomeMeState, HomeNavigation, HomeUser } from './types';
 import { TrainerHomeAlertsCard } from './trainer-home/ui/TrainerHomeAlertsCard';
+import { TrainerAttendanceQueueCard } from './trainer-home/ui/TrainerAttendanceQueueCard';
 import { TrainerHomeHeader } from './trainer-home/ui/TrainerHomeHeader';
 import { TrainerNowNextCard } from './trainer-home/ui/TrainerNowNextCard';
 
 const NOW_REFRESH_INTERVAL_MS = 30 * 1000;
 const UPCOMING_ALERT_WINDOW_MS = 30 * 60 * 1000;
 const FUTURE_HOME_RANGE_DAYS = 14;
+const PAST_ATTENDANCE_RANGE_DAYS = 30;
 
 const startOfLocalDay = (value: Date) =>
   new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
@@ -100,6 +102,7 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [activeSlot, setActiveSlot] = useState<SlotDto | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   const dateRange = useMemo(() => {
     const startLocal = startOfLocalDay(todayDate);
@@ -114,6 +117,23 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     queryKey: keys.trainerSlots.mine(dateRange),
     enabled: Boolean(me),
     queryFn: ({ signal }) => getMyTrainerSlots(dateRange, { signal }),
+    refetchInterval: NOW_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: false,
+  });
+
+  const attendanceRange = useMemo(() => {
+    const startLocal = startOfLocalDay(addDays(todayDate, -PAST_ATTENDANCE_RANGE_DAYS));
+    const endLocal = endOfLocalDay(addDays(todayDate, FUTURE_HOME_RANGE_DAYS));
+    return {
+      fromUtc: startLocal.toISOString(),
+      toUtc: endLocal.toISOString(),
+    };
+  }, [todayDate]);
+
+  const attendanceSlotsQuery = useAppQuery({
+    queryKey: keys.trainerSlots.mine(attendanceRange),
+    enabled: Boolean(me),
+    queryFn: ({ signal }) => getMyTrainerSlots(attendanceRange, { signal }),
     refetchInterval: NOW_REFRESH_INTERVAL_MS,
     refetchIntervalInBackground: false,
   });
@@ -228,6 +248,15 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     return entries;
   }, [activeBookedSlots, nowTs]);
 
+  const attendanceCount = useMemo(() => {
+    const slots = attendanceSlotsQuery.data ?? [];
+    return slots.filter((slot) => getUiSlotStatus(slot, nowTs) === 'needs_attention').length;
+  }, [attendanceSlotsQuery.data, nowTs]);
+
+  const attendanceSubtitle = attendanceCount > 0
+    ? t('home.trainer.attendanceCard.count', { count: attendanceCount })
+    : t('home.trainer.attendanceCard.empty');
+
   const highlightSlot = currentSlot ?? nextSlot ?? null;
   const highlightTimes = highlightSlot ? getSlotTimes(highlightSlot) : null;
   const highlightTimeLabel = highlightTimes
@@ -332,14 +361,23 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
     },
   });
 
-  const onRefresh = useCallback(() => {
-    refetchMe();
-    trainerSlotsQuery.refetch();
-  }, [refetchMe, trainerSlotsQuery]);
+  const onRefresh = useCallback(async () => {
+    setIsManualRefreshing(true);
+    try {
+      await Promise.allSettled([
+        Promise.resolve(refetchMe()),
+        trainerSlotsQuery.refetch(),
+        attendanceSlotsQuery.refetch(),
+      ]);
+    } finally {
+      setIsManualRefreshing(false);
+    }
+  }, [attendanceSlotsQuery, refetchMe, trainerSlotsQuery]);
 
   const isRefreshing = useMemo(() =>
-    isMeFetching || trainerSlotsQuery.isFetching,
-  [isMeFetching, trainerSlotsQuery.isFetching]);
+    isManualRefreshing
+    && (isMeFetching || trainerSlotsQuery.isFetching || attendanceSlotsQuery.isFetching),
+  [attendanceSlotsQuery.isFetching, isManualRefreshing, isMeFetching, trainerSlotsQuery.isFetching]);
 
   const handleOpenActions = (slot: SlotDto) => {
     if (!slot.id || !slot.bookingId || closeBookingMutation.isPending) {
@@ -416,6 +454,12 @@ export function TrainerHomeScreen({ navigation, me, meState }: TrainerHomeScreen
               {summaryLabel}
             </Text>
           ) : null}
+          <TrainerAttendanceQueueCard
+            title={t('home.trainer.attendanceCard.title')}
+            subtitle={attendanceSubtitle}
+            count={attendanceCount}
+            onPress={() => navigation.navigate('Schedule', { screen: 'AttendanceQueue' })}
+          />
           <TrainerHomeAlertsCard alerts={alerts} />
         </YStack>
       </TabScrollView>

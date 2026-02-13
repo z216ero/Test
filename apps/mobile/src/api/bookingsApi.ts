@@ -178,6 +178,8 @@ const mapSessionToBooking = (session: UpcomingSessionDto): ClientBooking | null 
 const isCompletedStatus = (value?: string | null): boolean =>
   (value ?? '').trim().toLowerCase() === 'completed';
 
+const paymentStatusCache = new Map<string, string | null>();
+
 const enrichPaymentStatuses = async (
   bookings: ClientBooking[],
   options?: RequestInit
@@ -191,20 +193,32 @@ const enrichPaymentStatuses = async (
   }
 
   const paymentStatusByBookingId = new Map<string, string | null>();
+  const bookingIdsToLoad: string[] = [];
+
+  completedWithBookingId.forEach((item) => {
+    const bookingId = item.slot.bookingId;
+    if (!bookingId) {
+      return;
+    }
+
+    if (paymentStatusCache.has(bookingId)) {
+      paymentStatusByBookingId.set(bookingId, paymentStatusCache.get(bookingId) ?? null);
+      return;
+    }
+
+    bookingIdsToLoad.push(bookingId);
+  });
 
   await Promise.all(
-    completedWithBookingId.map(async (item) => {
-      const bookingId = item.slot.bookingId;
-      if (!bookingId) {
-        return;
-      }
-
+    bookingIdsToLoad.map(async (bookingId) => {
       try {
         const response = await getBookingsBookingIdPayment(bookingId, options);
         const payment = unwrap<PaymentDto>(response, t('errors.generic'));
+        paymentStatusCache.set(bookingId, payment.status ?? null);
         paymentStatusByBookingId.set(bookingId, payment.status ?? null);
       } catch (error) {
         if (error instanceof ApiError && error.status === 404) {
+          paymentStatusCache.set(bookingId, null);
           paymentStatusByBookingId.set(bookingId, null);
           return;
         }

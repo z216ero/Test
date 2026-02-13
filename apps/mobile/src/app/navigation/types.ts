@@ -4,6 +4,7 @@ import type { AvailableSlotTrainerDto, SlotDto } from '@generated/api';
 export type ScheduleStackParamList = {
   ScheduleHome: { initialDateIsoLocal?: string } | undefined;
   SlotDetails: { slot: SlotDto };
+  AttendanceQueue: undefined;
 };
 
 export type BookingsStackParamList = {

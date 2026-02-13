@@ -29,6 +29,8 @@ export class TrainerSlotsConflictError extends ApiError {}
 export type AttendanceCloseStatus = 'Completed' | 'NoShow';
 export type PaymentMethod = 'Cash' | 'Transfer' | 'SBP';
 
+let cachedTrainerId: string | null = null;
+
 const mapCreateSlotError = (error: unknown): Error => {
   if (error instanceof ApiTimeoutError) {
     return error;
@@ -142,13 +144,22 @@ const mapAttendanceError = (error: unknown): Error => {
 };
 
 const getTrainerId = async (options?: RequestInit): Promise<string> => {
+  if (cachedTrainerId) {
+    return cachedTrainerId;
+  }
+
   const response = await getTrainersMe(options);
   const trainer = unwrap<TrainerDto>(response, t('errors.generic'));
   if (!trainer.id) {
     throw new ApiError(t('errors.generic'));
   }
 
+  cachedTrainerId = trainer.id;
   return trainer.id;
+};
+
+export const clearTrainerIdCache = (): void => {
+  cachedTrainerId = null;
 };
 
 export const getMyTrainerSlots = async (

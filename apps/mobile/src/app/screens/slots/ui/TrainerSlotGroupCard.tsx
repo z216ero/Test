@@ -161,6 +161,7 @@ export function TrainerSlotGroupCard({
             && !conflict
             && !isFull
             && !isBookedByCurrentClient;
+          const canOpenDetails = Boolean(slot.id) && (isBookable || isBookedByCurrentClient);
           const statusLabel = isBookedByCurrentClient
             ? t('slots.status.bookedByYou')
             : conflict
@@ -191,12 +192,12 @@ export function TrainerSlotGroupCard({
               padding="$3"
               alignItems="stretch"
               onPress={() => {
-                if (!isBookable || !slot.id) {
+                if (!canOpenDetails || !slot.id) {
                   return;
                 }
                 onOpenSlot(slot, trainer);
               }}
-              disabled={!isBookable}
+              disabled={!canOpenDetails}
             >
               <XStack justifyContent="space-between" alignItems="center">
                 <Text fontSize="$4" fontWeight="600" color={isBookable ? '$text' : '$muted'}>

@@ -132,3 +132,18 @@ export const getScheduledEntries = async (): Promise<ReminderEntry[]> => {
   const map = await loadMap();
   return Object.values(map);
 };
+
+export const clearAllTrainingReminders = async (): Promise<void> => {
+  const map = await loadMap();
+  const entries = Object.values(map);
+
+  const module = await getNotifeeModule();
+  const notifee = module?.default ?? module;
+  if (notifee) {
+    await Promise.allSettled(
+      entries.map((entry) => notifee.cancelTriggerNotification(entry.notificationId))
+    );
+  }
+
+  await AsyncStorage.removeItem(STORAGE_KEY);
+};

@@ -74,6 +74,7 @@ export function BookingsScreen({ navigation }: Props) {
 
   const [activeTab, setActiveTab] = useState<BookingTab>('upcoming');
   const [nowTs, setNowTs] = useState(() => Date.now());
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   const upcomingQuery = useAppQuery({
     queryKey: keys.bookings.upcoming(),
@@ -109,9 +110,16 @@ export function BookingsScreen({ navigation }: Props) {
     }, [refetchUpcoming, refetchHistory])
   );
 
-  const handleRefresh = () => {
-    upcomingQuery.refetch();
-    historyQuery.refetch();
+  const handleRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      await Promise.allSettled([
+        upcomingQuery.refetch(),
+        historyQuery.refetch(),
+      ]);
+    } finally {
+      setIsManualRefreshing(false);
+    }
   };
 
   const upcomingItems = useMemo(
@@ -488,7 +496,7 @@ export function BookingsScreen({ navigation }: Props) {
       <TabScrollView
         refreshControl={
           <RefreshControl
-            refreshing={activeFetching && !activeLoading}
+            refreshing={isManualRefreshing && activeFetching && !activeLoading}
             onRefresh={handleRefresh}
           />
         }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
@@ -100,6 +100,7 @@ type ClientHomeScreenProps = {
 
 export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenProps) {
   const queryClient = useQueryClient();
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const {
     isLoading: isMeLoading,
     isFetching: isMeFetching,
@@ -132,14 +133,21 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
     }, [refetchMe, refetchUpcoming])
   );
 
-  const onRefresh = () => {
-    refetchMe();
-    upcomingQuery.refetch();
+  const onRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      await Promise.allSettled([
+        Promise.resolve(refetchMe()),
+        upcomingQuery.refetch(),
+      ]);
+    } finally {
+      setIsManualRefreshing(false);
+    }
   };
 
   const isRefreshing = useMemo(
-    () => isMeFetching || upcomingQuery.isFetching,
-    [isMeFetching, upcomingQuery.isFetching]
+    () => isManualRefreshing && (isMeFetching || upcomingQuery.isFetching),
+    [isManualRefreshing, isMeFetching, upcomingQuery.isFetching]
   );
 
   const showSkeleton =
