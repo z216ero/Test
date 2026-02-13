@@ -24,6 +24,7 @@ import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   bookingStatusMeta,
+  type BookingStatusType,
   canCancelBooking,
   getBookingStatusType,
   getSlotTimes,
@@ -33,6 +34,7 @@ import {
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 import type { BookingsStackParamList } from '@app/navigation/types';
 import { AppIcon } from '@ui/AppIcon';
+import type { AvailableSlotTrainerDto } from '@generated/api';
 
 type Props = NativeStackScreenProps<BookingsStackParamList, 'BookingsHome'>;
 
@@ -52,6 +54,13 @@ type CancelContext = {
 
 const NOW_REFRESH_INTERVAL_MS = 60 * 1000;
 const LIVE_REFRESH_INTERVAL_MS = 15 * 1000;
+const isPaidStatus = (value?: string | null) => (value ?? '').trim().toLowerCase() === 'paid';
+const statusIndicatorRowWidth = 112;
+const unpaidPaymentColor = '#F59E0B';
+const compactStatusLabelMap: Partial<Record<BookingStatusType, 'bookings.statusPendingShort' | 'bookings.statusCancelledShort'>> = {
+  pending_confirmation: 'bookings.statusPendingShort',
+  cancelled: 'bookings.statusCancelledShort',
+};
 
 const buildDateKey = (value: Date): string => {
   const month = `${value.getMonth() + 1}`.padStart(2, '0');
@@ -235,7 +244,21 @@ export function BookingsScreen({ navigation }: Props) {
     const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : t('common.empty');
     const statusType = getBookingStatusType(booking.slot, nowTs);
     const statusMeta = bookingStatusMeta[statusType];
-    const statusLabel = t(statusMeta.labelKey);
+    const statusLabel = t(compactStatusLabelMap[statusType] ?? statusMeta.labelKey);
+    const showPaymentStatus = statusType === 'completed';
+    const paid = isPaidStatus(booking.paymentStatus);
+    const trainerProfile: AvailableSlotTrainerDto = {
+      id: booking.slot.trainerId,
+      name: booking.trainerName,
+      phoneNumber: booking.trainerPhoneNumber,
+      avatarUrl: booking.trainerAvatarUrl,
+      worksWithGender: booking.trainerWorksWithGender,
+      gender: booking.trainerGender,
+      rating: booking.trainerRating,
+      cityName: booking.trainerCityName,
+      districtName: booking.trainerDistrictName,
+      trainingTypes: booking.trainerTrainingTypes ?? null,
+    };
     const canCancel = booking.slot.id ? canCancelBooking(booking.slot, nowTs) : false;
     const isCancelling = Boolean(
       booking.slot.id
@@ -257,29 +280,45 @@ export function BookingsScreen({ navigation }: Props) {
           <Text fontSize="$4" fontWeight="700" color="$text">
             {timeLabel}
           </Text>
-          <XStack alignItems="center" gap="$2" flexShrink={1} minWidth={0}>
-            <YStack
-              width="$1"
-              height="$1"
-              borderRadius="$6"
-              backgroundColor={statusMeta.color}
-            />
-            <Text
-              fontSize="$2"
-              color={statusMeta.color}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              flexShrink={1}
-            >
-              {statusLabel}
-            </Text>
-          </XStack>
+          <YStack alignItems="flex-end" gap="$1" minWidth={0}>
+            <XStack width={statusIndicatorRowWidth} alignItems="center" gap="$2" minWidth={0}>
+              <YStack
+                width="$1"
+                height="$1"
+                borderRadius="$6"
+                backgroundColor={statusMeta.color}
+              />
+              <Text
+                fontSize="$2"
+                color={statusMeta.color}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                flexShrink={1}
+              >
+                {statusLabel}
+              </Text>
+            </XStack>
+            {showPaymentStatus ? (
+              <XStack width={statusIndicatorRowWidth} alignItems="center" gap="$2">
+                <YStack
+                  width="$1"
+                  height="$1"
+                  borderRadius="$6"
+                  backgroundColor={paid ? '$accent' : unpaidPaymentColor}
+                />
+                <Text fontSize="$2" color={paid ? '$accent' : unpaidPaymentColor}>
+                  {paid ? t('bookings.payment.paid') : t('bookings.payment.unpaid')}
+                </Text>
+              </XStack>
+            ) : null}
+          </YStack>
         </XStack>
         <XStack alignItems="center" gap="$3">
           <TrainerAvatar
             name={booking.trainerName}
             avatarUrl={booking.trainerAvatarUrl}
             size="$9"
+            trainerProfile={trainerProfile}
           />
           <YStack gap="$1" flex={1}>
             <Text fontSize="$4" fontWeight="700" color="$text">
@@ -324,6 +363,10 @@ export function BookingsScreen({ navigation }: Props) {
                 navigation.navigate('BookingDetails', {
                   slot: booking.slot,
                   trainerName: booking.trainerName,
+                  trainerPhoneNumber: booking.trainerPhoneNumber,
+                  trainerGender: booking.trainerGender,
+                  trainerWorksWithGender: booking.trainerWorksWithGender,
+                  trainerRating: booking.trainerRating,
                   trainerSpecializations: booking.trainerSpecializations,
                   trainerTrainingTypes: booking.trainerTrainingTypes,
                   trainerCityName: booking.trainerCityName,
@@ -358,6 +401,10 @@ export function BookingsScreen({ navigation }: Props) {
                 navigation.navigate('BookingDetails', {
                   slot: booking.slot,
                   trainerName: booking.trainerName,
+                  trainerPhoneNumber: booking.trainerPhoneNumber,
+                  trainerGender: booking.trainerGender,
+                  trainerWorksWithGender: booking.trainerWorksWithGender,
+                  trainerRating: booking.trainerRating,
                   trainerSpecializations: booking.trainerSpecializations,
                   trainerTrainingTypes: booking.trainerTrainingTypes,
                   trainerCityName: booking.trainerCityName,

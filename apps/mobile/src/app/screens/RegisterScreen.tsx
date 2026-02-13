@@ -72,9 +72,126 @@ const getGenderLabel = (code: string): string => {
   return code;
 };
 
+type RegisterField = 'email' | 'password' | 'confirmPassword' | 'name' | 'phoneNumber' | 'cityName';
+type RegisterFieldErrors = Partial<Record<RegisterField, string>>;
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const minPasswordLength = 8;
+const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d).+$/;
+
+const getProblemErrors = (details: unknown): Record<string, string[]> => {
+  if (!details || typeof details !== 'object' || !('errors' in details)) {
+    return {};
+  }
+
+  const errors = (details as { errors?: unknown }).errors;
+  if (!errors || typeof errors !== 'object') {
+    return {};
+  }
+
+  return Object.entries(errors as Record<string, unknown>).reduce<Record<string, string[]>>(
+    (acc, [key, value]) => {
+      if (Array.isArray(value)) {
+        const messages = value.filter((item): item is string => typeof item === 'string');
+        if (messages.length > 0) {
+          acc[key.toLowerCase()] = messages;
+        }
+      }
+      return acc;
+    },
+    {}
+  );
+};
+
+const firstProblemError = (errors: Record<string, string[]>, fieldKeys: string[]): string | null => {
+  for (const key of fieldKeys) {
+    const message = errors[key.toLowerCase()]?.[0];
+    if (message) {
+      return message;
+    }
+  }
+
+  return null;
+};
+
+const getRegisterApiFieldErrors = (error: ApiError): RegisterFieldErrors => {
+  const errors = getProblemErrors(error.details);
+  if (Object.keys(errors).length === 0) {
+    return {};
+  }
+
+  const emailError = firstProblemError(errors, ['email', 'Email']);
+  const passwordError = firstProblemError(errors, ['password', 'Password']);
+  const nameError = firstProblemError(errors, ['name', 'Name']);
+  const phoneError = firstProblemError(errors, ['phoneNumber', 'PhoneNumber']);
+  const cityError = firstProblemError(errors, ['cityName', 'CityName']);
+
+  return {
+    ...(emailError ? { email: emailError } : {}),
+    ...(passwordError ? { password: passwordError } : {}),
+    ...(nameError ? { name: nameError } : {}),
+    ...(phoneError ? { phoneNumber: phoneError } : {}),
+    ...(cityError ? { cityName: cityError } : {}),
+  };
+};
+
+const validateRegisterForm = (values: {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  name: string;
+  cityName: string;
+  phoneNumber: string;
+}): RegisterFieldErrors => {
+  const errors: RegisterFieldErrors = {};
+
+  const emailValue = values.email.trim();
+  const nameValue = values.name.trim();
+  const cityValue = values.cityName.trim();
+  const phoneValue = values.phoneNumber.trim();
+
+  if (!emailValue) {
+    errors.email = t('auth.register.emailRequired');
+  } else if (!emailPattern.test(emailValue)) {
+    errors.email = t('auth.register.emailInvalid');
+  }
+
+  if (!values.password) {
+    errors.password = t('auth.register.passwordRequired');
+  } else if (
+    values.password.length < minPasswordLength
+    || !passwordPattern.test(values.password)
+  ) {
+    errors.password = t('auth.register.passwordRules');
+  }
+
+  if (!values.confirmPassword) {
+    errors.confirmPassword = t('auth.register.passwordConfirmRequired');
+  } else if (values.confirmPassword !== values.password) {
+    errors.confirmPassword = t('auth.register.passwordMismatch');
+  }
+
+  if (!nameValue) {
+    errors.name = t('auth.register.nameRequired');
+  } else if (nameValue.length < 2) {
+    errors.name = t('auth.register.nameMin');
+  }
+
+  if (!cityValue) {
+    errors.cityName = t('auth.register.cityRequired');
+  }
+
+  if (phoneValue && !russianPhoneToE164(phoneValue)) {
+    errors.phoneNumber = t('auth.register.phoneInvalid');
+  }
+
+  return errors;
+};
+
 export function RegisterScreen({ navigation, route }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [cityName, setCityName] = useState('');
@@ -84,6 +201,8 @@ export function RegisterScreen({ navigation, route }: Props) {
   const [gender, setGender] = useState('');
   const [specialization, setSpecialization] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({});
+  const [didAttemptSubmit, setDidAttemptSubmit] = useState(false);
 
   const rolesQuery = useAppQuery({
     queryKey: keys.lookups.roles(),
@@ -151,6 +270,15 @@ export function RegisterScreen({ navigation, route }: Props) {
       setCityName(selection.cityName ?? '');
       setSelectedCityId(typeof selection.cityId === 'number' ? selection.cityId : null);
       setDistrictName('');
+      setFieldErrors((prev) => {
+        if (!('cityName' in prev)) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next.cityName;
+        return next;
+      });
+      setError(null);
     }
     if (selection.districtName) {
       setDistrictName(selection.districtName ?? '');
@@ -219,23 +347,63 @@ export function RegisterScreen({ navigation, route }: Props) {
       });
     },
     onError: (err) => {
+      if (err instanceof ApiError && err.status === 409) {
+        setError(null);
+        setFieldErrors((prev) => ({
+          ...prev,
+          email: t('auth.register.emailTaken'),
+        }));
+        return;
+      }
+
+      if (err instanceof ApiError && err.status === 400) {
+        const apiFieldErrors = getRegisterApiFieldErrors(err);
+        if (Object.keys(apiFieldErrors).length > 0) {
+          setFieldErrors((prev) => ({ ...prev, ...apiFieldErrors }));
+          setError(null);
+          return;
+        }
+      }
+
       setError(presentApiError(err).message);
     },
   });
 
+  const clearFieldError = (field: RegisterField) => {
+    setFieldErrors((prev) => {
+      if (!(field in prev)) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
   const handleRegister = async () => {
-    if (!email.trim() || !password || !name.trim() || !cityName.trim()) {
-      setError(t('auth.register.validationRequired'));
+    setDidAttemptSubmit(true);
+
+    const nextFieldErrors = validateRegisterForm({
+      email,
+      password,
+      confirmPassword,
+      name,
+      cityName,
+      phoneNumber,
+    });
+
+    setFieldErrors(nextFieldErrors);
+
+    if (
+      !role
+      || !gender
+      || (isTrainer && specializationOptions.length > 0 && !specialization)
+    ) {
+      setError(t('auth.register.validationRoleGender'));
       return;
     }
 
-    if (!role || !gender) {
-      setError(t('errors.generic'));
-      return;
-    }
-
-    if (phoneNumber.trim() && !russianPhoneToE164(phoneNumber)) {
-      setError(t('auth.register.phoneInvalid'));
+    if (Object.keys(nextFieldErrors).length > 0) {
       return;
     }
 
@@ -270,31 +438,64 @@ export function RegisterScreen({ navigation, route }: Props) {
         <AuthField
           label={t('auth.register.email')}
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(value: string) => {
+            setEmail(value);
+            clearFieldError('email');
+            setError(null);
+          }}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
           placeholder={t('common.emailPlaceholder')}
+          errorMessage={fieldErrors.email}
         />
         <AuthField
           label={t('auth.register.password')}
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(value: string) => {
+            setPassword(value);
+            clearFieldError('password');
+            clearFieldError('confirmPassword');
+            setError(null);
+          }}
           secureTextEntry
           placeholder={t('common.passwordCreatePlaceholder')}
+          errorMessage={fieldErrors.password}
+        />
+        <AuthField
+          label={t('auth.register.passwordConfirm')}
+          value={confirmPassword}
+          onChangeText={(value: string) => {
+            setConfirmPassword(value);
+            clearFieldError('confirmPassword');
+            setError(null);
+          }}
+          secureTextEntry
+          placeholder={t('auth.register.passwordConfirmPlaceholder')}
+          errorMessage={fieldErrors.confirmPassword}
         />
         <AuthField
           label={t('auth.register.name')}
           value={name}
-          onChangeText={setName}
+          onChangeText={(value: string) => {
+            setName(value);
+            clearFieldError('name');
+            setError(null);
+          }}
           placeholder={t('common.namePlaceholder')}
+          errorMessage={fieldErrors.name}
         />
         <AuthField
           label={t('auth.register.phone')}
           value={phoneNumber}
-          onChangeText={(value) => setPhoneNumber(normalizeRussianPhoneInput(value))}
+          onChangeText={(value: string) => {
+            setPhoneNumber(normalizeRussianPhoneInput(value));
+            clearFieldError('phoneNumber');
+            setError(null);
+          }}
           keyboardType="numeric"
           placeholder={t('auth.register.phonePlaceholder')}
+          errorMessage={fieldErrors.phoneNumber}
         />
         <YStack gap="$2">
           <Text fontSize="$3" color="$muted">
@@ -309,6 +510,11 @@ export function RegisterScreen({ navigation, route }: Props) {
               returnToKey: route.key,
             })}
           />
+          {fieldErrors.cityName ? (
+            <Text fontSize="$2" color="$danger">
+              {fieldErrors.cityName}
+            </Text>
+          ) : null}
         </YStack>
         <YStack gap="$2">
           <Text fontSize="$3" color="$muted">
@@ -319,7 +525,10 @@ export function RegisterScreen({ navigation, route }: Props) {
             placeholder={t('auth.register.districtPlaceholder')}
             onPress={() => {
               if (!selectedCityId) {
-                setError(t('auth.register.selectCityFirst'));
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  cityName: t('auth.register.selectCityFirst'),
+                }));
                 return;
               }
               navigation.navigate('LocationSearch', {
@@ -349,7 +558,10 @@ export function RegisterScreen({ navigation, route }: Props) {
                   borderWidth={1}
                   borderColor="$border"
                   borderRadius="$3"
-                  onPress={() => setRole(item.code)}
+                  onPress={() => {
+                    setRole(item.code);
+                    setError(null);
+                  }}
                   flex={1}
                   minHeight="$10"
                 >
@@ -358,6 +570,11 @@ export function RegisterScreen({ navigation, route }: Props) {
               );
             })}
           </XStack>
+          {didAttemptSubmit && !role ? (
+            <Text fontSize="$2" color="$danger">
+              {t('auth.register.roleRequired')}
+            </Text>
+          ) : null}
         </YStack>
         <YStack gap="$2">
           <Text fontSize="$3" color="$muted">
@@ -376,7 +593,10 @@ export function RegisterScreen({ navigation, route }: Props) {
                   borderWidth={1}
                   borderColor="$border"
                   borderRadius="$3"
-                  onPress={() => setGender(item.code)}
+                  onPress={() => {
+                    setGender(item.code);
+                    setError(null);
+                  }}
                   flex={1}
                   minHeight="$10"
                 >
@@ -385,6 +605,11 @@ export function RegisterScreen({ navigation, route }: Props) {
               );
             })}
           </XStack>
+          {didAttemptSubmit && !gender ? (
+            <Text fontSize="$2" color="$danger">
+              {t('auth.register.genderRequired')}
+            </Text>
+          ) : null}
         </YStack>
         {isTrainer ? (
           <YStack gap="$2">
@@ -404,7 +629,10 @@ export function RegisterScreen({ navigation, route }: Props) {
                     borderWidth={1}
                     borderColor="$border"
                     borderRadius="$3"
-                    onPress={() => setSpecialization(item.code)}
+                    onPress={() => {
+                      setSpecialization(item.code);
+                      setError(null);
+                    }}
                     minHeight="$9"
                   >
                     {item.label}
@@ -412,6 +640,11 @@ export function RegisterScreen({ navigation, route }: Props) {
                 );
               })}
             </XStack>
+            {didAttemptSubmit && specializationOptions.length > 0 && !specialization ? (
+              <Text fontSize="$2" color="$danger">
+                {t('auth.register.specializationRequired')}
+              </Text>
+            ) : null}
           </YStack>
         ) : null}
         {error ? <AuthError message={error} /> : null}

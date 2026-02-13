@@ -242,7 +242,12 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
             borderColor="$border"
           >
             <XStack alignItems="center" gap="$3">
-            <TrainerAvatar name={trainer.name} avatarUrl={trainer.avatarUrl} size="$10" />
+            <TrainerAvatar
+              name={trainer.name}
+              avatarUrl={trainer.avatarUrl}
+              size="$10"
+              trainerProfile={trainer}
+            />
             <YStack gap="$1" flex={1}>
               <Text fontSize="$5" fontWeight="700" color="$text">
                 {trainer.name ?? t('common.empty')}

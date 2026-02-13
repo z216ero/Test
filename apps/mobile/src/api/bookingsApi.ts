@@ -1,6 +1,7 @@
-import type { AuthUserDto, SlotDto, UpcomingSessionDto } from '@generated/api';
+import type { AuthUserDto, PaymentDto, SlotDto, UpcomingSessionDto } from '@generated/api';
 import {
   getAuthMe,
+  getBookingsBookingIdPayment,
   postSlotsSlotIdBook,
   postSlotsSlotIdCancel,
 } from '@generated/api';
@@ -12,11 +13,23 @@ import { customFetch } from './custom-fetch';
 export type ClientBooking = {
   slot: SlotDto;
   trainerName?: string | null;
+  trainerPhoneNumber?: string | null;
+  trainerGender?: string | null;
+  trainerWorksWithGender?: string | null;
+  trainerRating?: number | null;
   trainerCityName?: string | null;
   trainerDistrictName?: string | null;
   trainerSpecializations?: string[] | null;
   trainerTrainingTypes?: string[] | null;
   trainerAvatarUrl?: string | null;
+  paymentStatus?: string | null;
+};
+
+type ExtendedUpcomingSessionDto = UpcomingSessionDto & {
+  trainerPhoneNumber?: string | null;
+  trainerGender?: string | null;
+  trainerWorksWithGender?: string | null;
+  trainerRating?: number | null;
 };
 
 export class BookingConflictError extends ApiError {}
@@ -145,15 +158,75 @@ const mapSessionToBooking = (session: UpcomingSessionDto): ClientBooking | null 
   if (!session.slot) {
     return null;
   }
+  const extended = session as ExtendedUpcomingSessionDto;
+
   return {
     slot: session.slot,
     trainerName: session.trainerName,
+    trainerPhoneNumber: extended.trainerPhoneNumber,
+    trainerGender: extended.trainerGender,
+    trainerWorksWithGender: extended.trainerWorksWithGender,
+    trainerRating: extended.trainerRating,
     trainerCityName: session.trainerCityName,
     trainerDistrictName: session.trainerDistrictName,
     trainerSpecializations: session.trainerSpecializations,
     trainerTrainingTypes: session.trainerTrainingTypes,
     trainerAvatarUrl: session.trainerAvatarUrl,
   };
+};
+
+const isCompletedStatus = (value?: string | null): boolean =>
+  (value ?? '').trim().toLowerCase() === 'completed';
+
+const enrichPaymentStatuses = async (
+  bookings: ClientBooking[],
+  options?: RequestInit
+): Promise<ClientBooking[]> => {
+  const completedWithBookingId = bookings.filter(
+    (item) => isCompletedStatus(item.slot.bookingStatus) && Boolean(item.slot.bookingId)
+  );
+
+  if (completedWithBookingId.length === 0) {
+    return bookings;
+  }
+
+  const paymentStatusByBookingId = new Map<string, string | null>();
+
+  await Promise.all(
+    completedWithBookingId.map(async (item) => {
+      const bookingId = item.slot.bookingId;
+      if (!bookingId) {
+        return;
+      }
+
+      try {
+        const response = await getBookingsBookingIdPayment(bookingId, options);
+        const payment = unwrap<PaymentDto>(response, t('errors.generic'));
+        paymentStatusByBookingId.set(bookingId, payment.status ?? null);
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          paymentStatusByBookingId.set(bookingId, null);
+          return;
+        }
+
+        if (__DEV__) {
+          console.warn('Failed to load payment status for booking', bookingId, error);
+        }
+      }
+    })
+  );
+
+  return bookings.map((item) => {
+    const bookingId = item.slot.bookingId;
+    if (!bookingId || !isCompletedStatus(item.slot.bookingStatus)) {
+      return item;
+    }
+
+    return {
+      ...item,
+      paymentStatus: paymentStatusByBookingId.get(bookingId) ?? null,
+    };
+  });
 };
 
 export const getClientUpcomingBookings = async (
@@ -167,9 +240,10 @@ export const getClientUpcomingBookings = async (
     }
   );
   const data = unwrap<UpcomingSessionDto[]>(response, t('errors.generic'));
-  return data
+  const bookings = data
     .map(mapSessionToBooking)
     .filter((item): item is ClientBooking => item !== null);
+  return enrichPaymentStatuses(bookings, options);
 };
 
 export const getClientBookingHistory = async (
@@ -183,9 +257,10 @@ export const getClientBookingHistory = async (
     }
   );
   const data = unwrap<UpcomingSessionDto[]>(response, t('errors.generic'));
-  return data
+  const bookings = data
     .map(mapSessionToBooking)
     .filter((item): item is ClientBooking => item !== null);
+  return enrichPaymentStatuses(bookings, options);
 };
 
 

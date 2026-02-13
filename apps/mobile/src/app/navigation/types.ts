@@ -11,6 +11,10 @@ export type BookingsStackParamList = {
   BookingDetails: {
     slot: SlotDto;
     trainerName?: string | null;
+    trainerPhoneNumber?: string | null;
+    trainerGender?: string | null;
+    trainerWorksWithGender?: string | null;
+    trainerRating?: number | null;
     trainerSpecializations?: string[] | null;
     trainerTrainingTypes?: string[] | null;
     trainerCityName?: string | null;

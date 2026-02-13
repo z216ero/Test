@@ -17,6 +17,7 @@ import {
 } from '@app/components/bookings/bookingUtils';
 import { formatTimeRangeRu } from '@utils/datetime';
 import type { HomeMeState, HomeNavigation, HomeUser } from './types';
+import type { AvailableSlotTrainerDto } from '@generated/api';
 
 const MAX_UPCOMING = 5;
 const LIVE_REFRESH_INTERVAL_MS = 15 * 1000;
@@ -161,6 +162,10 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
       params: {
         slot: booking.slot,
         trainerName: booking.trainerName,
+        trainerPhoneNumber: booking.trainerPhoneNumber,
+        trainerGender: booking.trainerGender,
+        trainerWorksWithGender: booking.trainerWorksWithGender,
+        trainerRating: booking.trainerRating,
         trainerSpecializations: booking.trainerSpecializations,
         trainerTrainingTypes: booking.trainerTrainingTypes,
         trainerCityName: booking.trainerCityName,
@@ -242,6 +247,18 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
                   const dateLabel = times ? formatWeekdayDateRu(times.start) : t('common.empty');
                   const isBooked = getBookingStatusType(booking.slot) === 'booked';
                   const trainerName = booking.trainerName?.trim() || t('common.empty');
+                  const trainerProfile: AvailableSlotTrainerDto = {
+                    id: booking.slot.trainerId,
+                    name: booking.trainerName,
+                    phoneNumber: booking.trainerPhoneNumber,
+                    avatarUrl: booking.trainerAvatarUrl,
+                    worksWithGender: booking.trainerWorksWithGender,
+                    gender: booking.trainerGender,
+                    rating: booking.trainerRating,
+                    cityName: booking.trainerCityName,
+                    districtName: booking.trainerDistrictName,
+                    trainingTypes: booking.trainerTrainingTypes ?? null,
+                  };
                   const key = booking.slot.id ?? booking.slot.startsAtUtc ?? trainerName;
 
                   return (
@@ -260,6 +277,7 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
                               name={booking.trainerName}
                               avatarUrl={booking.trainerAvatarUrl}
                               size="$9"
+                              trainerProfile={trainerProfile}
                             />
                             <YStack gap="$1" flex={1}>
                               <Text fontSize="$4" fontWeight="700" color="$text">

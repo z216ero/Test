@@ -27,6 +27,7 @@ import {
 } from '@app/components/bookings/bookingUtils';
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 import type { BookingsStackParamList } from '@app/navigation/types';
+import type { AvailableSlotTrainerDto } from '@generated/api';
 
 type Props = NativeStackScreenProps<BookingsStackParamList, 'BookingDetails'>;
 
@@ -41,6 +42,10 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
   const {
     slot,
     trainerName,
+    trainerPhoneNumber,
+    trainerGender,
+    trainerWorksWithGender,
+    trainerRating,
     trainerCityName,
     trainerDistrictName,
     trainerAvatarUrl,
@@ -62,6 +67,29 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
     );
     return parts.length > 0 ? parts.join(', ') : null;
   }, [trainerCityName, trainerDistrictName]);
+  const trainerProfile = useMemo<AvailableSlotTrainerDto>(() => ({
+    id: slot.trainerId,
+    name: trainerName,
+    phoneNumber: trainerPhoneNumber,
+    avatarUrl: trainerAvatarUrl,
+    worksWithGender: trainerWorksWithGender,
+    gender: trainerGender,
+    rating: trainerRating,
+    cityName: trainerCityName,
+    districtName: trainerDistrictName,
+    trainingTypes: route.params.trainerTrainingTypes ?? null,
+  }), [
+    slot.trainerId,
+    trainerName,
+    trainerPhoneNumber,
+    trainerGender,
+    trainerWorksWithGender,
+    trainerRating,
+    trainerAvatarUrl,
+    trainerCityName,
+    trainerDistrictName,
+    route.params.trainerTrainingTypes,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -213,6 +241,7 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
                 name={trainerName}
                 avatarUrl={trainerAvatarUrl}
                 size="$10"
+                trainerProfile={trainerProfile}
               />
               <YStack gap="$1" flex={1}>
                 <Text fontSize="$4" fontWeight="700" color="$text">

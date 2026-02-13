@@ -26,6 +26,7 @@ type PersonalInfoTrainerSectionsProps = {
   genderOptions: LookupOption[];
   worksWithGender: string;
   onSelectWorksWithGender: (code: string) => void;
+  trainingTypesError?: string;
 };
 
 const ChipButton = ({
@@ -77,6 +78,7 @@ export function PersonalInfoTrainerSections({
   genderOptions,
   worksWithGender,
   onSelectWorksWithGender,
+  trainingTypesError,
 }: PersonalInfoTrainerSectionsProps) {
   const { isDark } = useAppTheme();
 
@@ -172,6 +174,11 @@ export function PersonalInfoTrainerSections({
                 : t('profile.personal.trainingTypesShowMore')}
             </Text>
           </Button>
+        ) : null}
+        {trainingTypesError ? (
+          <Text fontSize="$2" color="$danger">
+            {trainingTypesError}
+          </Text>
         ) : null}
         <YStack gap="$2">
           <Text fontSize="$4" fontWeight="700" color="$text">

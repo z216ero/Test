@@ -71,14 +71,33 @@ public sealed class ClientService(AppDbContext db)
             cancellationToken);
 
         var trainerAvatarIds = await GetTrainerAvatarIdsAsync(individualBookings, groupAttendees, cancellationToken);
+        var trainerRatings = await LoadTrainerRatingsAsync(
+            individualBookings
+                .Select(booking => booking.Slot?.TrainerId)
+                .Concat(groupAttendees.Select(attendee => attendee.Slot?.TrainerId))
+                .Where(id => id.HasValue)
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToList(),
+            cancellationToken);
 
         var sessions = new List<UpcomingSessionDto>(individualBookings.Count + groupAttendees.Count);
         sessions.AddRange(individualBookings
             .Where(booking => booking.Slot is not null)
-            .Select(booking => ToSessionDto(booking.Slot!, booking.Status, trainerAvatarIds, occupiedCounts)));
+            .Select(booking => ToSessionDto(
+                booking.Slot!,
+                booking.Status,
+                trainerAvatarIds,
+                occupiedCounts,
+                trainerRatings)));
         sessions.AddRange(groupAttendees
             .Where(attendee => attendee.Slot is not null)
-            .Select(attendee => ToSessionDto(attendee.Slot!, attendee.Status, trainerAvatarIds, occupiedCounts)));
+            .Select(attendee => ToSessionDto(
+                attendee.Slot!,
+                attendee.Status,
+                trainerAvatarIds,
+                occupiedCounts,
+                trainerRatings)));
 
         var sorted = sessions
             .OrderBy(x => x.Slot.StartsAtUtc)
@@ -166,14 +185,33 @@ public sealed class ClientService(AppDbContext db)
             cancellationToken);
 
         var trainerAvatarIds = await GetTrainerAvatarIdsAsync(individualBookings, groupAttendees, cancellationToken);
+        var trainerRatings = await LoadTrainerRatingsAsync(
+            individualBookings
+                .Select(booking => booking.Slot?.TrainerId)
+                .Concat(groupAttendees.Select(attendee => attendee.Slot?.TrainerId))
+                .Where(id => id.HasValue)
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToList(),
+            cancellationToken);
 
         var sessions = new List<UpcomingSessionDto>(individualBookings.Count + groupAttendees.Count);
         sessions.AddRange(individualBookings
             .Where(booking => booking.Slot is not null)
-            .Select(booking => ToSessionDto(booking.Slot!, booking.Status, trainerAvatarIds, occupiedCounts)));
+            .Select(booking => ToSessionDto(
+                booking.Slot!,
+                booking.Status,
+                trainerAvatarIds,
+                occupiedCounts,
+                trainerRatings)));
         sessions.AddRange(groupAttendees
             .Where(attendee => attendee.Slot is not null)
-            .Select(attendee => ToSessionDto(attendee.Slot!, attendee.Status, trainerAvatarIds, occupiedCounts)));
+            .Select(attendee => ToSessionDto(
+                attendee.Slot!,
+                attendee.Status,
+                trainerAvatarIds,
+                occupiedCounts,
+                trainerRatings)));
 
         var sorted = sessions
             .OrderByDescending(x => x.Slot.StartsAtUtc)
@@ -237,21 +275,24 @@ public sealed class ClientService(AppDbContext db)
         TrainingSlot slot,
         BookingStatus bookingStatus,
         HashSet<Guid> trainerAvatarIds,
-        IReadOnlyDictionary<Guid, int> occupiedCounts)
-        => ToSessionDto(slot, bookingStatus.ToString(), trainerAvatarIds, occupiedCounts);
+        IReadOnlyDictionary<Guid, int> occupiedCounts,
+        IReadOnlyDictionary<Guid, double?> trainerRatings)
+        => ToSessionDto(slot, bookingStatus.ToString(), trainerAvatarIds, occupiedCounts, trainerRatings);
 
     private static UpcomingSessionDto ToSessionDto(
         TrainingSlot slot,
         SlotAttendeeStatus attendeeStatus,
         HashSet<Guid> trainerAvatarIds,
-        IReadOnlyDictionary<Guid, int> occupiedCounts)
-        => ToSessionDto(slot, attendeeStatus.ToString(), trainerAvatarIds, occupiedCounts);
+        IReadOnlyDictionary<Guid, int> occupiedCounts,
+        IReadOnlyDictionary<Guid, double?> trainerRatings)
+        => ToSessionDto(slot, attendeeStatus.ToString(), trainerAvatarIds, occupiedCounts, trainerRatings);
 
     private static UpcomingSessionDto ToSessionDto(
         TrainingSlot slot,
         string bookingStatus,
         HashSet<Guid> trainerAvatarIds,
-        IReadOnlyDictionary<Guid, int> occupiedCounts)
+        IReadOnlyDictionary<Guid, int> occupiedCounts,
+        IReadOnlyDictionary<Guid, double?> trainerRatings)
     {
         var trainerProfile = slot.TrainerProfile;
         var trainerName = trainerProfile?.User?.Name;
@@ -263,6 +304,9 @@ public sealed class ClientService(AppDbContext db)
         var trainerAvatarUrl = trainerUserId.HasValue && trainerAvatarIds.Contains(trainerUserId.Value)
             ? $"/users/{trainerUserId.Value}/avatar"
             : null;
+        var trainerPhoneNumber = trainerProfile?.User?.PhoneNumber;
+        var trainerGender = trainerProfile?.User?.Gender.ToString();
+        var trainerWorksWithGender = trainerProfile?.WorksWithGender.ToString();
 
         return new UpcomingSessionDto(
             ToSlotDto(slot, bookingStatus, occupiedCounts),
@@ -271,7 +315,50 @@ public sealed class ClientService(AppDbContext db)
             trainerDistrictName,
             trainerSpecializations,
             trainerTrainingTypes,
-            trainerAvatarUrl);
+            trainerAvatarUrl,
+            trainerPhoneNumber,
+            trainerGender,
+            trainerWorksWithGender,
+            trainerRatings.GetValueOrDefault(slot.TrainerId));
+    }
+
+    private async Task<Dictionary<Guid, double?>> LoadTrainerRatingsAsync(
+        IReadOnlyCollection<Guid> trainerIds,
+        CancellationToken cancellationToken)
+    {
+        if (trainerIds.Count == 0)
+        {
+            return [];
+        }
+
+        var ratings = new Dictionary<Guid, double?>();
+        foreach (var trainerId in trainerIds)
+        {
+            var ratingSample = await db.Bookings
+                .AsNoTracking()
+                .Where(b => b.Slot != null
+                    && b.Slot.TrainerId == trainerId
+                    && (b.Status == BookingStatus.Completed || b.Status == BookingStatus.NoShow))
+                .OrderByDescending(b => b.Slot!.StartsAtUtc)
+                .Take(10)
+                .Select(b => b.Status)
+                .ToListAsync(cancellationToken);
+
+            if (ratingSample.Count < 5)
+            {
+                ratings[trainerId] = null;
+                continue;
+            }
+
+            var completedCount = ratingSample.Count(status => status == BookingStatus.Completed);
+            var rating = Math.Round(
+                completedCount / (double)ratingSample.Count * 5,
+                1,
+                MidpointRounding.AwayFromZero);
+            ratings[trainerId] = rating;
+        }
+
+        return ratings;
     }
 
     private async Task<HashSet<Guid>> GetTrainerAvatarIdsAsync(

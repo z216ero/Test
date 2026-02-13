@@ -4,7 +4,7 @@ import { Button, Text, XStack, YStack } from 'tamagui';
 import type { AvailableSlotTrainerDto } from '@generated/api';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
-import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
+import { Avatar, useAuthorizedImageSource } from '@ui/components';
 import { useToast } from '@ui/feedback/useToast';
 
 type TrainerProfileSheetProps = {
@@ -51,6 +51,7 @@ export function TrainerProfileSheet({
 }: TrainerProfileSheetProps) {
   const { showToast } = useToast();
   const trainerName = trainer?.name?.trim() || t('common.empty');
+  const avatarSource = useAuthorizedImageSource(trainer?.avatarUrl);
   const location = buildLocation(trainer);
   const trainingTypes = buildTrainingTypes(trainer);
   const phoneNumber = trainer?.phoneNumber?.trim() || '';
@@ -76,15 +77,18 @@ export function TrainerProfileSheet({
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
+      modal
       dismissOnSnapToBottom
-      snapPoints={[58]}
+      snapPointsMode="fit"
       dismissOnOverlayPress
+      zIndex={100_000}
     >
       <Sheet.Overlay
         animation="fast"
         enterStyle={hiddenOverlayStyle}
         exitStyle={hiddenOverlayStyle}
         backgroundColor="rgba(15, 23, 42, 0.2)"
+        zIndex={100_000}
       />
       <Sheet.Frame
         padding="$5"
@@ -92,15 +96,20 @@ export function TrainerProfileSheet({
         backgroundColor="$backgroundSoft"
         borderTopLeftRadius="$6"
         borderTopRightRadius="$6"
+        borderTopWidth={1}
+        borderTopColor="$border"
+        zIndex={100_001}
       >
         <Sheet.Handle />
 
         <YStack gap="$3">
           <XStack alignItems="center" gap="$3">
-            <TrainerAvatar
+            <Avatar
               name={trainerName}
-              avatarUrl={trainer?.avatarUrl}
+              source={avatarSource}
               size="$12"
+              borderRadius="$6"
+              textSize="$4"
             />
             <YStack gap="$1" flex={1}>
               <Text fontSize="$6" fontWeight="700" color="$text" numberOfLines={2}>
