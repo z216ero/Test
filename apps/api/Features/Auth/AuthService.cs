@@ -284,7 +284,7 @@ public sealed class AuthService(
         var hasAvatar = await db.UserAvatars
             .AsNoTracking()
             .AnyAsync(a => a.UserId == user.Id, cancellationToken);
-        var avatarUrl = hasAvatar ? "/users/me/avatar" : null;
+        var avatarUrl = hasAvatar ? $"/users/{user.Id}/avatar" : null;
 
         if (string.Equals(user.Role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
         {

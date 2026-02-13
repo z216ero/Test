@@ -4,6 +4,7 @@ import type { AvailableSlotTrainerDto, SlotDto } from '@generated/api';
 export type ScheduleStackParamList = {
   ScheduleHome: { initialDateIsoLocal?: string } | undefined;
   SlotDetails: { slot: SlotDto };
+  AttendanceQueue: undefined;
 };
 
 export type BookingsStackParamList = {
@@ -11,6 +12,10 @@ export type BookingsStackParamList = {
   BookingDetails: {
     slot: SlotDto;
     trainerName?: string | null;
+    trainerPhoneNumber?: string | null;
+    trainerGender?: string | null;
+    trainerWorksWithGender?: string | null;
+    trainerRating?: number | null;
     trainerSpecializations?: string[] | null;
     trainerTrainingTypes?: string[] | null;
     trainerCityName?: string | null;

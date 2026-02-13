@@ -189,6 +189,12 @@ export const markPushEventProcessed = async (eventId: string): Promise<boolean> 
   return false;
 };
 
+export const clearPushIndicators = async (): Promise<void> => {
+  cachedState = DEFAULT_STATE;
+  await AsyncStorage.removeItem(STORAGE_KEY);
+  notify();
+};
+
 export const usePushIndicators = (): PushIndicatorsState => {
   const [state, setState] = useState<PushIndicatorsState>(getPushIndicatorsSnapshot());
 

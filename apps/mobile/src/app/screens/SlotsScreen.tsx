@@ -6,7 +6,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, RefreshControl } from 'react-native';
 import { XStack, YStack } from 'tamagui';
-import type { AvailableSlotTrainerDto, SlotDto } from '@generated/api';
+import type { SlotDto } from '@generated/api';
 import { getClientUpcomingBookings } from '@api/bookingsApi';
 import { me } from '@api/authApi';
 import { getAvailableSlotsForClient } from '@api/slotsApi';
@@ -29,7 +29,7 @@ import {
 } from '@app/utils/clientSlotsFilters';
 import type { SlotsStackParamList } from '@app/navigation/types';
 import { SlotsHeader } from './slots/ui/SlotsHeader';
-import { TrainerProfileSheet } from './slots/ui/TrainerProfileSheet';
+import { ClientSlotDetailsSheet } from './slots/ui/ClientSlotDetailsSheet';
 import { type SlotGroup, TrainerSlotGroupCard } from './slots/ui/TrainerSlotGroupCard';
 
 const DATE_RANGE_DAYS = 14;
@@ -119,8 +119,10 @@ export function SlotsScreen({ navigation }: Props) {
   const [filtersReady, setFiltersReady] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
-  const [trainerProfileSheetOpen, setTrainerProfileSheetOpen] = useState(false);
-  const [selectedTrainer, setSelectedTrainer] = useState<AvailableSlotTrainerDto | null>(null);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [activeSlot, setActiveSlot] = useState<SlotDto | null>(null);
+  const [activeTrainer, setActiveTrainer] = useState<SlotGroup['trainer'] | null>(null);
+  const [slotDetailsSheetOpen, setSlotDetailsSheetOpen] = useState(false);
 
   const specializationsQuery = useAppQuery({
     queryKey: keys.lookups.specializations(),
@@ -325,9 +327,16 @@ export function SlotsScreen({ navigation }: Props) {
     }
   };
 
-  const handleRefresh = () => {
-    slotsQuery.refetch();
-    bookingsQuery.refetch();
+  const handleRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      await Promise.allSettled([
+        slotsQuery.refetch(),
+        bookingsQuery.refetch(),
+      ]);
+    } finally {
+      setIsManualRefreshing(false);
+    }
   };
 
   const renderContent = () => {
@@ -365,11 +374,9 @@ export function SlotsScreen({ navigation }: Props) {
             canCheckConflicts={canCheckConflicts}
             nowTs={nowTs}
             onOpenSlot={(slot, trainer) => {
-              navigation.navigate('ClientSlotDetails', { slot, trainer });
-            }}
-            onOpenTrainerProfile={(trainer) => {
-              setSelectedTrainer(trainer);
-              setTrainerProfileSheetOpen(true);
+              setActiveSlot(slot);
+              setActiveTrainer(trainer);
+              setSlotDetailsSheetOpen(true);
             }}
           />
         ))}
@@ -387,7 +394,7 @@ export function SlotsScreen({ navigation }: Props) {
       <TabScrollView
         refreshControl={
           <RefreshControl
-            refreshing={slotsQuery.isFetching && !slotsQuery.isLoading}
+            refreshing={isManualRefreshing && (slotsQuery.isFetching || bookingsQuery.isFetching)}
             onRefresh={handleRefresh}
           />
         }
@@ -442,15 +449,22 @@ export function SlotsScreen({ navigation }: Props) {
         onApply={handleApplyFilters}
         onOpenChange={setSheetOpen}
       />
-
-      <TrainerProfileSheet
-        open={trainerProfileSheetOpen}
-        trainer={selectedTrainer}
+      <ClientSlotDetailsSheet
+        open={slotDetailsSheetOpen}
+        slot={activeSlot}
+        trainer={activeTrainer}
+        bookings={bookings}
+        canCheckConflicts={canCheckConflicts}
+        nowTs={nowTs}
         onOpenChange={(open) => {
-          setTrainerProfileSheetOpen(open);
+          setSlotDetailsSheetOpen(open);
           if (!open) {
-            setSelectedTrainer(null);
+            setActiveSlot(null);
+            setActiveTrainer(null);
           }
+        }}
+        onBooked={() => {
+          navigation.getParent()?.navigate('Bookings', { screen: 'BookingsHome' });
         }}
       />
     </YStack>

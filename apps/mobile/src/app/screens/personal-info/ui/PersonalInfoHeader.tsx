@@ -18,7 +18,7 @@ export function PersonalInfoHeader({ isLoading, error }: PersonalInfoHeaderProps
         </Text>
       ) : null}
       {error ? (
-        <Text fontSize="$3" color="$text">
+        <Text fontSize="$3" color="$danger">
           {error}
         </Text>
       ) : null}

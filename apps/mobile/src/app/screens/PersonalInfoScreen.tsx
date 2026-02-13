@@ -49,6 +49,14 @@ type SelectedAvatar = {
   name: string;
 };
 
+type PersonalInfoFieldErrors = {
+  name?: string;
+  cityName?: string;
+  phoneNumber?: string;
+  trainingTypes?: string;
+  pricePerSession?: string;
+};
+
 type Props = NativeStackScreenProps<ProfileStackParamList, 'PersonalInfo'>;
 
 const sortByOrder = (values: string[], order: Map<string, number>): string[] => (
@@ -75,7 +83,8 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
   const [pricePerSession, setPricePerSession] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState<SelectedAvatar | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<PersonalInfoFieldErrors>({});
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -215,6 +224,8 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
       setCityName(selection.cityName ?? '');
       setSelectedCityId(typeof selection.cityId === 'number' ? selection.cityId : null);
       setDistrictName('');
+      setFieldErrors((prev) => ({ ...prev, cityName: undefined }));
+      setSubmitError(null);
     }
     if (selection.districtName) {
       setDistrictName(selection.districtName ?? '');
@@ -224,7 +235,7 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     if (meError) {
-      setError(presentApiError(meError).message);
+      setSubmitError(presentApiError(meError).message);
     }
   }, [meError]);
 
@@ -253,6 +264,8 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
   }, [specializationOrder]);
 
   const toggleTrainingType = useCallback((code: string) => {
+    setFieldErrors((prev) => ({ ...prev, trainingTypes: undefined }));
+    setSubmitError(null);
     setTrainingTypes((prev) => {
       const exists = prev.includes(code);
       const next = exists
@@ -265,10 +278,12 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
   const handlePriceChange = useCallback((value: string) => {
     const normalized = value.replace(/\D/g, '');
     setPricePerSession(normalized);
+    setFieldErrors((prev) => ({ ...prev, pricePerSession: undefined }));
+    setSubmitError(null);
   }, []);
 
   const handlePickPhoto = async () => {
-    setError(null);
+    setSubmitError(null);
 
     const result = await launchImageLibrary({
       mediaType: 'photo',
@@ -283,19 +298,19 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
     }
 
     if (result.errorCode || result.errorMessage) {
-      setError(t('errors.invalidImage'));
+      setSubmitError(t('errors.invalidImage'));
       return;
     }
 
     const asset = result.assets?.[0];
     if (!asset?.uri) {
-      setError(t('errors.invalidImage'));
+      setSubmitError(t('errors.invalidImage'));
       return;
     }
 
     const normalizedType = asset.type?.toLowerCase();
     if (normalizedType && normalizedType !== 'image/jpeg' && normalizedType !== 'image/png') {
-      setError(t('errors.invalidImage'));
+      setSubmitError(t('errors.invalidImage'));
       return;
     }
 
@@ -352,7 +367,7 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
     },
     onError: (err) => {
       const presented = presentApiError(err);
-      setError(presented.message);
+      setSubmitError(presented.message);
       if (shouldShowErrorToast(presented)) {
         showToast({
           type: 'error',
@@ -364,30 +379,43 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
   });
 
   const handleSave = async () => {
-    setError(null);
-    if (isTrainer && trainingTypes.length === 0) {
-      setError(t('profile.personal.trainingTypesRequired'));
-      return;
+    const nextFieldErrors: PersonalInfoFieldErrors = {};
+
+    if (!name.trim()) {
+      nextFieldErrors.name = t('profile.personal.nameRequired');
+    } else if (name.trim().length < 2) {
+      nextFieldErrors.name = t('profile.personal.nameMin');
     }
+
     if (!cityName.trim()) {
-      setError(t('profile.personal.cityRequired'));
-      return;
+      nextFieldErrors.cityName = t('profile.personal.cityRequired');
     }
+
     if (phoneNumber.trim().length > 0 && !russianPhoneToE164(phoneNumber)) {
-      setError(t('profile.personal.phoneInvalid'));
-      return;
+      nextFieldErrors.phoneNumber = t('profile.personal.phoneInvalid');
     }
+
+    if (isTrainer && trainingTypes.length === 0) {
+      nextFieldErrors.trainingTypes = t('profile.personal.trainingTypesRequired');
+    }
+
     if (isTrainer && pricePerSession.trim().length > 0) {
       const value = Number(pricePerSession);
       if (!Number.isFinite(value)) {
-        setError(t('profile.personal.priceInvalid'));
-        return;
+        nextFieldErrors.pricePerSession = t('profile.personal.priceInvalid');
       }
-      if (value < 0 || value > maxPriceRub) {
-        setError(t('profile.personal.priceInvalid'));
-        return;
+      if ((Number.isFinite(value) && value < 0) || value > maxPriceRub) {
+        nextFieldErrors.pricePerSession = t('profile.personal.priceInvalid');
       }
     }
+
+    setFieldErrors(nextFieldErrors);
+    setSubmitError(null);
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      return;
+    }
+
     try {
       await saveMutation.mutateAsync();
     } catch {
@@ -396,6 +424,8 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
   };
 
   const handleSelectCity = () => {
+    setFieldErrors((prev) => ({ ...prev, cityName: undefined }));
+    setSubmitError(null);
     navigation.navigate('LocationSearch', {
       mode: 'city',
       returnTo: 'PersonalInfo',
@@ -405,7 +435,10 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
 
   const handleSelectDistrict = () => {
     if (!selectedCityId) {
-      setError(t('profile.personal.cityRequired'));
+      setFieldErrors((prev) => ({
+        ...prev,
+        cityName: t('profile.personal.cityRequired'),
+      }));
       return;
     }
     navigation.navigate('LocationSearch', {
@@ -432,7 +465,7 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
         <YStack gap="$6">
           <PersonalInfoHeader
             isLoading={isLoading}
-            error={error}
+            error={submitError}
           />
           <PersonalInfoPhotoSection
             avatarSource={avatarSource}
@@ -442,9 +475,17 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
           />
           <PersonalInfoMainSection
             name={name}
-            onChangeName={setName}
+            onChangeName={(value) => {
+              setName(value);
+              setFieldErrors((prev) => ({ ...prev, name: undefined }));
+              setSubmitError(null);
+            }}
             phoneNumber={phoneNumber}
-            onChangePhoneNumber={(value) => setPhoneNumber(normalizeRussianPhoneInput(value))}
+            onChangePhoneNumber={(value) => {
+              setPhoneNumber(normalizeRussianPhoneInput(value));
+              setFieldErrors((prev) => ({ ...prev, phoneNumber: undefined }));
+              setSubmitError(null);
+            }}
             cityName={cityName}
             districtName={districtName}
             onSelectCity={handleSelectCity}
@@ -457,6 +498,7 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
             onChangePrice={handlePriceChange}
             priceHint={priceHint}
             email={email}
+            fieldErrors={fieldErrors}
           />
           <PersonalInfoTrainerSections
             isTrainer={isTrainer}
@@ -474,6 +516,7 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
             genderOptions={genderOptions}
             worksWithGender={worksWithGender}
             onSelectWorksWithGender={setWorksWithGender}
+            trainingTypesError={fieldErrors.trainingTypes}
           />
           <PersonalInfoActions
             isSaving={saveMutation.isPending}

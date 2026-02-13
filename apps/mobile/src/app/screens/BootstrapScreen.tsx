@@ -1,7 +1,8 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Text, YStack } from 'tamagui';
-import { clearSession, getAccessToken } from '@auth/tokenStorage';
+import { getAccessToken } from '@auth/tokenStorage';
+import { performLocalLogout } from '@auth/sessionManager';
 import { me } from '@api/authApi';
 import { ApiError } from '@api/core';
 import { ApiHttpError } from '@api/fetcher';
@@ -48,7 +49,7 @@ export function BootstrapScreen({ navigation }: Props) {
       } catch (err) {
         if (
           (err instanceof ApiError || err instanceof ApiHttpError)
-          && err.status === 401
+          && (err.status === 401 || err.status === 404)
         ) {
           return { target: 'auth' as const };
         }
@@ -63,7 +64,7 @@ export function BootstrapScreen({ navigation }: Props) {
     }
 
     if (bootstrapQuery.data.target === 'auth') {
-      clearSession().finally(() => {
+      performLocalLogout().finally(() => {
         goToAuth();
       });
       return;

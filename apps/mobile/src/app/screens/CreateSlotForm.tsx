@@ -187,7 +187,7 @@ export function CreateSlotForm({
         onOpenChange={setGroupSettingsOpen}
         modal
         dismissOnSnapToBottom
-        snapPoints={[45]}
+        snapPoints={[50]}
       >
         <Sheet.Overlay
           animation="fast"

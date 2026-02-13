@@ -18,7 +18,6 @@ type TrainerSlotGroupCardProps = {
   canCheckConflicts: boolean;
   nowTs: number;
   onOpenSlot: (slot: SlotDto, trainer: AvailableSlotTrainerDto) => void;
-  onOpenTrainerProfile: (trainer: AvailableSlotTrainerDto) => void;
 };
 
 const getSlotRange = (slot: SlotDto): { start: number; end: number } | null => {
@@ -80,7 +79,6 @@ export function TrainerSlotGroupCard({
   canCheckConflicts,
   nowTs,
   onOpenSlot,
-  onOpenTrainerProfile,
 }: TrainerSlotGroupCardProps) {
   const trainer = group.trainer;
   const trainerName = trainer.name ?? t('common.empty');
@@ -98,16 +96,12 @@ export function TrainerSlotGroupCard({
     >
       <XStack alignItems="center" justifyContent="space-between" gap="$3">
         <XStack alignItems="center" gap="$3" flex={1}>
-          <Button
-            unstyled
-            onPress={() => onOpenTrainerProfile(trainer)}
-          >
-            <TrainerAvatar
-              name={trainerName}
-              avatarUrl={trainer.avatarUrl}
-              size="$10"
-            />
-          </Button>
+          <TrainerAvatar
+            name={trainerName}
+            avatarUrl={trainer.avatarUrl}
+            size="$10"
+            trainerProfile={trainer}
+          />
           <YStack gap="$1" flex={1}>
             <XStack alignItems="center" justifyContent="space-between" gap="$2">
               <Text fontSize="$4" fontWeight="700" color="$text" flex={1} numberOfLines={1}>
@@ -167,6 +161,7 @@ export function TrainerSlotGroupCard({
             && !conflict
             && !isFull
             && !isBookedByCurrentClient;
+          const canOpenDetails = Boolean(slot.id) && (isBookable || isBookedByCurrentClient);
           const statusLabel = isBookedByCurrentClient
             ? t('slots.status.bookedByYou')
             : conflict
@@ -197,12 +192,12 @@ export function TrainerSlotGroupCard({
               padding="$3"
               alignItems="stretch"
               onPress={() => {
-                if (!isBookable || !slot.id) {
+                if (!canOpenDetails || !slot.id) {
                   return;
                 }
                 onOpenSlot(slot, trainer);
               }}
-              disabled={!isBookable}
+              disabled={!canOpenDetails}
             >
               <XStack justifyContent="space-between" alignItems="center">
                 <Text fontSize="$4" fontWeight="600" color={isBookable ? '$text' : '$muted'}>

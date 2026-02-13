@@ -155,7 +155,7 @@ export function SlotActionsSheet({
       open={open}
       onOpenChange={onOpenChange}
       dismissOnSnapToBottom
-      snapPoints={[72]}
+      snapPointsMode="fit"
       dismissOnOverlayPress
     >
       <Sheet.Overlay

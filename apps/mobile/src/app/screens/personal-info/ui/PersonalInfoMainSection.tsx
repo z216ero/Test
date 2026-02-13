@@ -2,7 +2,6 @@ import { Button, Text, XStack, YStack } from 'tamagui';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
 import { FormInput, SelectFieldButton } from '@ui/components';
-import { useAppTheme } from '@app/theme/AppThemeContext';
 
 type LookupOption = {
   code: string;
@@ -26,6 +25,12 @@ type PersonalInfoMainSectionProps = {
   onChangePrice: (value: string) => void;
   priceHint: string;
   email: string;
+  fieldErrors: {
+    name?: string;
+    phoneNumber?: string;
+    cityName?: string;
+    pricePerSession?: string;
+  };
 };
 
 export function PersonalInfoMainSection({
@@ -45,9 +50,8 @@ export function PersonalInfoMainSection({
   onChangePrice,
   priceHint,
   email,
+  fieldErrors,
 }: PersonalInfoMainSectionProps) {
-  const { isDark } = useAppTheme();
-
   return (
     <YStack
       gap="$3"
@@ -69,6 +73,11 @@ export function PersonalInfoMainSection({
           onChangeText={onChangeName}
           placeholder={t('profile.personal.name')}
         />
+        {fieldErrors.name ? (
+          <Text fontSize="$2" color="$danger">
+            {fieldErrors.name}
+          </Text>
+        ) : null}
       </YStack>
       <YStack gap="$2">
         <Text fontSize="$3" color="$text">
@@ -80,6 +89,11 @@ export function PersonalInfoMainSection({
           placeholder={t('profile.personal.phonePlaceholder')}
           keyboardType="numeric"
         />
+        {fieldErrors.phoneNumber ? (
+          <Text fontSize="$2" color="$danger">
+            {fieldErrors.phoneNumber}
+          </Text>
+        ) : null}
       </YStack>
       <YStack gap="$2">
         <Text fontSize="$3" color="$text">
@@ -90,6 +104,11 @@ export function PersonalInfoMainSection({
           placeholder={t('profile.personal.cityPlaceholder')}
           onPress={onSelectCity}
         />
+        {fieldErrors.cityName ? (
+          <Text fontSize="$2" color="$danger">
+            {fieldErrors.cityName}
+          </Text>
+        ) : null}
       </YStack>
       <YStack gap="$2">
         <Text fontSize="$3" color="$text">
@@ -145,10 +164,13 @@ export function PersonalInfoMainSection({
             value={pricePerSession}
             onChangeText={onChangePrice}
             placeholder={t('profile.personal.pricePlaceholder')}
-            color={isDark ? '#FFFFFF' : '#0F172A'}
-            placeholderTextColor={isDark ? '#FFFFFF' : '#64748B'}
             keyboardType="numeric"
           />
+          {fieldErrors.pricePerSession ? (
+            <Text fontSize="$2" color="$danger">
+              {fieldErrors.pricePerSession}
+            </Text>
+          ) : null}
           <Text fontSize="$2" color="$muted">
             {priceHint}
           </Text>

@@ -4,7 +4,7 @@ import { Button, Switch, Text, XStack, YStack } from 'tamagui';
 import { logout } from '@api/authApi';
 import { presentApiError } from '@api/ApiErrorPresenter';
 import { getMe } from '@api/homeApi';
-import { clearSession } from '@auth/tokenStorage';
+import { performLocalLogout } from '@auth/sessionManager';
 import { t } from '@i18n';
 import { useAppTheme } from '@app/theme/AppThemeContext';
 import type { ProfileStackParamList, RootStackParamList } from '@app/navigation/types';
@@ -124,7 +124,7 @@ export function ProfileScreen({ navigation }: Props) {
   ];
 
   const handleLogout = async () => {
-    await clearSession();
+    await performLocalLogout();
     const tabNavigation = navigation.getParent();
     const rootNavigation =
       tabNavigation?.getParent<NativeStackNavigationProp<RootStackParamList>>();

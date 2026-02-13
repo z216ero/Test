@@ -76,7 +76,7 @@ export function ProfileSupportSheet({ open, onOpenChange }: ProfileSupportSheetP
               circular
               chromeless
               onPress={handleCopyTelegram}
-              accessibilityLabel={t('profile.support.copyTelegram')}
+              aria-label={t('profile.support.copyTelegram')}
             >
               <AppIcon name="copy" size={16} color="$muted" />
             </Button>

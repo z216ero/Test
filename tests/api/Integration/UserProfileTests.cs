@@ -294,6 +294,6 @@ public sealed class UserProfileTests : IClassFixture<ApiPostgresFixture>
         var me = await meResponse.Content.ReadFromJsonAsync<AuthUserDto>();
         Assert.NotNull(me);
         Assert.True(me!.HasAvatar);
-        Assert.Equal("/users/me/avatar", me.AvatarUrl);
+        Assert.Equal($"/users/{me.Id}/avatar", me.AvatarUrl);
     }
 }

@@ -67,6 +67,24 @@ export function PaymentsScreen(_: Props) {
     queryFn: ({ signal }) => getTrainerPaymentsList(params, { signal }),
   });
 
+  const sortedPayments = useMemo(() => {
+    const toTimestamp = (value?: string | null): number => {
+      if (!value) {
+        return 0;
+      }
+      const ts = new Date(value).getTime();
+      return Number.isNaN(ts) ? 0 : ts;
+    };
+
+    return payments
+      .slice()
+      .sort((left, right) => {
+        const leftTs = toTimestamp(left.slotStartAtUtc) || toTimestamp(left.paidAtUtc);
+        const rightTs = toTimestamp(right.slotStartAtUtc) || toTimestamp(right.paidAtUtc);
+        return rightTs - leftTs;
+      });
+  }, [payments]);
+
   useFocusEffect(
     useCallback(() => {
       if (!isLoading && isStale) {
@@ -172,15 +190,15 @@ export function PaymentsScreen(_: Props) {
   };
 
   const renderContent = () => {
-    if (isLoading && payments.length === 0) {
+    if (isLoading && sortedPayments.length === 0) {
       return <LoadingState />;
     }
 
-    if (error && payments.length === 0) {
+    if (error && sortedPayments.length === 0) {
       return <ErrorState error={error} onRetry={handleRefresh} />;
     }
 
-    if (payments.length === 0) {
+    if (sortedPayments.length === 0) {
       const title = activeFilter === 'Pending'
         ? t('payments.empty.pending')
         : activeFilter === 'Paid'
@@ -191,7 +209,7 @@ export function PaymentsScreen(_: Props) {
 
     return (
       <YStack gap="$3">
-        {payments.map((item) => {
+        {sortedPayments.map((item) => {
           const paymentId = item.paymentId ?? '';
           const isUpdating = !!paymentId
             && markPaidMutation.isPending

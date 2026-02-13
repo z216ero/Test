@@ -9,4 +9,8 @@ public sealed record UpcomingSessionDto(
     string? TrainerDistrictName,
     IReadOnlyList<string> TrainerSpecializations,
     IReadOnlyList<string> TrainerTrainingTypes,
-    string? TrainerAvatarUrl);
+    string? TrainerAvatarUrl,
+    string? TrainerPhoneNumber,
+    string? TrainerGender,
+    string? TrainerWorksWithGender,
+    double? TrainerRating);

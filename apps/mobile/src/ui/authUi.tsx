@@ -12,6 +12,7 @@ type AuthHeaderProps = {
 
 type AuthFieldProps = InputProps & {
   label: string;
+  errorMessage?: string;
 };
 
 type AuthFooterProps = {
@@ -74,7 +75,7 @@ export function AuthCard({ children, ...props }: StackProps) {
   )
 }
 
-export function AuthField({ label, ...inputProps }: AuthFieldProps) {
+export function AuthField({ label, errorMessage, ...inputProps }: AuthFieldProps) {
   return (
     <YStack gap="$2">
       <Text fontSize="$3" color="$muted">
@@ -93,6 +94,11 @@ export function AuthField({ label, ...inputProps }: AuthFieldProps) {
         height={40}
         {...inputProps}
       />
+      {errorMessage ? (
+        <Text fontSize="$2" color="$danger">
+          {errorMessage}
+        </Text>
+      ) : null}
     </YStack>
   )
 }
@@ -116,7 +122,7 @@ export function AuthPrimaryButton({ children, ...props }: ButtonProps) {
 
 export function AuthError({ message }: AuthErrorProps) {
   return (
-    <Text fontSize="$3" color="$text" fontWeight="700">
+    <Text fontSize="$3" color="$danger" fontWeight="700">
       {message}
     </Text>
   );

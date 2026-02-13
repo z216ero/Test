@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { getApp } from '@react-native-firebase/app';
 import {
@@ -7,12 +7,13 @@ import {
   onMessage,
   onNotificationOpenedApp,
 } from '@react-native-firebase/messaging';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { AppState, StatusBar } from 'react-native';
 import { enableScreens } from 'react-native-screens';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { PortalProvider } from '@tamagui/portal';
 import { RootNavigator } from '@app/navigation/RootNavigator';
+import type { RootStackParamList } from '@app/navigation/types';
 import { AppThemeProvider, useAppTheme } from '@app/theme/AppThemeContext';
 import { queryClient } from '@query/queryClient';
 import { keys } from '@query/keys';
@@ -23,6 +24,11 @@ import {
   registerPushTokenRefreshListener,
 } from '@notifications/pushRegistration';
 import { hydratePushIndicators } from '@notifications/pushIndicators';
+import { getAccessToken } from '@auth/tokenStorage';
+import { performLocalLogout } from '@auth/sessionManager';
+import { me } from '@api/authApi';
+import { ApiError } from '@api/core';
+import { ApiHttpError } from '@api/fetcher';
 import config from './tamagui.config.cjs';
 import { TamaguiProvider, Theme } from '@tamagui/core';
 
@@ -38,11 +44,38 @@ const getTokenValue = <T,>(token: TokenValue<T> | undefined): T | undefined =>
 const baseInsetPadding = (getTokenValue(tokens.space[2]) as number) ?? 8;
 const safeAreaBackground = (getTokenValue(tokens.color.background) as string) ?? '#ffffff';
 const safeAreaBackgroundDark = '#0B1220';
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 function AppContent() {
   const { isDark, themeName } = useAppTheme();
   const resumeInvalidateRef = useRef(0);
   const navigationTheme = isDark ? DarkTheme : DefaultTheme;
+
+  const redirectToAuth = useCallback(() => {
+    if (!navigationRef.isReady()) {
+      return;
+    }
+    navigationRef.resetRoot({ index: 0, routes: [{ name: 'Auth' }] });
+  }, []);
+
+  const ensureSessionIsValid = useCallback(async () => {
+    const token = await getAccessToken();
+    if (!token) {
+      return;
+    }
+
+    try {
+      await me();
+    } catch (error) {
+      if (
+        (error instanceof ApiError || error instanceof ApiHttpError)
+        && (error.status === 401 || error.status === 404)
+      ) {
+        await performLocalLogout();
+        redirectToAuth();
+      }
+    }
+  }, [redirectToAuth]);
 
   useEffect(() => {
     const messaging = getMessaging(getApp());
@@ -80,7 +113,10 @@ function AppContent() {
       queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
       queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Client') });
+      ensureSessionIsValid().catch(() => {});
     });
+
+    ensureSessionIsValid().catch(() => {});
 
     return () => {
       unsubscribeMessage();
@@ -88,7 +124,7 @@ function AppContent() {
       unsubscribeToken();
       resumeSubscription.remove();
     };
-  }, []);
+  }, [ensureSessionIsValid]);
 
   return (
     <SafeAreaProvider>
@@ -107,7 +143,7 @@ function AppContent() {
             <PortalProvider shouldAddRootHost>
               <QueryClientProvider client={queryClient}>
                 <ToastProvider>
-                  <NavigationContainer theme={navigationTheme}>
+                  <NavigationContainer ref={navigationRef} theme={navigationTheme}>
                     <RootNavigator />
                   </NavigationContainer>
                 </ToastProvider>

@@ -21,6 +21,7 @@ import { RegisterScreen } from '@app/screens/RegisterScreen';
 import { ScheduleScreen } from '@app/screens/ScheduleScreen';
 import { SlotsScreen } from '@app/screens/SlotsScreen';
 import { TrainerSlotDetailsScreen } from '@app/screens/TrainerSlotDetailsScreen';
+import { TrainerAttendanceQueueScreen } from '@app/screens/TrainerAttendanceQueueScreen';
 import type {
   ClientTabsParamList,
   AuthStackParamList,
@@ -74,6 +75,7 @@ const ScheduleStackNavigator = () => (
   <ScheduleStack.Navigator screenOptions={{ headerShown: false }}>
     <ScheduleStack.Screen name="ScheduleHome" component={ScheduleScreen} />
     <ScheduleStack.Screen name="SlotDetails" component={TrainerSlotDetailsScreen} />
+    <ScheduleStack.Screen name="AttendanceQueue" component={TrainerAttendanceQueueScreen} />
   </ScheduleStack.Navigator>
 );
 
