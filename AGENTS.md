@@ -6,7 +6,6 @@
   - apps/api/            -> Minimal API
   - apps/apphost/        -> Aspire AppHost
   - apps/mobile/         -> React Native app
-  - infra/compose.yml    -> Postgres (and optional deps)
   - docs/domain.md       -> domain rules (source of truth)
 
 ## Domain (MVP scope)
