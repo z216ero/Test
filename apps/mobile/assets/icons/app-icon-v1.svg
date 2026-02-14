@@ -1,0 +1,15 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Trainer Slot icon variant 1">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#EAF4FF"/>
+      <stop offset="100%" stop-color="#D6E8FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#bg)"/>
+  <rect x="212" y="250" width="600" height="540" rx="86" fill="#FFFFFF"/>
+  <rect x="212" y="250" width="600" height="140" rx="86" fill="#2A5CAA"/>
+  <circle cx="332" cy="320" r="22" fill="#FFFFFF"/>
+  <circle cx="420" cy="320" r="22" fill="#FFFFFF"/>
+  <rect x="320" y="480" width="120" height="120" rx="28" fill="#2A5CAA"/>
+  <path d="M578 560l62 62 114-132" fill="none" stroke="#2A5CAA" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
