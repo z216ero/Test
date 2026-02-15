@@ -16,13 +16,18 @@ type PushType =
   | 'booking_created'
   | 'booking_cancelled'
   | 'slot_cancelled_by_trainer'
-  | 'attendance_marked';
+  | 'attendance_marked'
+  | 'payment_marked_paid'
+  | 'payment_marked_pending';
 
 type PushPayload = {
   type: PushType;
   roleHint: PushRoleHint | null;
   trainerId?: string;
-  clientId?: string;
+  clientUserId?: string;
+  trainerClientId?: string;
+  bookingId?: string;
+  paymentId?: string;
   slotId: string;
   eventId?: string;
   occurredAtUtc?: string;
@@ -40,6 +45,8 @@ const VALID_TYPES = new Set<PushType>([
   'booking_cancelled',
   'slot_cancelled_by_trainer',
   'attendance_marked',
+  'payment_marked_paid',
+  'payment_marked_pending',
 ]);
 
 const INVALIDATE_DEBOUNCE_MS = 400;
@@ -100,7 +107,10 @@ const parsePayload = (
     type,
     roleHint: normalizeRoleHint(readString(data.roleHint) ?? null),
     trainerId: readString(data.trainerId),
-    clientId: readString(data.clientId),
+    clientUserId: readString(data.clientUserId ?? data.clientId),
+    trainerClientId: readString(data.trainerClientId),
+    bookingId: readString(data.bookingId),
+    paymentId: readString(data.paymentId),
     slotId,
     eventId: readString(data.eventId),
     occurredAtUtc: readString(data.occurredAtUtc),
@@ -153,6 +163,8 @@ const collectClientKeys = (payload: PushPayload): QueryKey[] => {
 const collectTrainerKeys = (): QueryKey[] => [
   keys.trainerSlots.mine(),
   keys.home.upcoming('Trainer'),
+  keys.payments.all(),
+  keys.reports.summary(),
 ];
 
 const buildInvalidationKeys = (payload: PushPayload): QueryKey[] => {
@@ -174,6 +186,18 @@ const buildInvalidationKeys = (payload: PushPayload): QueryKey[] => {
   if (payload.type === 'slot_cancelled_by_trainer' || payload.type === 'attendance_marked') {
     if (includeTrainer) {
       list.push(...collectTrainerKeys());
+    }
+    if (includeClient) {
+      list.push(...collectClientKeys(payload));
+    }
+  }
+
+  if (payload.type === 'payment_marked_paid' || payload.type === 'payment_marked_pending') {
+    if (includeTrainer) {
+      list.push(...collectTrainerKeys());
+    }
+    if (payload.bookingId) {
+      list.push(keys.payments.booking(payload.bookingId));
     }
     if (includeClient) {
       list.push(...collectClientKeys(payload));

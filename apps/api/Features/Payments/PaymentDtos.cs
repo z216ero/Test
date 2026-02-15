@@ -3,7 +3,8 @@ namespace Api.Features.Payments;
 public sealed record PaymentListItemDto(
     Guid PaymentId,
     Guid BookingId,
-    Guid ClientId,
+    Guid? ClientId,
+    Guid? TrainerClientId,
     string ClientName,
     DateTime SlotStartAtUtc,
     DateTime SlotEndAtUtc,
@@ -15,7 +16,8 @@ public sealed record PaymentListItemDto(
 public sealed record PaymentDto(
     Guid PaymentId,
     Guid BookingId,
-    Guid ClientId,
+    Guid? ClientId,
+    Guid? TrainerClientId,
     string ClientName,
     DateTime SlotStartAtUtc,
     DateTime SlotEndAtUtc,
@@ -27,3 +29,7 @@ public sealed record PaymentDto(
     DateTime UpdatedAtUtc);
 
 public sealed record MarkPaymentPaidRequest(string? Method);
+
+public sealed record MarkBookingPaymentPaidRequest(
+    string? Method,
+    DateTime? PaidAtUtc);

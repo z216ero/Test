@@ -21,6 +21,7 @@ export type BookingsStackParamList = {
     trainerCityName?: string | null;
     trainerDistrictName?: string | null;
     trainerAvatarUrl?: string | null;
+    paymentStatus?: string | null;
   };
 };
 
@@ -43,6 +44,9 @@ export type ProfileStackParamList = {
   ProfileHome: undefined;
   PersonalInfo: { locationSelection?: LocationSelection } | undefined;
   Notifications: undefined;
+  TrainerClients: undefined;
+  TrainerClientForm: { clientId?: string } | undefined;
+  TrainerReport: undefined;
   LocationSearch: LocationSearchParams;
 };
 
@@ -66,7 +70,7 @@ export type ClientTabsParamList = {
 export type TrainerTabsParamList = {
   Home: undefined;
   Schedule: NavigatorScreenParams<ScheduleStackParamList>;
-  CreateSlot: { initialDateIsoLocal?: string } | undefined;
+  CreateSlot: { initialDateIsoLocal?: string; assignTrainerClientId?: string } | undefined;
   Payments: undefined;
   Profile: NavigatorScreenParams<ProfileStackParamList>;
 };

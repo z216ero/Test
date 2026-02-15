@@ -76,7 +76,21 @@ export function PaymentsScreen(_: Props) {
       return Number.isNaN(ts) ? 0 : ts;
     };
 
-    return payments
+    const nowTs = Date.now();
+    const visiblePayments = payments.filter((item) => {
+      const status = (item.status ?? '').trim().toLowerCase();
+      const endTs = item.slotEndAtUtc ? new Date(item.slotEndAtUtc).getTime() : Number.NaN;
+      const isFuture = !Number.isNaN(endTs) && endTs > nowTs;
+
+      // Future unpaid sessions should not pollute trainer payments list.
+      if (isFuture && status === 'pending') {
+        return false;
+      }
+
+      return true;
+    });
+
+    return visiblePayments
       .slice()
       .sort((left, right) => {
         const leftTs = toTimestamp(left.slotStartAtUtc) || toTimestamp(left.paidAtUtc);

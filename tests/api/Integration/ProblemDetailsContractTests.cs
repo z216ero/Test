@@ -1,6 +1,8 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Api.Features.Auth;
 using Api.Data;
 using Api.Features.Bookings;
 using Api.Features.Trainers;
@@ -67,15 +69,23 @@ public sealed class ProblemDetailsContractTests : IClassFixture<ApiPostgresFixtu
         await db.SaveChangesAsync();
 
         var client = factory.CreateClient();
+        var firstClientAuth = await RegisterClientAsync(client);
+        var secondClientAuth = await RegisterClientAsync(client);
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", firstClientAuth.AccessToken);
 
         var firstResponse = await client.PostAsJsonAsync(
             $"/slots/{slotId}/book",
-            new BookSlotRequest(Guid.NewGuid()));
+            new BookSlotRequest(firstClientAuth.User.Id));
         Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", secondClientAuth.AccessToken);
 
         var secondResponse = await client.PostAsJsonAsync(
             $"/slots/{slotId}/book",
-            new BookSlotRequest(Guid.NewGuid()));
+            new BookSlotRequest(secondClientAuth.User.Id));
         Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
 
         var payload = await secondResponse.Content.ReadFromJsonAsync<JsonElement>();
@@ -86,6 +96,21 @@ public sealed class ProblemDetailsContractTests : IClassFixture<ApiPostgresFixtu
         Assert.False(payload.TryGetProperty("exception", out _));
         Assert.False(payload.TryGetProperty("stackTrace", out _));
         Assert.False(payload.TryGetProperty("stacktrace", out _));
+    }
+
+    private static async Task<AuthResponse> RegisterClientAsync(HttpClient client)
+    {
+        var email = $"client-{Guid.NewGuid():N}@example.com";
+        var registerResponse = await client.PostAsJsonAsync("/auth/register", new RegisterRequest(
+            email,
+            "Password123",
+            "Client",
+            $"Client {Guid.NewGuid():N}"[..20],
+            "Москва"));
+        Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
+        var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.NotNull(auth);
+        return auth!;
     }
 }
 

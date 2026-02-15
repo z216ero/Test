@@ -10,6 +10,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<AppMeta> AppMetas => Set<AppMeta>();
     public DbSet<TrainerProfile> TrainerProfiles => Set<TrainerProfile>();
     public DbSet<ClientProfile> ClientProfiles => Set<ClientProfile>();
+    public DbSet<TrainerClient> TrainerClients => Set<TrainerClient>();
     public DbSet<TrainingSlot> TrainingSlots => Set<TrainingSlot>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<Payment> Payments => Set<Payment>();
@@ -103,6 +104,42 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<TrainerClient>(entity =>
+        {
+            entity.ToTable("trainer_clients");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.DisplayName)
+                .HasMaxLength(100)
+                .IsRequired();
+            entity.Property(x => x.Phone)
+                .HasMaxLength(30);
+            entity.Property(x => x.Notes)
+                .HasMaxLength(500);
+            entity.Property(x => x.Status)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(TrainerClientStatus.Active)
+                .IsRequired();
+            entity.Property(x => x.CreatedAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.Property(x => x.UpdatedAtUtc);
+            entity.HasIndex(x => x.TrainerId);
+            entity.HasIndex(x => new { x.TrainerId, x.LinkedUserId })
+                .HasFilter("\"LinkedUserId\" IS NOT NULL")
+                .IsUnique();
+            entity.HasIndex(x => new { x.TrainerId, x.Phone })
+                .HasFilter("\"Phone\" IS NOT NULL")
+                .IsUnique();
+            entity.HasOne(x => x.TrainerProfile)
+                .WithMany(x => x.TrainerClients)
+                .HasForeignKey(x => x.TrainerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.LinkedUser)
+                .WithMany()
+                .HasForeignKey(x => x.LinkedUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<ClientProfile>(entity =>
         {
             entity.ToTable("client_profiles");
@@ -182,8 +219,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             entity.ToTable("bookings");
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.ClientId)
-                .IsRequired();
+            entity.Property(x => x.ClientId);
+            entity.Property(x => x.TrainerClientId);
             entity.Property(x => x.Status)
                 .HasConversion<string>()
                 .HasMaxLength(20)
@@ -191,12 +228,22 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsRequired();
             entity.Property(x => x.CreatedAtUtc)
                 .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.Property(x => x.UpdatedAtUtc);
             entity.HasIndex(x => x.SlotId)
                 .IsUnique();
+            entity.HasIndex(x => x.ClientId);
+            entity.HasIndex(x => x.TrainerClientId);
+            entity.ToTable(tb => tb.HasCheckConstraint(
+                "CK_bookings_client_or_trainer_client",
+                "(\"ClientId\" IS NULL) <> (\"TrainerClientId\" IS NULL)"));
             entity.HasOne(x => x.Slot)
                 .WithOne(x => x.Booking)
                 .HasForeignKey<Booking>(x => x.SlotId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.TrainerClient)
+                .WithMany()
+                .HasForeignKey(x => x.TrainerClientId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Payment>(entity =>
@@ -231,8 +278,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             entity.ToTable("slot_attendees");
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.ClientId)
-                .IsRequired();
+            entity.Property(x => x.ClientId);
+            entity.Property(x => x.TrainerClientId);
             entity.Property(x => x.Status)
                 .HasConversion<string>()
                 .HasMaxLength(20)
@@ -242,13 +289,25 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasDefaultValueSql("now() at time zone 'utc'");
             entity.Property(x => x.UpdatedAtUtc);
             entity.HasIndex(x => new { x.SlotId, x.ClientId })
+                .HasFilter("\"ClientId\" IS NOT NULL")
+                .IsUnique();
+            entity.HasIndex(x => new { x.SlotId, x.TrainerClientId })
+                .HasFilter("\"TrainerClientId\" IS NOT NULL")
                 .IsUnique();
             entity.HasIndex(x => x.SlotId);
             entity.HasIndex(x => new { x.ClientId, x.Status });
+            entity.HasIndex(x => new { x.TrainerClientId, x.Status });
+            entity.ToTable(tb => tb.HasCheckConstraint(
+                "CK_slot_attendees_client_or_trainer_client",
+                "(\"ClientId\" IS NULL) <> (\"TrainerClientId\" IS NULL)"));
             entity.HasOne(x => x.Slot)
                 .WithMany(x => x.Attendees)
                 .HasForeignKey(x => x.SlotId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.TrainerClient)
+                .WithMany()
+                .HasForeignKey(x => x.TrainerClientId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<UserAvatar>(entity =>

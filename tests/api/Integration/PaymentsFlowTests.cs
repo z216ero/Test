@@ -34,7 +34,7 @@ public sealed class PaymentsFlowTests : IClassFixture<ApiPostgresFixture>
         await UpdateTrainerPriceAsync(client, trainerAuth, 180_000);
         var slotStartUtc = BuildFutureStartUtc(2);
         var slotId = await CreateIndividualSlotAsync(client, trainerAuth, slotStartUtc);
-        await BookSlotAsync(client, slotId, clientAuth.User.Id);
+        await BookSlotAsync(client, slotId, clientAuth.User.Id, clientAuth.AccessToken);
 
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", trainerAuth.AccessToken);
@@ -431,8 +431,10 @@ public sealed class PaymentsFlowTests : IClassFixture<ApiPostgresFixture>
         return slot.Id;
     }
 
-    private static async Task BookSlotAsync(HttpClient client, Guid slotId, Guid clientId)
+    private static async Task BookSlotAsync(HttpClient client, Guid slotId, Guid clientId, string clientAccessToken)
     {
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", clientAccessToken);
         var bookResponse = await client.PostAsJsonAsync(
             $"/slots/{slotId}/book",
             new BookSlotRequest(clientId));
@@ -451,7 +453,7 @@ public sealed class PaymentsFlowTests : IClassFixture<ApiPostgresFixture>
         await UpdateTrainerPriceAsync(client, trainerAuth, pricePerSession);
         var slotStartUtc = BuildFutureStartUtc(3);
         var slotId = await CreateIndividualSlotAsync(client, trainerAuth, slotStartUtc);
-        await BookSlotAsync(client, slotId, clientAuth.User.Id);
+        await BookSlotAsync(client, slotId, clientAuth.User.Id, clientAuth.AccessToken);
 
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", trainerAuth.AccessToken);

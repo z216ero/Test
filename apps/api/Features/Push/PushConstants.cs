@@ -26,6 +26,8 @@ public static class PushEventTypes
     public const string BookingCancelled = "booking_cancelled";
     public const string SlotCancelledByTrainer = "slot_cancelled_by_trainer";
     public const string AttendanceMarked = "attendance_marked";
+    public const string PaymentMarkedPaid = "payment_marked_paid";
+    public const string PaymentMarkedPending = "payment_marked_pending";
     public const string TrainingReminder = "training_reminder";
 }
 

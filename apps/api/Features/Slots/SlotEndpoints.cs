@@ -11,14 +11,31 @@ public static class SlotEndpoints
     public static IEndpointRouteBuilder MapSlotEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/trainers/{trainerId:guid}/slots").WithTags("Slots");
+        var myGroup = app.MapGroup("/trainers/me/slots").WithTags("Slots");
         var availableGroup = app.MapGroup("/slots").WithTags("Slots");
 
         group.MapPost("/", async (
             Guid trainerId,
             CreateSlotRequest? request,
+            HttpContext httpContext,
             SlotService service,
             CancellationToken cancellationToken) =>
         {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            if (!string.Equals(role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
+            {
+                return TypedResults.Problem(
+                    title: "Forbidden",
+                    detail: "Only trainers can create slots.",
+                    statusCode: StatusCodes.Status403Forbidden,
+                    type: "https://errors.trainerapp/forbidden");
+            }
+
             if (request is null)
             {
                 return Problems.BadRequest(
@@ -53,7 +70,7 @@ public static class SlotEndpoints
                 return Problems.Validation(errors);
             }
 
-            var result = await service.CreateSlotAsync(trainerId, request, cancellationToken);
+            var result = await service.CreateSlotAsync(trainerId, userId, role, request, cancellationToken);
             if (!result.IsSuccess)
             {
                 return Problems.FromServiceError(result.Error!);
@@ -64,8 +81,94 @@ public static class SlotEndpoints
         })
         .Produces<SlotDto>(StatusCodes.Status201Created)
         .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status404NotFound)
-        .ProducesProblem(StatusCodes.Status409Conflict);
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .RequireAuthorization();
+
+        myGroup.MapPost("/", async (
+            CreateSlotRequest? request,
+            HttpContext httpContext,
+            AppDbContext db,
+            SlotService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            if (!string.Equals(role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
+            {
+                return TypedResults.Problem(
+                    title: "Forbidden",
+                    detail: "Only trainers can create slots.",
+                    statusCode: StatusCodes.Status403Forbidden,
+                    type: "https://errors.trainerapp/forbidden");
+            }
+
+            var trainerId = await db.TrainerProfiles
+                .AsNoTracking()
+                .Where(t => t.UserId == userId)
+                .Select(t => (Guid?)t.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (!trainerId.HasValue)
+            {
+                return Problems.NotFound("Trainer profile not found", "Trainer profile is not available for this user.");
+            }
+
+            if (request is null)
+            {
+                return Problems.BadRequest(
+                    "Invalid request",
+                    "Request body is required.");
+            }
+
+            var errors = new Dictionary<string, string[]>();
+            if (request.StartsAtUtc == default)
+            {
+                errors["startsAtUtc"] = new[] { "StartsAtUtc is required." };
+            }
+            else if (request.StartsAtUtc.Kind != DateTimeKind.Utc)
+            {
+                errors["startsAtUtc"] = new[] { "StartsAtUtc must be in UTC." };
+            }
+
+            if (request.DurationMinutes <= 0)
+            {
+                errors["durationMinutes"] = new[] { "DurationMinutes must be greater than 0." };
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.SlotType)
+                && !string.Equals(request.SlotType, "Individual", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(request.SlotType, "Group", StringComparison.OrdinalIgnoreCase))
+            {
+                errors["slotType"] = new[] { "SlotType must be Individual or Group." };
+            }
+
+            if (errors.Count > 0)
+            {
+                return Problems.Validation(errors);
+            }
+
+            var result = await service.CreateSlotAsync(trainerId.Value, userId, role, request, cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            var slot = result.Value!;
+            return Results.Created($"/trainers/{trainerId.Value}/slots/{slot.Id}", slot);
+        })
+        .Produces<SlotDto>(StatusCodes.Status201Created)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .RequireAuthorization();
 
         group.MapGet("/", async (
             Guid trainerId,

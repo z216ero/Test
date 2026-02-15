@@ -5,6 +5,8 @@ import type {
 } from '@generated/api';
 import {
   getBookingsBookingIdPayment,
+  postBookingsBookingIdPaymentMarkPaid,
+  postBookingsBookingIdPaymentMarkPending,
   getTrainerPayments,
   patchPaymentsPaymentIdMarkPaid,
   patchPaymentsPaymentIdRefund,
@@ -14,7 +16,7 @@ import { ApiError, unwrap } from './core';
 import { ApiTimeoutError } from './fetcher';
 
 export type TrainerPaymentsStatusFilter = 'All' | 'Pending' | 'Paid' | 'Refunded';
-export type PaymentMethod = 'Cash' | 'Transfer' | 'SBP';
+export type PaymentMethod = 'Cash' | 'Transfer' | 'SBP' | 'Other';
 
 export class PaymentConflictError extends ApiError {}
 export class PaymentNotFoundError extends ApiError {}
@@ -82,6 +84,35 @@ export const markPaymentPaid = async (
 ): Promise<PaymentDto> => {
   try {
     const response = await patchPaymentsPaymentIdMarkPaid(paymentId, { method }, options);
+    return unwrap<PaymentDto>(response, t('errors.generic'));
+  } catch (error) {
+    throw mapPaymentError(error);
+  }
+};
+
+export const markBookingPaymentPaid = async (
+  bookingId: string,
+  method: PaymentMethod,
+  options?: RequestInit
+): Promise<PaymentDto> => {
+  try {
+    const response = await postBookingsBookingIdPaymentMarkPaid(
+      bookingId,
+      { method },
+      options
+    );
+    return unwrap<PaymentDto>(response, t('errors.generic'));
+  } catch (error) {
+    throw mapPaymentError(error);
+  }
+};
+
+export const markBookingPaymentPending = async (
+  bookingId: string,
+  options?: RequestInit
+): Promise<PaymentDto> => {
+  try {
+    const response = await postBookingsBookingIdPaymentMarkPending(bookingId, options);
     return unwrap<PaymentDto>(response, t('errors.generic'));
   } catch (error) {
     throw mapPaymentError(error);

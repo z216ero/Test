@@ -6,8 +6,10 @@ using Api.Features.Health;
 using Api.Features.Lookups;
 using Api.Features.Payments;
 using Api.Features.Push;
+using Api.Features.Reports;
 using Api.Features.Slots;
 using Api.Features.Trainers;
+using Api.Features.TrainerClients;
 using Api.Features.Users;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -103,6 +105,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<TrainerService>();
+builder.Services.AddScoped<TrainerClientService>();
 builder.Services.AddScoped<SlotService>();
 builder.Services.AddScoped<GroupSlotAutoCancellationService>();
 builder.Services.AddScoped<BookingService>();
@@ -112,6 +115,7 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<PushService>();
 builder.Services.AddScoped<TrainingReminderService>();
 builder.Services.AddScoped<PaymentService>();
+builder.Services.AddScoped<ReportService>();
 builder.Services.AddSingleton<FirebaseMessagingClient>();
 builder.Services.AddHostedService<GroupSlotAutoCancellationWorker>();
 builder.Services.AddHostedService<TrainingReminderWorker>();
@@ -126,6 +130,7 @@ app.UseAuthorization();
 app.MapHealthEndpoints();
 app.MapAuthEndpoints();
 app.MapTrainerEndpoints();
+app.MapTrainerClientEndpoints();
 app.MapSlotEndpoints();
 app.MapBookingEndpoints();
 app.MapClientEndpoints();
@@ -133,6 +138,7 @@ app.MapUserEndpoints();
 app.MapPushEndpoints();
 app.MapLookupEndpoints();
 app.MapPaymentEndpoints();
+app.MapReportEndpoints();
 
 await app.RunAsync();
 

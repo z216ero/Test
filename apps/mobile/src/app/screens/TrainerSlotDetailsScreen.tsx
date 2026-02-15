@@ -10,8 +10,14 @@ import {
   markGroupAttendeeCompleted,
   markGroupAttendeeNoShow,
 } from '@api/trainerSlotsApi';
+import {
+  getBookingPayment,
+  markBookingPaymentPaid,
+  markBookingPaymentPending,
+  type PaymentMethod as BookingPaymentMethod,
+} from '@api/paymentsApi';
 import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
-import type { SlotAttendeeDto, SlotDto } from '@generated/api';
+import type { PaymentDto, SlotAttendeeDto, SlotDto } from '@generated/api';
 import { t } from '@i18n';
 import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
@@ -29,6 +35,7 @@ import {
 type Props = NativeStackScreenProps<ScheduleStackParamList, 'SlotDetails'>;
 
 const ATTENDEES_POLL_INTERVAL_MS = 10 * 1000;
+const BOOKING_PAYMENT_METHODS: BookingPaymentMethod[] = ['Cash', 'Transfer', 'SBP', 'Other'];
 
 const getSlotTimes = (slot: SlotDto) => {
   if (!slot.startsAtUtc) {
@@ -69,6 +76,19 @@ const getStatusLabel = (status?: string | null) => {
   }
 };
 
+const getPaymentMethodLabel = (method: BookingPaymentMethod) => {
+  switch (method) {
+    case 'Cash':
+      return t('payments.method.cash');
+    case 'Transfer':
+      return t('payments.method.transfer');
+    case 'SBP':
+      return t('payments.method.sbp');
+    default:
+      return t('payments.method.other');
+  }
+};
+
 const normalize = (value?: string | null) => value?.toLowerCase().trim();
 const isGroupSlot = (slot: SlotDto) => normalize(slot.slotType) === 'group';
 const isBookedAttendee = (attendee: SlotAttendeeDto) => normalize(attendee.status) === 'booked';
@@ -77,6 +97,8 @@ const isCancelledAttendee = (attendee: SlotAttendeeDto) => normalize(attendee.st
 export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   const { slot } = route.params;
   const [actionError, setActionError] = useState<string | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] =
+    useState<BookingPaymentMethod>('Cash');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -101,9 +123,20 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
     refetchIntervalInBackground: false,
   });
 
+  const paymentQuery = useAppQuery({
+    queryKey: keys.payments.booking(slot.bookingId ?? 'missing'),
+    enabled: !group && Boolean(slot.bookingId),
+    queryFn: ({ signal }) => getBookingPayment(slot.bookingId!, { signal }),
+  });
+
   const invalidateTrainerData = () => {
     queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
     queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+    queryClient.invalidateQueries({ queryKey: keys.reports.summary() });
+    queryClient.invalidateQueries({ queryKey: keys.payments.all() });
+    if (slot.bookingId) {
+      queryClient.invalidateQueries({ queryKey: keys.payments.booking(slot.bookingId) });
+    }
     if (slot.id) {
       queryClient.invalidateQueries({ queryKey: ['slots', 'attendees', slot.id] });
     }
@@ -206,12 +239,60 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
     },
   });
 
+  const markPaidMutation = useAppMutation({
+    mutationFn: (payload: { bookingId: string; method: BookingPaymentMethod }) =>
+      markBookingPaymentPaid(payload.bookingId, payload.method),
+    onSuccess: (payment) => {
+      if (slot.bookingId) {
+        queryClient.setQueryData<PaymentDto>(keys.payments.booking(slot.bookingId), payment);
+      }
+      invalidateTrainerData();
+    },
+    onError: (err) => {
+      const presented = presentApiError(err);
+      setActionError(presented.message);
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
+    },
+  });
+
+  const markPendingMutation = useAppMutation({
+    mutationFn: (bookingId: string) => markBookingPaymentPending(bookingId),
+    onSuccess: (payment) => {
+      if (slot.bookingId) {
+        queryClient.setQueryData<PaymentDto>(keys.payments.booking(slot.bookingId), payment);
+      }
+      invalidateTrainerData();
+    },
+    onError: (err) => {
+      const presented = presentApiError(err);
+      setActionError(presented.message);
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
+    },
+  });
+
   const canMarkIndividual =
     !group
     && attendanceActionsAvailable
     && slotStatus === 'Booked'
     && !!slot.id
     && !!slot.bookingId;
+  const paymentStatusRaw = paymentQuery.data?.status ?? null;
+  const paymentStatus = paymentStatusRaw?.toLowerCase() ?? '';
+  const canTogglePayment = !group && Boolean(slot.bookingId);
+  const isPaymentPending =
+    markPaidMutation.isPending || markPendingMutation.isPending || paymentQuery.isFetching;
 
   const attendees = attendeesQuery.data ?? [];
   const hasAttendeesSnapshot = attendeesQuery.data !== undefined;
@@ -452,6 +533,88 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
                   : t('slotDetails.markNoShow')}
               </Text>
             </Button>
+          </YStack>
+        ) : null}
+
+        {canTogglePayment ? (
+          <YStack
+            gap="$3"
+            padding="$4"
+            borderRadius="$4"
+            borderWidth={1}
+            borderColor="$border"
+            backgroundColor="$background"
+          >
+            <Text fontSize="$4" fontWeight="700" color="$text">
+              {t('slotDetails.paymentTitle')}
+            </Text>
+            <Text fontSize="$3" color="$muted">
+              {paymentStatus === 'paid'
+                ? t('bookings.payment.paid')
+                : t('bookings.payment.unpaid')}
+            </Text>
+            {paymentStatus !== 'paid' ? (
+              <YStack gap="$2">
+                <XStack gap="$2" flexWrap="wrap">
+                  {BOOKING_PAYMENT_METHODS.map((method) => {
+                    const selected = method === selectedPaymentMethod;
+                    return (
+                      <Button
+                        key={method}
+                        backgroundColor={selected ? '$surfaceMuted' : '$background'}
+                        borderWidth={1}
+                        borderColor={selected ? '$accent' : '$border'}
+                        borderRadius="$4"
+                        minHeight="$8"
+                        onPress={() => setSelectedPaymentMethod(method)}
+                        disabled={isPaymentPending}
+                      >
+                        <Text color="$text" fontSize="$2" fontWeight={selected ? '700' : '600'}>
+                          {getPaymentMethodLabel(method)}
+                        </Text>
+                      </Button>
+                    );
+                  })}
+                </XStack>
+                <Button
+                  backgroundColor="$accent"
+                  color="$accentText"
+                  borderRadius="$4"
+                  minHeight="$9"
+                  onPress={() => {
+                    if (!slot.bookingId || isPaymentPending) {
+                      return;
+                    }
+                    markPaidMutation.mutate({
+                      bookingId: slot.bookingId,
+                      method: selectedPaymentMethod,
+                    });
+                  }}
+                  disabled={isPaymentPending}
+                >
+                  {isPaymentPending ? t('common.loading') : t('slotDetails.paymentMarkPaid')}
+                </Button>
+              </YStack>
+            ) : (
+              <Button
+                backgroundColor="$background"
+                borderRadius="$4"
+                borderWidth={1}
+                borderColor="$border"
+                minHeight="$9"
+                onPress={() => {
+                  if (!slot.bookingId || isPaymentPending) {
+                    return;
+                  }
+                  markPendingMutation.mutate(slot.bookingId);
+                }}
+                disabled={isPaymentPending}
+              >
+                <Text color="$text">
+                  {isPaymentPending ? t('common.loading') : t('slotDetails.paymentMarkPending')}
+                </Text>
+              </Button>
+            )}
           </YStack>
         ) : null}
 

@@ -17,4 +17,5 @@ public sealed class TrainerProfile
     public Gender WorksWithGender { get; set; } = Gender.Any;
     public DateTime CreatedAtUtc { get; set; }
     public List<TrainingSlot> Slots { get; set; } = new();
+    public List<TrainerClient> TrainerClients { get; set; } = new();
 }

@@ -91,16 +91,22 @@ export interface AvailableSlotTrainerDto {
 }
 
 export interface BookSlotRequest {
-  clientId?: string;
+  /** @nullable */
+  clientId?: string | null;
 }
 
 export interface BookingDto {
   id?: string;
   slotId?: string;
-  clientId?: string;
+  /** @nullable */
+  clientId?: string | null;
+  /** @nullable */
+  trainerClientId?: string | null;
   /** @nullable */
   status?: string | null;
   createdAtUtc?: string;
+  /** @nullable */
+  updatedAtUtc?: string | null;
 }
 
 export interface CityDto {
@@ -154,6 +160,19 @@ export interface CreateSlotRequest {
   /** @nullable */
   capacityMin?: number | null;
   autoCancelIfMinNotReached?: boolean;
+  /** @nullable */
+  assignToTrainerClientId?: string | null;
+  /** @nullable */
+  assignToClientId?: string | null;
+}
+
+export interface CreateTrainerClientRequest {
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  notes?: string | null;
 }
 
 export interface CreateTrainerRequest {
@@ -177,6 +196,10 @@ export interface DistrictDto {
   cityId?: number;
   /** @nullable */
   name?: string | null;
+}
+
+export interface LinkTrainerClientRequest {
+  linkedUserId?: string;
 }
 
 export interface LoginRequest {
@@ -209,6 +232,13 @@ export interface LookupResponse {
   items?: LookupItem[] | null;
 }
 
+export interface MarkBookingPaymentPaidRequest {
+  /** @nullable */
+  method?: string | null;
+  /** @nullable */
+  paidAtUtc?: string | null;
+}
+
 export interface MarkPaymentPaidRequest {
   /** @nullable */
   method?: string | null;
@@ -217,7 +247,10 @@ export interface MarkPaymentPaidRequest {
 export interface PaymentDto {
   paymentId?: string;
   bookingId?: string;
-  clientId?: string;
+  /** @nullable */
+  clientId?: string | null;
+  /** @nullable */
+  trainerClientId?: string | null;
   /** @nullable */
   clientName?: string | null;
   slotStartAtUtc?: string;
@@ -236,7 +269,10 @@ export interface PaymentDto {
 export interface PaymentListItemDto {
   paymentId?: string;
   bookingId?: string;
-  clientId?: string;
+  /** @nullable */
+  clientId?: string | null;
+  /** @nullable */
+  trainerClientId?: string | null;
   /** @nullable */
   clientName?: string | null;
   slotStartAtUtc?: string;
@@ -319,6 +355,10 @@ export interface SlotDto {
   trainerId?: string;
   /** @nullable */
   bookingId?: string | null;
+  /** @nullable */
+  clientId?: string | null;
+  /** @nullable */
+  trainerClientId?: string | null;
   startsAtUtc?: string;
   durationMinutes?: number;
   /** @nullable */
@@ -344,9 +384,27 @@ export interface SlotDto {
   trainerPricePerSession?: number | null;
 }
 
-export interface StringFAnonymousType9 {
+export interface StringFAnonymousType13 {
   /** @nullable */
   status?: string | null;
+}
+
+export interface TrainerClientDto {
+  id?: string;
+  trainerId?: string;
+  /** @nullable */
+  linkedUserId?: string | null;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  status?: string | null;
+  createdAtUtc?: string;
+  /** @nullable */
+  updatedAtUtc?: string | null;
 }
 
 export interface TrainerDto {
@@ -358,6 +416,17 @@ export interface TrainerDto {
   /** @nullable */
   pricePerSession?: number | null;
   createdAtUtc?: string;
+}
+
+export interface TrainerSummaryReportDto {
+  fromUtc?: string;
+  toUtc?: string;
+  sessionsBooked?: number;
+  sessionsCompleted?: number;
+  sessionsNoShow?: number;
+  sessionsCancelled?: number;
+  revenuePaid?: number;
+  revenuePending?: number;
 }
 
 export interface UpcomingSessionDto {
@@ -374,6 +443,14 @@ export interface UpcomingSessionDto {
   trainerTrainingTypes?: string[] | null;
   /** @nullable */
   trainerAvatarUrl?: string | null;
+  /** @nullable */
+  trainerPhoneNumber?: string | null;
+  /** @nullable */
+  trainerGender?: string | null;
+  /** @nullable */
+  trainerWorksWithGender?: string | null;
+  /** @nullable */
+  trainerRating?: number | null;
 }
 
 export interface UpdatePushPreferencesRequest {
@@ -381,6 +458,17 @@ export interface UpdatePushPreferencesRequest {
   groupMinCancellationEnabled?: boolean;
   reminderEnabled?: boolean;
   reminderOffsetMinutes?: number;
+}
+
+export interface UpdateTrainerClientRequest {
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  status?: string | null;
 }
 
 export interface UpdateUserRequest {
@@ -475,6 +563,11 @@ from?: string;
 to?: string;
 };
 
+export type GetTrainersMeReportsSummaryParams = {
+fromUtc?: string;
+toUtc?: string;
+};
+
 export type GetTrainersTrainerIdSlotsParams = {
 fromUtc?: string;
 toUtc?: string;
@@ -486,6 +579,10 @@ toUtc?: string;
 specializations?: string[];
 gender?: string;
 districtOnly?: boolean;
+};
+
+export type GetTrainerClientsParams = {
+status?: string;
 };
 
 export type PutUsersMeAvatarBody = {
@@ -721,6 +818,16 @@ export type postSlotsSlotIdBookResponse400 = {
   status: 400
 }
 
+export type postSlotsSlotIdBookResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postSlotsSlotIdBookResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
 export type postSlotsSlotIdBookResponse404 = {
   data: ProblemDetails
   status: 404
@@ -734,7 +841,7 @@ export type postSlotsSlotIdBookResponse409 = {
 export type postSlotsSlotIdBookResponseSuccess = (postSlotsSlotIdBookResponse200) & {
   headers: Headers;
 };
-export type postSlotsSlotIdBookResponseError = (postSlotsSlotIdBookResponse400 | postSlotsSlotIdBookResponse404 | postSlotsSlotIdBookResponse409) & {
+export type postSlotsSlotIdBookResponseError = (postSlotsSlotIdBookResponse400 | postSlotsSlotIdBookResponse401 | postSlotsSlotIdBookResponse403 | postSlotsSlotIdBookResponse404 | postSlotsSlotIdBookResponse409) & {
   headers: Headers;
 };
 
@@ -833,6 +940,16 @@ export type postSlotsSlotIdCompleteResponse400 = {
   status: 400
 }
 
+export type postSlotsSlotIdCompleteResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postSlotsSlotIdCompleteResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
 export type postSlotsSlotIdCompleteResponse404 = {
   data: ProblemDetails
   status: 404
@@ -846,7 +963,7 @@ export type postSlotsSlotIdCompleteResponse409 = {
 export type postSlotsSlotIdCompleteResponseSuccess = (postSlotsSlotIdCompleteResponse200) & {
   headers: Headers;
 };
-export type postSlotsSlotIdCompleteResponseError = (postSlotsSlotIdCompleteResponse400 | postSlotsSlotIdCompleteResponse404 | postSlotsSlotIdCompleteResponse409) & {
+export type postSlotsSlotIdCompleteResponseError = (postSlotsSlotIdCompleteResponse400 | postSlotsSlotIdCompleteResponse401 | postSlotsSlotIdCompleteResponse403 | postSlotsSlotIdCompleteResponse404 | postSlotsSlotIdCompleteResponse409) & {
   headers: Headers;
 };
 
@@ -883,6 +1000,16 @@ export type postSlotsSlotIdNoShowResponse400 = {
   status: 400
 }
 
+export type postSlotsSlotIdNoShowResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postSlotsSlotIdNoShowResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
 export type postSlotsSlotIdNoShowResponse404 = {
   data: ProblemDetails
   status: 404
@@ -896,7 +1023,7 @@ export type postSlotsSlotIdNoShowResponse409 = {
 export type postSlotsSlotIdNoShowResponseSuccess = (postSlotsSlotIdNoShowResponse200) & {
   headers: Headers;
 };
-export type postSlotsSlotIdNoShowResponseError = (postSlotsSlotIdNoShowResponse400 | postSlotsSlotIdNoShowResponse404 | postSlotsSlotIdNoShowResponse409) & {
+export type postSlotsSlotIdNoShowResponseError = (postSlotsSlotIdNoShowResponse400 | postSlotsSlotIdNoShowResponse401 | postSlotsSlotIdNoShowResponse403 | postSlotsSlotIdNoShowResponse404 | postSlotsSlotIdNoShowResponse409) & {
   headers: Headers;
 };
 
@@ -1230,7 +1357,7 @@ export const getClientsMeHistory = async ( options?: RequestInit): Promise<getCl
 
 
 export type getHealthResponse200 = {
-  data: StringFAnonymousType9
+  data: StringFAnonymousType13
   status: 200
 }
     
@@ -1957,6 +2084,113 @@ export const getBookingsBookingIdPayment = async (bookingId: string, options?: R
 
 
 
+export type postBookingsBookingIdPaymentMarkPaidResponse200 = {
+  data: PaymentDto
+  status: 200
+}
+
+export type postBookingsBookingIdPaymentMarkPaidResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postBookingsBookingIdPaymentMarkPaidResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postBookingsBookingIdPaymentMarkPaidResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type postBookingsBookingIdPaymentMarkPaidResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postBookingsBookingIdPaymentMarkPaidResponseSuccess = (postBookingsBookingIdPaymentMarkPaidResponse200) & {
+  headers: Headers;
+};
+export type postBookingsBookingIdPaymentMarkPaidResponseError = (postBookingsBookingIdPaymentMarkPaidResponse400 | postBookingsBookingIdPaymentMarkPaidResponse401 | postBookingsBookingIdPaymentMarkPaidResponse404 | postBookingsBookingIdPaymentMarkPaidResponse409) & {
+  headers: Headers;
+};
+
+export type postBookingsBookingIdPaymentMarkPaidResponse = (postBookingsBookingIdPaymentMarkPaidResponseSuccess | postBookingsBookingIdPaymentMarkPaidResponseError)
+
+export const getPostBookingsBookingIdPaymentMarkPaidUrl = (bookingId: string,) => {
+
+
+  
+
+  return `/bookings/${bookingId}/payment/mark-paid`
+}
+
+export const postBookingsBookingIdPaymentMarkPaid = async (bookingId: string,
+    markBookingPaymentPaidRequest: MarkBookingPaymentPaidRequest, options?: RequestInit): Promise<postBookingsBookingIdPaymentMarkPaidResponse> => {
+  
+  return customFetch<postBookingsBookingIdPaymentMarkPaidResponse>(getPostBookingsBookingIdPaymentMarkPaidUrl(bookingId),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      markBookingPaymentPaidRequest,)
+  }
+);}
+
+
+
+export type postBookingsBookingIdPaymentMarkPendingResponse200 = {
+  data: PaymentDto
+  status: 200
+}
+
+export type postBookingsBookingIdPaymentMarkPendingResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postBookingsBookingIdPaymentMarkPendingResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type postBookingsBookingIdPaymentMarkPendingResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postBookingsBookingIdPaymentMarkPendingResponseSuccess = (postBookingsBookingIdPaymentMarkPendingResponse200) & {
+  headers: Headers;
+};
+export type postBookingsBookingIdPaymentMarkPendingResponseError = (postBookingsBookingIdPaymentMarkPendingResponse401 | postBookingsBookingIdPaymentMarkPendingResponse404 | postBookingsBookingIdPaymentMarkPendingResponse409) & {
+  headers: Headers;
+};
+
+export type postBookingsBookingIdPaymentMarkPendingResponse = (postBookingsBookingIdPaymentMarkPendingResponseSuccess | postBookingsBookingIdPaymentMarkPendingResponseError)
+
+export const getPostBookingsBookingIdPaymentMarkPendingUrl = (bookingId: string,) => {
+
+
+  
+
+  return `/bookings/${bookingId}/payment/mark-pending`
+}
+
+export const postBookingsBookingIdPaymentMarkPending = async (bookingId: string, options?: RequestInit): Promise<postBookingsBookingIdPaymentMarkPendingResponse> => {
+  
+  return customFetch<postBookingsBookingIdPaymentMarkPendingResponse>(getPostBookingsBookingIdPaymentMarkPendingUrl(bookingId),
+  {      
+    ...options,
+    method: 'POST'
+    
+    
+  }
+);}
+
+
+
 export type patchPaymentsPaymentIdMarkPaidResponse200 = {
   data: PaymentDto
   status: 200
@@ -2252,6 +2486,68 @@ export const putPushPreferences = async (updatePushPreferencesRequest: UpdatePus
 
 
 
+export type getTrainersMeReportsSummaryResponse200 = {
+  data: TrainerSummaryReportDto
+  status: 200
+}
+
+export type getTrainersMeReportsSummaryResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type getTrainersMeReportsSummaryResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getTrainersMeReportsSummaryResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type getTrainersMeReportsSummaryResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type getTrainersMeReportsSummaryResponseSuccess = (getTrainersMeReportsSummaryResponse200) & {
+  headers: Headers;
+};
+export type getTrainersMeReportsSummaryResponseError = (getTrainersMeReportsSummaryResponse400 | getTrainersMeReportsSummaryResponse401 | getTrainersMeReportsSummaryResponse403 | getTrainersMeReportsSummaryResponse404) & {
+  headers: Headers;
+};
+
+export type getTrainersMeReportsSummaryResponse = (getTrainersMeReportsSummaryResponseSuccess | getTrainersMeReportsSummaryResponseError)
+
+export const getGetTrainersMeReportsSummaryUrl = (params?: GetTrainersMeReportsSummaryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/trainers/me/reports/summary?${stringifiedParams}` : `/trainers/me/reports/summary`
+}
+
+export const getTrainersMeReportsSummary = async (params?: GetTrainersMeReportsSummaryParams, options?: RequestInit): Promise<getTrainersMeReportsSummaryResponse> => {
+  
+  return customFetch<getTrainersMeReportsSummaryResponse>(getGetTrainersMeReportsSummaryUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
 export type postTrainersTrainerIdSlotsResponse201 = {
   data: SlotDto
   status: 201
@@ -2260,6 +2556,16 @@ export type postTrainersTrainerIdSlotsResponse201 = {
 export type postTrainersTrainerIdSlotsResponse400 = {
   data: ProblemDetails
   status: 400
+}
+
+export type postTrainersTrainerIdSlotsResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postTrainersTrainerIdSlotsResponse403 = {
+  data: ProblemDetails
+  status: 403
 }
 
 export type postTrainersTrainerIdSlotsResponse404 = {
@@ -2275,7 +2581,7 @@ export type postTrainersTrainerIdSlotsResponse409 = {
 export type postTrainersTrainerIdSlotsResponseSuccess = (postTrainersTrainerIdSlotsResponse201) & {
   headers: Headers;
 };
-export type postTrainersTrainerIdSlotsResponseError = (postTrainersTrainerIdSlotsResponse400 | postTrainersTrainerIdSlotsResponse404 | postTrainersTrainerIdSlotsResponse409) & {
+export type postTrainersTrainerIdSlotsResponseError = (postTrainersTrainerIdSlotsResponse400 | postTrainersTrainerIdSlotsResponse401 | postTrainersTrainerIdSlotsResponse403 | postTrainersTrainerIdSlotsResponse404 | postTrainersTrainerIdSlotsResponse409) & {
   headers: Headers;
 };
 
@@ -2358,6 +2664,67 @@ export const getTrainersTrainerIdSlots = async (trainerId: string,
     method: 'GET'
     
     
+  }
+);}
+
+
+
+export type postTrainersMeSlotsResponse201 = {
+  data: SlotDto
+  status: 201
+}
+
+export type postTrainersMeSlotsResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postTrainersMeSlotsResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postTrainersMeSlotsResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type postTrainersMeSlotsResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type postTrainersMeSlotsResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postTrainersMeSlotsResponseSuccess = (postTrainersMeSlotsResponse201) & {
+  headers: Headers;
+};
+export type postTrainersMeSlotsResponseError = (postTrainersMeSlotsResponse400 | postTrainersMeSlotsResponse401 | postTrainersMeSlotsResponse403 | postTrainersMeSlotsResponse404 | postTrainersMeSlotsResponse409) & {
+  headers: Headers;
+};
+
+export type postTrainersMeSlotsResponse = (postTrainersMeSlotsResponseSuccess | postTrainersMeSlotsResponseError)
+
+export const getPostTrainersMeSlotsUrl = () => {
+
+
+  
+
+  return `/trainers/me/slots`
+}
+
+export const postTrainersMeSlots = async (createSlotRequest: CreateSlotRequest, options?: RequestInit): Promise<postTrainersMeSlotsResponse> => {
+  
+  return customFetch<postTrainersMeSlotsResponse>(getPostTrainersMeSlotsUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createSlotRequest,)
   }
 );}
 
@@ -2473,6 +2840,243 @@ export const getSlotsSlotIdAttendees = async (slotId: string, options?: RequestI
     method: 'GET'
     
     
+  }
+);}
+
+
+
+export type postTrainerClientsResponse200 = {
+  data: TrainerClientDto
+  status: 200
+}
+
+export type postTrainerClientsResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postTrainerClientsResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postTrainerClientsResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type postTrainerClientsResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postTrainerClientsResponseSuccess = (postTrainerClientsResponse200) & {
+  headers: Headers;
+};
+export type postTrainerClientsResponseError = (postTrainerClientsResponse400 | postTrainerClientsResponse401 | postTrainerClientsResponse403 | postTrainerClientsResponse409) & {
+  headers: Headers;
+};
+
+export type postTrainerClientsResponse = (postTrainerClientsResponseSuccess | postTrainerClientsResponseError)
+
+export const getPostTrainerClientsUrl = () => {
+
+
+  
+
+  return `/trainer-clients`
+}
+
+export const postTrainerClients = async (createTrainerClientRequest: CreateTrainerClientRequest, options?: RequestInit): Promise<postTrainerClientsResponse> => {
+  
+  return customFetch<postTrainerClientsResponse>(getPostTrainerClientsUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createTrainerClientRequest,)
+  }
+);}
+
+
+
+export type getTrainerClientsResponse200 = {
+  data: TrainerClientDto[]
+  status: 200
+}
+
+export type getTrainerClientsResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type getTrainerClientsResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getTrainerClientsResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+    
+export type getTrainerClientsResponseSuccess = (getTrainerClientsResponse200) & {
+  headers: Headers;
+};
+export type getTrainerClientsResponseError = (getTrainerClientsResponse400 | getTrainerClientsResponse401 | getTrainerClientsResponse403) & {
+  headers: Headers;
+};
+
+export type getTrainerClientsResponse = (getTrainerClientsResponseSuccess | getTrainerClientsResponseError)
+
+export const getGetTrainerClientsUrl = (params?: GetTrainerClientsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/trainer-clients?${stringifiedParams}` : `/trainer-clients`
+}
+
+export const getTrainerClients = async (params?: GetTrainerClientsParams, options?: RequestInit): Promise<getTrainerClientsResponse> => {
+  
+  return customFetch<getTrainerClientsResponse>(getGetTrainerClientsUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type patchTrainerClientsIdResponse200 = {
+  data: TrainerClientDto
+  status: 200
+}
+
+export type patchTrainerClientsIdResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type patchTrainerClientsIdResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type patchTrainerClientsIdResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type patchTrainerClientsIdResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type patchTrainerClientsIdResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type patchTrainerClientsIdResponseSuccess = (patchTrainerClientsIdResponse200) & {
+  headers: Headers;
+};
+export type patchTrainerClientsIdResponseError = (patchTrainerClientsIdResponse400 | patchTrainerClientsIdResponse401 | patchTrainerClientsIdResponse403 | patchTrainerClientsIdResponse404 | patchTrainerClientsIdResponse409) & {
+  headers: Headers;
+};
+
+export type patchTrainerClientsIdResponse = (patchTrainerClientsIdResponseSuccess | patchTrainerClientsIdResponseError)
+
+export const getPatchTrainerClientsIdUrl = (id: string,) => {
+
+
+  
+
+  return `/trainer-clients/${id}`
+}
+
+export const patchTrainerClientsId = async (id: string,
+    updateTrainerClientRequest: UpdateTrainerClientRequest, options?: RequestInit): Promise<patchTrainerClientsIdResponse> => {
+  
+  return customFetch<patchTrainerClientsIdResponse>(getPatchTrainerClientsIdUrl(id),
+  {      
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateTrainerClientRequest,)
+  }
+);}
+
+
+
+export type postTrainerClientsIdLinkResponse200 = {
+  data: TrainerClientDto
+  status: 200
+}
+
+export type postTrainerClientsIdLinkResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postTrainerClientsIdLinkResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postTrainerClientsIdLinkResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type postTrainerClientsIdLinkResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type postTrainerClientsIdLinkResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postTrainerClientsIdLinkResponseSuccess = (postTrainerClientsIdLinkResponse200) & {
+  headers: Headers;
+};
+export type postTrainerClientsIdLinkResponseError = (postTrainerClientsIdLinkResponse400 | postTrainerClientsIdLinkResponse401 | postTrainerClientsIdLinkResponse403 | postTrainerClientsIdLinkResponse404 | postTrainerClientsIdLinkResponse409) & {
+  headers: Headers;
+};
+
+export type postTrainerClientsIdLinkResponse = (postTrainerClientsIdLinkResponseSuccess | postTrainerClientsIdLinkResponseError)
+
+export const getPostTrainerClientsIdLinkUrl = (id: string,) => {
+
+
+  
+
+  return `/trainer-clients/${id}/link`
+}
+
+export const postTrainerClientsIdLink = async (id: string,
+    linkTrainerClientRequest: LinkTrainerClientRequest, options?: RequestInit): Promise<postTrainerClientsIdLinkResponse> => {
+  
+  return customFetch<postTrainerClientsIdLinkResponse>(getPostTrainerClientsIdLinkUrl(id),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      linkTrainerClientRequest,)
   }
 );}
 

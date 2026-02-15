@@ -107,7 +107,7 @@ export function TrainerProfileSheet({
             <Avatar
               name={trainerName}
               source={avatarSource}
-              size="$12"
+              size="$11"
               borderRadius="$6"
               textSize="$4"
             />
@@ -149,7 +149,7 @@ export function TrainerProfileSheet({
                 chromeless
                 disabled={!canCopyPhone}
                 onPress={handleCopyPhone}
-                accessibilityLabel={t('slots.trainerSheet.copyPhone')}
+                aria-label={t('slots.trainerSheet.copyPhone')}
               >
                 <AppIcon name="copy" size={16} color="$muted" />
               </Button>

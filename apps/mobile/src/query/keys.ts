@@ -1,5 +1,10 @@
-import type { GetSlotsAvailableParams, GetTrainersTrainerIdSlotsParams } from '@generated/api';
-import type { GetTrainerPaymentsParams } from '@generated/api';
+import type {
+  GetSlotsAvailableParams,
+  GetTrainerClientsParams,
+  GetTrainerPaymentsParams,
+  GetTrainersMeReportsSummaryParams,
+  GetTrainersTrainerIdSlotsParams,
+} from '@generated/api';
 
 export const keys = {
   auth: {
@@ -22,6 +27,18 @@ export const keys = {
       params
         ? (['trainer', 'slots', 'mine', params] as const)
         : (['trainer', 'slots', 'mine'] as const),
+  },
+  trainerClients: {
+    list: (params?: GetTrainerClientsParams) =>
+      params
+        ? (['trainer', 'clients', 'list', params] as const)
+        : (['trainer', 'clients', 'list'] as const),
+  },
+  reports: {
+    summary: (params?: GetTrainersMeReportsSummaryParams) =>
+      params
+        ? (['trainer', 'reports', 'summary', params] as const)
+        : (['trainer', 'reports', 'summary'] as const),
   },
   bookings: {
     upcoming: () => ['bookings', 'upcoming'] as const,

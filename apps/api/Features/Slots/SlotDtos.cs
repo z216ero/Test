@@ -6,12 +6,16 @@ public sealed record CreateSlotRequest(
     string? SlotType = null,
     int? CapacityMax = null,
     int? CapacityMin = null,
-    bool AutoCancelIfMinNotReached = false);
+    bool AutoCancelIfMinNotReached = false,
+    Guid? AssignToTrainerClientId = null,
+    Guid? AssignToClientId = null);
 
 public sealed record SlotDto(
     Guid Id,
     Guid TrainerId,
     Guid? BookingId,
+    Guid? ClientId,
+    Guid? TrainerClientId,
     DateTime StartsAtUtc,
     int DurationMinutes,
     string SlotType,

@@ -1,12 +1,20 @@
 using System.Data;
 using Api.Data;
 using Api.Features.Common;
+using Api.Features.Push;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Api.Features.Payments;
 
-public sealed class PaymentService(AppDbContext db)
+public sealed class PaymentService(AppDbContext db, PushService pushService)
 {
+    public PaymentService(AppDbContext db)
+        : this(db, CreateNoOpPushService(db))
+    {
+    }
+
     public async Task<ServiceResult<IReadOnlyList<PaymentListItemDto>>> GetTrainerPaymentsAsync(
         Guid trainerUserId,
         string? status,
@@ -134,6 +142,143 @@ public sealed class PaymentService(AppDbContext db)
         return ServiceResult<PaymentDto>.Success(ToDto(payment));
     }
 
+    public async Task<ServiceResult<PaymentDto>> MarkBookingPaidAsync(
+        Guid bookingId,
+        Guid trainerUserId,
+        string? role,
+        PaymentMethod method,
+        DateTime? paidAtUtc,
+        CancellationToken cancellationToken)
+    {
+        if (paidAtUtc.HasValue && paidAtUtc.Value.Kind != DateTimeKind.Utc)
+        {
+            return ServiceResult<PaymentDto>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid paidAtUtc",
+                "paidAtUtc must be in UTC.");
+        }
+
+        var trainerProfileId = await ResolveTrainerProfileIdAsync(trainerUserId, cancellationToken);
+        if (!trainerProfileId.HasValue || !string.Equals(role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
+        {
+            return ServiceResult<PaymentDto>.Fail(
+                StatusCodes.Status404NotFound,
+                "Booking not found",
+                "Booking does not exist.");
+        }
+
+        var paymentId = await BuildBasePaymentsQuery()
+            .Where(p => p.BookingId == bookingId
+                && p.Booking != null
+                && p.Booking.Slot != null
+                && p.Booking.Slot.TrainerId == trainerProfileId.Value)
+            .Select(p => (Guid?)p.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (!paymentId.HasValue)
+        {
+            return ServiceResult<PaymentDto>.Fail(
+                StatusCodes.Status404NotFound,
+                "Booking not found",
+                "Booking does not exist.");
+        }
+
+        var result = await MarkPaidInternalAsync(
+            paymentId.Value,
+            trainerProfileId.Value,
+            method,
+            paidAtUtc,
+            cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
+        {
+            await pushService.NotifyPaymentMarkedAsync(
+                result.Value.PaymentId,
+                true,
+                cancellationToken);
+        }
+
+        return result;
+    }
+
+    public async Task<ServiceResult<PaymentDto>> MarkBookingPendingAsync(
+        Guid bookingId,
+        Guid trainerUserId,
+        string? role,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
+        {
+            return ServiceResult<PaymentDto>.Fail(
+                StatusCodes.Status404NotFound,
+                "Booking not found",
+                "Booking does not exist.");
+        }
+
+        var trainerProfileId = await ResolveTrainerProfileIdAsync(trainerUserId, cancellationToken);
+        if (!trainerProfileId.HasValue)
+        {
+            return ServiceResult<PaymentDto>.Fail(
+                StatusCodes.Status404NotFound,
+                "Booking not found",
+                "Booking does not exist.");
+        }
+
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+            var payment = await db.Payments
+                .Include(p => p.Booking!)
+                .ThenInclude(b => b!.Slot)
+                .Where(p => p.BookingId == bookingId
+                    && p.Booking != null
+                    && p.Booking.Slot != null
+                    && p.Booking.Slot.TrainerId == trainerProfileId.Value)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (payment is null)
+            {
+                return ServiceResult<PaymentDto>.Fail(
+                    StatusCodes.Status404NotFound,
+                    "Booking not found",
+                    "Booking does not exist.");
+            }
+
+            if (payment.Status == PaymentStatus.Pending)
+            {
+                var current = await GetTrainerPaymentByBookingAsync(bookingId, trainerProfileId.Value, cancellationToken);
+                return current is null
+                    ? ServiceResult<PaymentDto>.Fail(StatusCodes.Status404NotFound, "Booking not found", "Booking does not exist.")
+                    : ServiceResult<PaymentDto>.Success(ToDto(current));
+            }
+
+            payment.Status = PaymentStatus.Pending;
+            payment.Method = null;
+            payment.PaidAtUtc = null;
+            payment.UpdatedAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            var updated = await GetTrainerPaymentByBookingAsync(bookingId, trainerProfileId.Value, cancellationToken);
+            if (updated is null)
+            {
+                return ServiceResult<PaymentDto>.Fail(
+                    StatusCodes.Status404NotFound,
+                    "Booking not found",
+                    "Booking does not exist.");
+            }
+
+            if (updated is not null)
+            {
+                await pushService.NotifyPaymentMarkedAsync(
+                    updated.PaymentId,
+                    false,
+                    cancellationToken);
+            }
+
+            return ServiceResult<PaymentDto>.Success(ToDto(updated));
+        });
+    }
+
     public async Task<ServiceResult<PaymentDto>> MarkPaidAsync(
         Guid paymentId,
         Guid trainerUserId,
@@ -158,97 +303,21 @@ public sealed class PaymentService(AppDbContext db)
                 "Payment does not exist.");
         }
 
-        var current = await GetTrainerPaymentAsync(paymentId, trainerProfileId.Value, cancellationToken);
-        if (current is null)
+        var result = await MarkPaidInternalAsync(
+            paymentId,
+            trainerProfileId.Value,
+            method,
+            paidAtUtc: null,
+            cancellationToken);
+        if (result.IsSuccess && result.Value is not null)
         {
-            return ServiceResult<PaymentDto>.Fail(
-                StatusCodes.Status404NotFound,
-                "Payment not found",
-                "Payment does not exist.");
+            await pushService.NotifyPaymentMarkedAsync(
+                result.Value.PaymentId,
+                true,
+                cancellationToken);
         }
 
-        if (current.Status == PaymentStatus.Paid)
-        {
-            if (current.Method == method)
-            {
-                return ServiceResult<PaymentDto>.Success(ToDto(current));
-            }
-
-            return ServiceResult<PaymentDto>.Fail(
-                StatusCodes.Status409Conflict,
-                "Payment method conflict",
-                "Payment is already marked with another method.");
-        }
-
-        if (current.Status == PaymentStatus.Refunded)
-        {
-            return ServiceResult<PaymentDto>.Fail(
-                StatusCodes.Status409Conflict,
-                "Invalid payment state",
-                "Refunded payment cannot be marked as paid.");
-        }
-
-        if (current.BookingStatus != BookingStatus.Completed)
-        {
-            return ServiceResult<PaymentDto>.Fail(
-                StatusCodes.Status409Conflict,
-                "Training is not completed",
-                "Only completed trainings can be marked as paid.");
-        }
-
-        var strategy = db.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
-        {
-            await using var transaction = await db.Database
-                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-
-            var nowUtc = DateTime.UtcNow;
-            var affectedRows = await db.Payments
-                .Where(p => p.Id == paymentId
-                    && p.Status == PaymentStatus.Pending
-                    && p.Booking != null
-                    && p.Booking.Slot != null
-                    && p.Booking.Slot.TrainerId == trainerProfileId.Value)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(x => x.Status, PaymentStatus.Paid)
-                    .SetProperty(x => x.Method, method)
-                    .SetProperty(x => x.PaidAtUtc, nowUtc)
-                    .SetProperty(x => x.UpdatedAtUtc, nowUtc), cancellationToken);
-
-            if (affectedRows == 0)
-            {
-                var latest = await GetTrainerPaymentAsync(paymentId, trainerProfileId.Value, cancellationToken);
-                if (latest is null)
-                {
-                    return ServiceResult<PaymentDto>.Fail(
-                        StatusCodes.Status404NotFound,
-                        "Payment not found",
-                        "Payment does not exist.");
-                }
-
-                if (latest.Status == PaymentStatus.Paid && latest.Method == method)
-                {
-                    return ServiceResult<PaymentDto>.Success(ToDto(latest));
-                }
-
-                return ServiceResult<PaymentDto>.Fail(
-                    StatusCodes.Status409Conflict,
-                    "Payment status conflict",
-                    "Payment status was changed. Refresh and try again.");
-            }
-
-            var updated = await GetTrainerPaymentAsync(paymentId, trainerProfileId.Value, cancellationToken);
-            if (updated is null)
-            {
-                return ServiceResult<PaymentDto>.Fail(
-                    StatusCodes.Status404NotFound,
-                    "Payment not found",
-                    "Payment does not exist.");
-            }
-
-            await transaction.CommitAsync(cancellationToken);
-            return ServiceResult<PaymentDto>.Success(ToDto(updated));
-        });
+        return result;
     }
 
     public async Task<ServiceResult<PaymentDto>> RefundAsync(
@@ -343,10 +412,16 @@ public sealed class PaymentService(AppDbContext db)
             p.Id,
             p.BookingId,
             p.Booking!.ClientId,
-            db.Users
-                .Where(u => u.Id == p.Booking.ClientId)
-                .Select(u => u.Name)
-                .FirstOrDefault(),
+            p.Booking!.TrainerClientId,
+            p.Booking.ClientId != null
+                ? db.Users
+                    .Where(u => u.Id == p.Booking.ClientId)
+                    .Select(u => u.Name)
+                    .FirstOrDefault()
+                : db.TrainerClients
+                    .Where(tc => tc.Id == p.Booking.TrainerClientId)
+                    .Select(tc => tc.DisplayName)
+                    .FirstOrDefault(),
             p.Booking.Slot!.TrainerId,
             p.Booking.Slot.StartsAtUtc,
             p.Booking.Slot.DurationMinutes,
@@ -377,6 +452,117 @@ public sealed class PaymentService(AppDbContext db)
             .Where(p => p.Id == paymentId && p.Booking!.Slot!.TrainerId == trainerProfileId);
 
         return await ProjectPayments(query).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<PaymentProjection?> GetTrainerPaymentByBookingAsync(
+        Guid bookingId,
+        Guid trainerProfileId,
+        CancellationToken cancellationToken)
+    {
+        var query = BuildBasePaymentsQuery()
+            .Where(p => p.BookingId == bookingId && p.Booking!.Slot!.TrainerId == trainerProfileId);
+
+        return await ProjectPayments(query).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<ServiceResult<PaymentDto>> MarkPaidInternalAsync(
+        Guid paymentId,
+        Guid trainerProfileId,
+        PaymentMethod method,
+        DateTime? paidAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var current = await GetTrainerPaymentAsync(paymentId, trainerProfileId, cancellationToken);
+        if (current is null)
+        {
+            return ServiceResult<PaymentDto>.Fail(
+                StatusCodes.Status404NotFound,
+                "Payment not found",
+                "Payment does not exist.");
+        }
+
+        if (current.Status == PaymentStatus.Paid)
+        {
+            if (current.Method == method)
+            {
+                return ServiceResult<PaymentDto>.Success(ToDto(current));
+            }
+
+            return ServiceResult<PaymentDto>.Fail(
+                StatusCodes.Status409Conflict,
+                "Payment method conflict",
+                "Payment is already marked with another method.");
+        }
+
+        if (current.Status == PaymentStatus.Refunded)
+        {
+            return ServiceResult<PaymentDto>.Fail(
+                StatusCodes.Status409Conflict,
+                "Invalid payment state",
+                "Refunded payment cannot be marked as paid.");
+        }
+
+        if (current.BookingStatus != BookingStatus.Completed)
+        {
+            return ServiceResult<PaymentDto>.Fail(
+                StatusCodes.Status409Conflict,
+                "Training is not completed",
+                "Only completed trainings can be marked as paid.");
+        }
+
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database
+                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+            var nowUtc = paidAtUtc ?? DateTime.UtcNow;
+            var affectedRows = await db.Payments
+                .Where(p => p.Id == paymentId
+                    && p.Status == PaymentStatus.Pending
+                    && p.Booking != null
+                    && p.Booking.Slot != null
+                    && p.Booking.Slot.TrainerId == trainerProfileId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.Status, PaymentStatus.Paid)
+                    .SetProperty(x => x.Method, method)
+                    .SetProperty(x => x.PaidAtUtc, nowUtc)
+                    .SetProperty(x => x.UpdatedAtUtc, DateTime.UtcNow), cancellationToken);
+
+            if (affectedRows == 0)
+            {
+                var latest = await GetTrainerPaymentAsync(paymentId, trainerProfileId, cancellationToken);
+                if (latest is null)
+                {
+                    return ServiceResult<PaymentDto>.Fail(
+                        StatusCodes.Status404NotFound,
+                        "Payment not found",
+                        "Payment does not exist.");
+                }
+
+                if (latest.Status == PaymentStatus.Paid && latest.Method == method)
+                {
+                    return ServiceResult<PaymentDto>.Success(ToDto(latest));
+                }
+
+                return ServiceResult<PaymentDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Payment status conflict",
+                    "Payment status was changed. Refresh and try again.");
+            }
+
+            var updated = await GetTrainerPaymentAsync(paymentId, trainerProfileId, cancellationToken);
+            if (updated is null)
+            {
+                return ServiceResult<PaymentDto>.Fail(
+                    StatusCodes.Status404NotFound,
+                    "Payment not found",
+                    "Payment does not exist.");
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return ServiceResult<PaymentDto>.Success(ToDto(updated));
+        });
     }
 
     private static bool TryParseStatus(
@@ -410,6 +596,7 @@ public sealed class PaymentService(AppDbContext db)
             payment.PaymentId,
             payment.BookingId,
             payment.ClientId,
+            payment.TrainerClientId,
             string.IsNullOrWhiteSpace(payment.ClientName) ? "Client" : payment.ClientName!,
             payment.SlotStartAtUtc,
             payment.SlotStartAtUtc.AddMinutes(payment.SlotDurationMinutes),
@@ -425,6 +612,7 @@ public sealed class PaymentService(AppDbContext db)
             payment.PaymentId,
             payment.BookingId,
             payment.ClientId,
+            payment.TrainerClientId,
             string.IsNullOrWhiteSpace(payment.ClientName) ? "Client" : payment.ClientName!,
             payment.SlotStartAtUtc,
             payment.SlotStartAtUtc.AddMinutes(payment.SlotDurationMinutes),
@@ -439,7 +627,8 @@ public sealed class PaymentService(AppDbContext db)
     private sealed record PaymentProjection(
         Guid PaymentId,
         Guid BookingId,
-        Guid ClientId,
+        Guid? ClientId,
+        Guid? TrainerClientId,
         string? ClientName,
         Guid TrainerId,
         DateTime SlotStartAtUtc,
@@ -451,4 +640,11 @@ public sealed class PaymentService(AppDbContext db)
         DateTime? PaidAtUtc,
         DateTime CreatedAtUtc,
         DateTime UpdatedAtUtc);
+
+    private static PushService CreateNoOpPushService(AppDbContext dbContext)
+    {
+        var pushOptions = Options.Create(new PushOptions());
+        var messagingClient = new FirebaseMessagingClient(pushOptions, NullLogger<FirebaseMessagingClient>.Instance);
+        return new PushService(dbContext, messagingClient, NullLogger<PushService>.Instance);
+    }
 }

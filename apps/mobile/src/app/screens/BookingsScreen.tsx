@@ -380,6 +380,7 @@ export function BookingsScreen({ navigation }: Props) {
                   trainerCityName: booking.trainerCityName,
                   trainerDistrictName: booking.trainerDistrictName,
                   trainerAvatarUrl: booking.trainerAvatarUrl,
+                  paymentStatus: booking.paymentStatus,
                 });
               }}
             >
@@ -418,6 +419,7 @@ export function BookingsScreen({ navigation }: Props) {
                   trainerCityName: booking.trainerCityName,
                   trainerDistrictName: booking.trainerDistrictName,
                   trainerAvatarUrl: booking.trainerAvatarUrl,
+                  paymentStatus: booking.paymentStatus,
                 });
               }}
             >

@@ -49,6 +49,7 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
     trainerCityName,
     trainerDistrictName,
     trainerAvatarUrl,
+    paymentStatus,
   } = route.params;
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [networkError, setNetworkError] = useState<PresentedError | null>(null);
@@ -107,6 +108,12 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
   const statusType = getBookingStatusType(slot, nowTs);
   const statusMeta = bookingStatusMeta[statusType];
   const statusLabel = t(statusMeta.labelKey);
+  const normalizedPaymentStatus = (paymentStatus ?? '').trim().toLowerCase();
+  const paymentLabel = normalizedPaymentStatus
+    ? normalizedPaymentStatus === 'paid'
+      ? t('bookings.payment.paid')
+      : t('bookings.payment.unpaid')
+    : null;
 
   const canCancel = Boolean(slot.id) && canCancelBooking(slot, nowTs);
 
@@ -236,6 +243,11 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
             <Text fontSize="$3" color="$muted">
               {dateLabel}
             </Text>
+            {paymentLabel ? (
+              <Text fontSize="$3" color="$muted">
+                {t('bookings.payment.label')}: {paymentLabel}
+              </Text>
+            ) : null}
             <XStack alignItems="center" gap="$3">
               <TrainerAvatar
                 name={trainerName}

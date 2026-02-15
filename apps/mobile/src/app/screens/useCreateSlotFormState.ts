@@ -9,12 +9,15 @@ import type {
   CreateSlotRequest,
   GetTrainersTrainerIdSlotsParams,
   SlotDto,
+  TrainerClientDto,
 } from '@generated/api';
 import { ApiError } from '@api/core';
 import { ApiTimeoutError } from '@api/fetcher';
 import { TrainerSlotsOverlapError } from '@api/trainerSlotsApi';
+import { getTrainerClientsList } from '@api/trainerClientsApi';
 import { t } from '@i18n';
 import { useAppMutation, useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
 import { useToast } from '@ui/feedback/useToast';
 import { formatTimeRangeRu } from '@utils/datetime';
 import {
@@ -40,6 +43,7 @@ export type UseCreateSlotFormStateArgs = {
   createSlot: (payload: CreateSlotRequest, options?: RequestInit) => Promise<SlotDto>;
   onAfterSuccess: (count: number) => void;
   initialDateIsoLocal?: string;
+  initialAssignTrainerClientId?: string;
 };
 
 export const MULTI_COUNTS = [2, 3, 4] as const;
@@ -162,6 +166,7 @@ export const useCreateSlotFormState = ({
   createSlot,
   onAfterSuccess,
   initialDateIsoLocal,
+  initialAssignTrainerClientId,
 }: UseCreateSlotFormStateArgs) => {
   const { showToast } = useToast();
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -183,6 +188,13 @@ export const useCreateSlotFormState = ({
   const [pickerVisible, setPickerVisible] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [groupEnabled, setGroupEnabled] = useState(false);
+  const [assignmentMode, setAssignmentMode] = useState<'open' | 'assigned'>(
+    initialAssignTrainerClientId ? 'assigned' : 'open'
+  );
+  const [selectedTrainerClientId, setSelectedTrainerClientId] = useState<string | null>(
+    initialAssignTrainerClientId ?? null
+  );
+  const [trainerClientSearch, setTrainerClientSearch] = useState('');
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false);
   const [groupCapacityMin, setGroupCapacityMin] = useState(2);
   const [groupCapacityMax, setGroupCapacityMax] = useState(10);
@@ -270,6 +282,52 @@ export const useCreateSlotFormState = ({
     queryKey: buildQueryKey(dateRange),
     queryFn: ({ signal }) => loadSlots(dateRange, { signal }),
   });
+
+  const trainerClientsQuery = useAppQuery({
+    queryKey: keys.trainerClients.list({ status: 'Active' }),
+    queryFn: ({ signal }) => getTrainerClientsList({ status: 'Active' }, { signal }),
+  });
+
+  useEffect(() => {
+    if (!initialAssignTrainerClientId) {
+      return;
+    }
+    setAssignmentMode('assigned');
+    setSelectedTrainerClientId(initialAssignTrainerClientId);
+  }, [initialAssignTrainerClientId]);
+
+  useEffect(() => {
+    if (assignmentMode === 'assigned' && groupEnabled) {
+      setGroupEnabled(false);
+    }
+  }, [assignmentMode, groupEnabled]);
+
+  useEffect(() => {
+    if (assignmentMode === 'assigned' && multiEnabled) {
+      setMultiEnabled(false);
+      setMultiCount(MULTI_COUNTS[0]);
+    }
+  }, [assignmentMode, multiEnabled]);
+
+  const trainerClients = useMemo(
+    () => trainerClientsQuery.data ?? [],
+    [trainerClientsQuery.data]
+  );
+  const filteredTrainerClients = useMemo(() => {
+    const query = trainerClientSearch.trim().toLowerCase();
+    if (!query) {
+      return trainerClients;
+    }
+    return trainerClients.filter((item) =>
+      (item.displayName ?? '').toLowerCase().includes(query)
+    );
+  }, [trainerClientSearch, trainerClients]);
+
+  const selectedTrainerClient = useMemo<TrainerClientDto | null>(
+    () =>
+      trainerClients.find((item) => item.id && item.id === selectedTrainerClientId) ?? null,
+    [selectedTrainerClientId, trainerClients]
+  );
 
   const blockingSlots = useMemo(() => {
     return (slotsQuery.data ?? []).reduce<LocalSlotRange[]>((acc, slot) => {
@@ -390,6 +448,8 @@ export const useCreateSlotFormState = ({
     !!selectedStart
     && selectionAvailable
     && isGroupCapacityValid
+    && (assignmentMode === 'open' || Boolean(selectedTrainerClientId))
+    && (assignmentMode === 'open' || !trainerClientsQuery.isLoading)
     && !slotsQuery.isLoading
     && !slotsQuery.error;
 
@@ -442,6 +502,19 @@ export const useCreateSlotFormState = ({
       onAfterSuccess(count);
     },
     onError: (error) => {
+      const conflictCode = (() => {
+        if (!(error instanceof ApiError) || !error.details || typeof error.details !== 'object') {
+          return null;
+        }
+        const code = (error.details as { errorCode?: unknown }).errorCode;
+        return typeof code === 'string' ? code : null;
+      })();
+
+      if (conflictCode === 'booking_time_conflict') {
+        setApiError(t('createSlot.errorClientTimeConflict'));
+        return;
+      }
+
       if (
         error instanceof TrainerSlotsOverlapError
         || (error instanceof ApiError && error.status === 409)
@@ -476,7 +549,11 @@ export const useCreateSlotFormState = ({
   });
 
   const handleCreate = async () => {
-    if (!selectedStart || !selectionAvailable) {
+    if (
+      !selectedStart
+      || !selectionAvailable
+      || (assignmentMode === 'assigned' && !selectedTrainerClientId)
+    ) {
       return;
     }
 
@@ -488,6 +565,9 @@ export const useCreateSlotFormState = ({
       capacityMin: groupEnabled ? groupCapacityMin : null,
       capacityMax: groupEnabled ? groupCapacityMax : null,
       autoCancelIfMinNotReached: groupEnabled ? groupAutoCancelIfMinNotReached : false,
+      assignToTrainerClientId:
+        !groupEnabled && assignmentMode === 'assigned' ? selectedTrainerClientId : null,
+      assignToClientId: null,
     }));
 
     try {
@@ -525,6 +605,15 @@ export const useCreateSlotFormState = ({
     slotCount,
     groupEnabled,
     setGroupEnabled,
+    assignmentMode,
+    setAssignmentMode,
+    selectedTrainerClientId,
+    setSelectedTrainerClientId,
+    trainerClientSearch,
+    setTrainerClientSearch,
+    filteredTrainerClients,
+    selectedTrainerClient,
+    trainerClientsQuery,
     groupSettingsOpen,
     setGroupSettingsOpen,
     groupCapacityMin,

@@ -12,12 +12,16 @@ type Props = BottomTabScreenProps<TrainerTabsParamList, 'CreateSlot'>;
 export function CreateSlotTabScreen({ navigation, route }: Props) {
   const queryClient = useQueryClient();
   const initialDateIsoLocal = route.params?.initialDateIsoLocal;
+  const initialAssignTrainerClientId = route.params?.assignTrainerClientId;
 
   useEffect(() => {
-    if (initialDateIsoLocal) {
-      navigation.setParams({ initialDateIsoLocal: undefined });
+    if (initialDateIsoLocal || initialAssignTrainerClientId) {
+      navigation.setParams({
+        initialDateIsoLocal: undefined,
+        assignTrainerClientId: undefined,
+      });
     }
-  }, [initialDateIsoLocal, navigation]);
+  }, [initialAssignTrainerClientId, initialDateIsoLocal, navigation]);
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -30,6 +34,7 @@ export function CreateSlotTabScreen({ navigation, route }: Props) {
   const handleSuccess = () => {
     queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
     queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+    queryClient.invalidateQueries({ queryKey: keys.reports.summary() });
     navigation.navigate('Schedule', { screen: 'ScheduleHome' });
   };
 
@@ -42,6 +47,7 @@ export function CreateSlotTabScreen({ navigation, route }: Props) {
       loadSlots={(params, options) => getMyTrainerSlots(params, options)}
       createSlot={(payload, options) => createSlot(payload, options)}
       initialDateIsoLocal={initialDateIsoLocal}
+      initialAssignTrainerClientId={initialAssignTrainerClientId}
     />
   );
 }

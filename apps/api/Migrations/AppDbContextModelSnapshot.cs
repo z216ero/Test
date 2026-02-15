@@ -148,7 +148,7 @@ namespace Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("ClientId")
+                    b.Property<Guid?>("ClientId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -166,12 +166,25 @@ namespace Api.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Booked");
 
+                    b.Property<Guid?>("TrainerClientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
 
                     b.HasIndex("SlotId")
                         .IsUnique();
 
-                    b.ToTable("bookings", (string)null);
+                    b.HasIndex("TrainerClientId");
+
+                    b.ToTable("bookings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_bookings_client_or_trainer_client", "(\"ClientId\" IS NULL) <> (\"TrainerClientId\" IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Api.Data.City", b =>
@@ -444,7 +457,7 @@ namespace Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("ClientId")
+                    b.Property<Guid?>("ClientId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -462,6 +475,9 @@ namespace Api.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Booked");
 
+                    b.Property<Guid?>("TrainerClientId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -472,9 +488,76 @@ namespace Api.Migrations
                     b.HasIndex("ClientId", "Status");
 
                     b.HasIndex("SlotId", "ClientId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"ClientId\" IS NOT NULL");
 
-                    b.ToTable("slot_attendees", (string)null);
+                    b.HasIndex("SlotId", "TrainerClientId")
+                        .IsUnique()
+                        .HasFilter("\"TrainerClientId\" IS NOT NULL");
+
+                    b.HasIndex("TrainerClientId", "Status");
+
+                    b.ToTable("slot_attendees", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_slot_attendees_client_or_trainer_client", "(\"ClientId\" IS NULL) <> (\"TrainerClientId\" IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Api.Data.TrainerClient", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now() at time zone 'utc'");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("LinkedUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<Guid>("TrainerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkedUserId");
+
+                    b.HasIndex("TrainerId");
+
+                    b.HasIndex("TrainerId", "LinkedUserId")
+                        .IsUnique()
+                        .HasFilter("\"LinkedUserId\" IS NOT NULL");
+
+                    b.HasIndex("TrainerId", "Phone")
+                        .IsUnique()
+                        .HasFilter("\"Phone\" IS NOT NULL");
+
+                    b.ToTable("trainer_clients", (string)null);
                 });
 
             modelBuilder.Entity("Api.Data.TrainerProfile", b =>
@@ -755,7 +838,14 @@ namespace Api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Api.Data.TrainerClient", "TrainerClient")
+                        .WithMany()
+                        .HasForeignKey("TrainerClientId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Slot");
+
+                    b.Navigation("TrainerClient");
                 });
 
             modelBuilder.Entity("Api.Data.ClientProfile", b =>
@@ -835,7 +925,32 @@ namespace Api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Api.Data.TrainerClient", "TrainerClient")
+                        .WithMany()
+                        .HasForeignKey("TrainerClientId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Slot");
+
+                    b.Navigation("TrainerClient");
+                });
+
+            modelBuilder.Entity("Api.Data.TrainerClient", b =>
+                {
+                    b.HasOne("Api.Data.AppUser", "LinkedUser")
+                        .WithMany()
+                        .HasForeignKey("LinkedUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Api.Data.TrainerProfile", "TrainerProfile")
+                        .WithMany("TrainerClients")
+                        .HasForeignKey("TrainerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LinkedUser");
+
+                    b.Navigation("TrainerProfile");
                 });
 
             modelBuilder.Entity("Api.Data.TrainerProfile", b =>
@@ -958,6 +1073,8 @@ namespace Api.Migrations
             modelBuilder.Entity("Api.Data.TrainerProfile", b =>
                 {
                     b.Navigation("Slots");
+
+                    b.Navigation("TrainerClients");
                 });
 
             modelBuilder.Entity("Api.Data.TrainingSlot", b =>

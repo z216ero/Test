@@ -59,7 +59,8 @@ public sealed class GroupSlotAutoCancellationService(
             if (bookedAttendees.Count < slot.CapacityMin.Value)
             {
                 var clientIds = bookedAttendees
-                    .Select(attendee => attendee.ClientId)
+                    .Where(attendee => attendee.ClientId.HasValue)
+                    .Select(attendee => attendee.ClientId!.Value)
                     .Distinct()
                     .ToList();
 

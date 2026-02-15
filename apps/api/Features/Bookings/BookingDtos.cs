@@ -1,13 +1,15 @@
 namespace Api.Features.Bookings;
 
-public sealed record BookSlotRequest(Guid ClientId);
+public sealed record BookSlotRequest(Guid? ClientId);
 
 public sealed record BookingDto(
     Guid Id,
     Guid SlotId,
-    Guid ClientId,
+    Guid? ClientId,
+    Guid? TrainerClientId,
     string Status,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    DateTime? UpdatedAtUtc);
 
 public sealed record CloseBookingRequest(
     string? Attendance,

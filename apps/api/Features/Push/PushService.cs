@@ -137,6 +137,7 @@ public sealed class PushService(
                     cancellationToken);
 
                 await SafeSendToUserAsync(trainerUserId, UserRoles.Trainer, payload, cancellationToken);
+                await SafeSendToUserAsync(clientId, UserRoles.Client, payload, cancellationToken);
             });
     }
 
@@ -257,6 +258,60 @@ public sealed class PushService(
             });
     }
 
+    public async Task NotifyPaymentMarkedAsync(
+        Guid paymentId,
+        bool markedPaid,
+        CancellationToken cancellationToken)
+    {
+        var eventType = markedPaid
+            ? PushEventTypes.PaymentMarkedPaid
+            : PushEventTypes.PaymentMarkedPending;
+
+        await SafeNotifyAsync(
+            eventType,
+            async () =>
+            {
+                var payment = await db.Payments
+                    .AsNoTracking()
+                    .Where(p => p.Id == paymentId)
+                    .Select(p => new
+                    {
+                        p.Id,
+                        p.BookingId,
+                        p.Booking!.ClientId,
+                        p.Booking.TrainerClientId,
+                        SlotId = p.Booking.SlotId,
+                        TrainerId = p.Booking.Slot!.TrainerId,
+                        StartsAtUtc = p.Booking.Slot.StartsAtUtc
+                    })
+                    .FirstOrDefaultAsync(cancellationToken);
+                if (payment is null)
+                {
+                    return;
+                }
+
+                var trainerUserId = await GetTrainerUserIdAsync(payment.TrainerId, cancellationToken);
+                var payload = await BuildPayloadAsync(
+                    eventType,
+                    payment.SlotId,
+                    payment.TrainerId,
+                    payment.ClientId,
+                    payment.StartsAtUtc,
+                    trainerUserId,
+                    cancellationReason: null,
+                    cancellationToken,
+                    bookingId: payment.BookingId,
+                    paymentId: payment.Id,
+                    trainerClientId: payment.TrainerClientId);
+
+                await SafeSendToUserAsync(trainerUserId, UserRoles.Trainer, payload, cancellationToken);
+                if (payment.ClientId.HasValue)
+                {
+                    await SafeSendToUserAsync(payment.ClientId.Value, UserRoles.Client, payload, cancellationToken);
+                }
+            });
+    }
+
     public async Task<bool> TryNotifyTrainingReminderAsync(
         Guid slotId,
         Guid trainerId,
@@ -329,6 +384,8 @@ public sealed class PushService(
             PushEventTypes.BookingCancelled => UserRoles.Client,
             PushEventTypes.SlotCancelledByTrainer => UserRoles.Trainer,
             PushEventTypes.AttendanceMarked => UserRoles.Trainer,
+            PushEventTypes.PaymentMarkedPaid => UserRoles.Trainer,
+            PushEventTypes.PaymentMarkedPending => UserRoles.Trainer,
             PushEventTypes.TrainingReminder => UserRoles.Trainer,
             _ => UserRoles.Client
         };
@@ -346,7 +403,10 @@ public sealed class PushService(
         DateTime startsAtUtc,
         Guid? trainerUserId,
         string? cancellationReason,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? bookingId = null,
+        Guid? paymentId = null,
+        Guid? trainerClientId = null)
     {
         var slotDurationMinutes = await db.TrainingSlots
             .AsNoTracking()
@@ -364,6 +424,9 @@ public sealed class PushService(
             slotId,
             trainerId,
             clientId,
+            trainerClientId,
+            bookingId,
+            paymentId,
             startsAtUtc,
             slotDurationMinutes,
             actorName,
@@ -522,6 +585,22 @@ public sealed class PushService(
         if (payload.ClientId.HasValue)
         {
             data["clientId"] = payload.ClientId.Value.ToString();
+            data["clientUserId"] = payload.ClientId.Value.ToString();
+        }
+
+        if (payload.TrainerClientId.HasValue)
+        {
+            data["trainerClientId"] = payload.TrainerClientId.Value.ToString();
+        }
+
+        if (payload.BookingId.HasValue)
+        {
+            data["bookingId"] = payload.BookingId.Value.ToString();
+        }
+
+        if (payload.PaymentId.HasValue)
+        {
+            data["paymentId"] = payload.PaymentId.Value.ToString();
         }
 
         if (payload.StartsAtUtc.HasValue)
@@ -587,6 +666,16 @@ public sealed class PushService(
             {
                 Title = "\u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0438",
                 Body = "\u0421\u0442\u0430\u0442\u0443\u0441 \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0438 \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D"
+            },
+            PushEventTypes.PaymentMarkedPaid => new Notification
+            {
+                Title = "\u041E\u043F\u043B\u0430\u0442\u0430 \u043E\u0442\u043C\u0435\u0447\u0435\u043D\u0430",
+                Body = "\u0421\u0442\u0430\u0442\u0443\u0441 \u043E\u043F\u043B\u0430\u0442\u044B \u0438\u0437\u043C\u0435\u043D\u0451\u043D \u043D\u0430 \u00AB\u041E\u043F\u043B\u0430\u0447\u0435\u043D\u043E\u00BB"
+            },
+            PushEventTypes.PaymentMarkedPending => new Notification
+            {
+                Title = "\u041E\u043F\u043B\u0430\u0442\u0430 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
+                Body = "\u0421\u0442\u0430\u0442\u0443\u0441 \u043E\u043F\u043B\u0430\u0442\u044B \u0438\u0437\u043C\u0435\u043D\u0451\u043D \u043D\u0430 \u00AB\u0412 \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u0438\u00BB"
             },
             PushEventTypes.TrainingReminder => new Notification
             {
@@ -675,6 +764,9 @@ public sealed class PushService(
         Guid SlotId,
         Guid? TrainerId,
         Guid? ClientId,
+        Guid? TrainerClientId,
+        Guid? BookingId,
+        Guid? PaymentId,
         DateTime? StartsAtUtc,
         int? SlotDurationMinutes,
         string ActorName,

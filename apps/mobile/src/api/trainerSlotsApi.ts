@@ -17,7 +17,7 @@ import {
   postSlotsSlotIdCancel,
   postSlotsSlotIdComplete,
   postSlotsSlotIdNoShow,
-  postTrainersTrainerIdSlots,
+  postTrainersMeSlots,
 } from '@generated/api';
 import { t } from '@i18n';
 import { ApiError, unwrap } from './core';
@@ -27,7 +27,7 @@ export class TrainerSlotsOverlapError extends ApiError {}
 export class TrainerSlotsNotFoundError extends ApiError {}
 export class TrainerSlotsConflictError extends ApiError {}
 export type AttendanceCloseStatus = 'Completed' | 'NoShow';
-export type PaymentMethod = 'Cash' | 'Transfer' | 'SBP';
+export type PaymentMethod = 'Cash' | 'Transfer' | 'SBP' | 'Other';
 
 let cachedTrainerId: string | null = null;
 
@@ -184,12 +184,7 @@ export const createSlot = async (
   options?: RequestInit
 ): Promise<SlotDto> => {
   try {
-    const trainerId = await getTrainerId(options);
-    const response = await postTrainersTrainerIdSlots(
-      trainerId,
-      payload,
-      options
-    );
+    const response = await postTrainersMeSlots(payload, options);
     return unwrap<SlotDto>(response, t('errors.generic'));
   } catch (error) {
     throw mapCreateSlotError(error);

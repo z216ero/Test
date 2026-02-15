@@ -20,12 +20,13 @@ public sealed class TrainingReminderService(
         var individualCandidates = await db.Bookings
             .AsNoTracking()
             .Where(booking => booking.Status == BookingStatus.Booked
+                && booking.ClientId.HasValue
                 && booking.Slot != null
                 && booking.Slot.Status != TrainingSlotStatus.Cancelled
                 && booking.Slot.StartsAtUtc > nowUtc
                 && booking.Slot.StartsAtUtc <= latestSlotStartUtc)
             .Select(booking => new ReminderCandidate(
-                booking.ClientId,
+                booking.ClientId!.Value,
                 booking.SlotId,
                 booking.Slot!.TrainerId,
                 booking.Slot.StartsAtUtc))
@@ -34,12 +35,13 @@ public sealed class TrainingReminderService(
         var groupCandidates = await db.SlotAttendees
             .AsNoTracking()
             .Where(attendee => attendee.Status == SlotAttendeeStatus.Booked
+                && attendee.ClientId.HasValue
                 && attendee.Slot != null
                 && attendee.Slot.Status != TrainingSlotStatus.Cancelled
                 && attendee.Slot.StartsAtUtc > nowUtc
                 && attendee.Slot.StartsAtUtc <= latestSlotStartUtc)
             .Select(attendee => new ReminderCandidate(
-                attendee.ClientId,
+                attendee.ClientId!.Value,
                 attendee.SlotId,
                 attendee.Slot!.TrainerId,
                 attendee.Slot.StartsAtUtc))

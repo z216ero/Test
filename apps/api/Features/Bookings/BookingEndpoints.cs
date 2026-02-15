@@ -14,26 +14,27 @@ public static class BookingEndpoints
         group.MapPost("/book", async (
             Guid slotId,
             BookSlotRequest? request,
+            HttpContext httpContext,
             BookingService service,
             CancellationToken cancellationToken) =>
         {
-            if (request is null)
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
             {
-                return Problems.BadRequest(
-                    "Invalid request",
-                    "Request body is required.");
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
             }
 
-            if (request.ClientId == Guid.Empty)
+            var role = AuthClaims.GetRole(httpContext.User);
+            if (!string.Equals(role, UserRoles.Client, StringComparison.OrdinalIgnoreCase))
             {
-                var errors = new Dictionary<string, string[]>
-                {
-                    ["clientId"] = new[] { "ClientId is required." }
-                };
-                return Problems.Validation(errors);
+                return TypedResults.Problem(
+                    title: "Forbidden",
+                    detail: "Only clients can book slots.",
+                    statusCode: StatusCodes.Status403Forbidden,
+                    type: "https://errors.trainerapp/forbidden");
             }
 
-            var result = await service.BookSlotAsync(slotId, request, cancellationToken);
+            request ??= new BookSlotRequest(null);
+            var result = await service.BookSlotAsync(slotId, userId, request, cancellationToken);
             if (!result.IsSuccess)
             {
                 return Problems.FromServiceError(result.Error!);
@@ -43,8 +44,11 @@ public static class BookingEndpoints
         })
         .Produces<SlotDto>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status404NotFound)
-        .ProducesProblem(StatusCodes.Status409Conflict);
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .RequireAuthorization();
 
         group.MapPost("/cancel", async (
             Guid slotId,
@@ -76,11 +80,20 @@ public static class BookingEndpoints
 
         group.MapPost("/complete", async (
             Guid slotId,
+            HttpContext httpContext,
             BookingService service,
             CancellationToken cancellationToken) =>
         {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
             var result = await service.MarkAttendanceAsync(
                 slotId,
+                userId,
+                role,
                 BookingStatus.Completed,
                 cancellationToken);
 
@@ -93,16 +106,28 @@ public static class BookingEndpoints
         })
         .Produces<BookingDto>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status404NotFound)
-        .ProducesProblem(StatusCodes.Status409Conflict);
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .RequireAuthorization();
 
         group.MapPost("/no-show", async (
             Guid slotId,
+            HttpContext httpContext,
             BookingService service,
             CancellationToken cancellationToken) =>
         {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
             var result = await service.MarkAttendanceAsync(
                 slotId,
+                userId,
+                role,
                 BookingStatus.NoShow,
                 cancellationToken);
 
@@ -115,8 +140,11 @@ public static class BookingEndpoints
         })
         .Produces<BookingDto>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status404NotFound)
-        .ProducesProblem(StatusCodes.Status409Conflict);
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .RequireAuthorization();
 
         group.MapPost("/attendees/{clientId:guid}/complete", async (
             Guid slotId,
@@ -240,7 +268,7 @@ public static class BookingEndpoints
                 {
                     var errors = new Dictionary<string, string[]>
                     {
-                        ["payment.method"] = new[] { "Method must be Cash, Transfer or SBP when markPaid is true." }
+                        ["payment.method"] = new[] { "Method must be Cash, Transfer, SBP or Other when markPaid is true." }
                     };
                     return Problems.Validation(errors);
                 }

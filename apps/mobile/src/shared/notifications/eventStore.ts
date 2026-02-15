@@ -109,6 +109,18 @@ export const buildEventText = (input: NotificationEventInput): {
         description,
       };
     }
+    case 'payment_marked_paid': {
+      return {
+        title: 'Оплата отмечена',
+        description: withTime('Статус оплаты изменён на «Оплачено»'),
+      };
+    }
+    case 'payment_marked_pending': {
+      return {
+        title: 'Оплата обновлена',
+        description: withTime('Статус оплаты изменён на «В ожидании»'),
+      };
+    }
     default: {
       const description = slotTimeRange
         ? `Есть обновление (${slotTimeRange})`

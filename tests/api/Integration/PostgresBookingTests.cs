@@ -63,7 +63,8 @@ public sealed class PostgresBookingTests : IClassFixture<PostgresFixture>
                 await start.Task;
                 await using var db = _fixture.CreateDbContext();
                 var service = new BookingService(db);
-                return await service.BookSlotAsync(slotId, new BookSlotRequest(Guid.NewGuid()), CancellationToken.None);
+                var clientId = Guid.NewGuid();
+                return await service.BookSlotAsync(slotId, clientId, new BookSlotRequest(clientId), CancellationToken.None);
             }
 
             var firstTask = AttemptAsync();

@@ -79,6 +79,86 @@ public static class PaymentEndpoints
         .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status404NotFound);
 
+        bookingGroup.MapPost("/{bookingId:guid}/payment/mark-paid", async (
+            Guid bookingId,
+            MarkBookingPaymentPaidRequest? request,
+            HttpContext httpContext,
+            PaymentService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            if (request is null || string.IsNullOrWhiteSpace(request.Method))
+            {
+                var errors = new Dictionary<string, string[]>
+                {
+                    ["method"] = new[] { "Method is required." }
+                };
+                return Problems.Validation(errors);
+            }
+
+            if (!Enum.TryParse<PaymentMethod>(request.Method, true, out var method))
+            {
+                var errors = new Dictionary<string, string[]>
+                {
+                    ["method"] = new[] { "Method must be Cash, Transfer, SBP or Other." }
+                };
+                return Problems.Validation(errors);
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            var result = await service.MarkBookingPaidAsync(
+                bookingId,
+                userId,
+                role,
+                method,
+                request.PaidAtUtc,
+                cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .Produces<PaymentDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
+
+        bookingGroup.MapPost("/{bookingId:guid}/payment/mark-pending", async (
+            Guid bookingId,
+            HttpContext httpContext,
+            PaymentService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            var result = await service.MarkBookingPendingAsync(
+                bookingId,
+                userId,
+                role,
+                cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .Produces<PaymentDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
+
         var paymentsGroup = app.MapGroup("/payments")
             .WithTags("Payments")
             .RequireAuthorization();
@@ -108,7 +188,7 @@ public static class PaymentEndpoints
             {
                 var errors = new Dictionary<string, string[]>
                 {
-                    ["method"] = new[] { "Method must be Cash, Transfer or SBP." }
+                    ["method"] = new[] { "Method must be Cash, Transfer, SBP or Other." }
                 };
                 return Problems.Validation(errors);
             }

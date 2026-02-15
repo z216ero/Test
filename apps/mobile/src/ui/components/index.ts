@@ -1,5 +1,6 @@
 export { Avatar } from './Avatar';
 export { FormInput } from './FormInput';
+export { PhoneInput } from './PhoneInput';
 export { IOSDatePickerCard } from './IOSDatePickerCard';
 export { PrimaryButton } from './PrimaryButton';
 export { SecondaryButton } from './SecondaryButton';

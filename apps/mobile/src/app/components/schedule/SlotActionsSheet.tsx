@@ -46,7 +46,7 @@ type SlotActionsSheetProps = {
   ) => void;
 };
 
-const paymentMethods: PaymentMethod[] = ['Cash', 'Transfer', 'SBP'];
+const paymentMethods: PaymentMethod[] = ['Cash', 'Transfer', 'SBP', 'Other'];
 
 const paymentMethodLabel = (method: PaymentMethod): string => {
   if (method === 'Cash') {
@@ -55,7 +55,10 @@ const paymentMethodLabel = (method: PaymentMethod): string => {
   if (method === 'Transfer') {
     return t('payments.method.transfer');
   }
-  return t('payments.method.sbp');
+  if (method === 'SBP') {
+    return t('payments.method.sbp');
+  }
+  return t('payments.method.other');
 };
 
 export function SlotActionsSheet({

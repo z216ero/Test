@@ -29,7 +29,7 @@ export function PaymentMethodSheet({
       open={open}
       onOpenChange={onOpenChange}
       dismissOnSnapToBottom
-      snapPoints={[50]}
+      snapPoints={[55]}
       dismissOnOverlayPress={!isSubmitting}
     >
       <Sheet.Overlay

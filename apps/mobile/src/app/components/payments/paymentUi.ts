@@ -54,9 +54,11 @@ export const paymentMethodLabel = (method: string | null | undefined): string =>
       return t('payments.method.transfer');
     case 'SBP':
       return t('payments.method.sbp');
+    case 'Other':
+      return t('payments.method.other');
     default:
       return t('payments.method.unknown');
   }
 };
 
-export const paymentMethods: PaymentMethod[] = ['Cash', 'Transfer', 'SBP'];
+export const paymentMethods: PaymentMethod[] = ['Cash', 'Transfer', 'SBP', 'Other'];

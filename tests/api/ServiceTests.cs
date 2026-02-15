@@ -419,8 +419,10 @@ public sealed class ServiceTests
         await db.SaveChangesAsync();
 
         var service = new BookingService(db);
-        var first = await service.BookSlotAsync(slotId, new BookSlotRequest(Guid.NewGuid()), CancellationToken.None);
-        var second = await service.BookSlotAsync(slotId, new BookSlotRequest(Guid.NewGuid()), CancellationToken.None);
+        var firstClientId = Guid.NewGuid();
+        var secondClientId = Guid.NewGuid();
+        var first = await service.BookSlotAsync(slotId, firstClientId, new BookSlotRequest(firstClientId), CancellationToken.None);
+        var second = await service.BookSlotAsync(slotId, secondClientId, new BookSlotRequest(secondClientId), CancellationToken.None);
 
         Assert.True(first.IsSuccess);
         Assert.False(second.IsSuccess);
@@ -448,7 +450,7 @@ public sealed class ServiceTests
 
         var clientId = Guid.NewGuid();
         var service = new BookingService(db);
-        var result = await service.BookSlotAsync(slotId, new BookSlotRequest(clientId), CancellationToken.None);
+        var result = await service.BookSlotAsync(slotId, clientId, new BookSlotRequest(clientId), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
 
@@ -578,7 +580,7 @@ public sealed class ServiceTests
     }
 
     [Fact]
-    public async Task CancelSlotAsync_WhenBooked_DeletesBooking_AndSetsSlotOpen()
+    public async Task CancelSlotAsync_WhenBooked_MarksBookingCancelled_AndSetsSlotOpen()
     {
         await using var db = CreateDbContext();
         var (trainerId, _) = await SeedTrainerAsync(db);
@@ -616,10 +618,11 @@ public sealed class ServiceTests
         Assert.True(result.IsSuccess);
 
         var slot = await db.TrainingSlots.FirstAsync(s => s.Id == slotId);
-        var bookingExists = await db.Bookings.AnyAsync(b => b.SlotId == slotId);
+        var booking = await db.Bookings.FirstOrDefaultAsync(b => b.SlotId == slotId);
 
         Assert.Equal(TrainingSlotStatus.Open, slot.Status);
-        Assert.False(bookingExists);
+        Assert.NotNull(booking);
+        Assert.Equal(BookingStatus.Cancelled, booking!.Status);
     }
 
     [Fact]

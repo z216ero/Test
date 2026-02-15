@@ -422,6 +422,8 @@ public sealed class ClientService(AppDbContext db)
             slot.Id,
             slot.TrainerId,
             slot.Booking?.Id,
+            slot.Booking?.ClientId,
+            slot.Booking?.TrainerClientId,
             slot.StartsAtUtc,
             slot.DurationMinutes,
             slot.SlotType.ToString(),

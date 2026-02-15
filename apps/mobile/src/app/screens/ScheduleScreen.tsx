@@ -387,6 +387,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
       queryClient.invalidateQueries({ queryKey: keys.payments.all() });
+      queryClient.invalidateQueries({ queryKey: keys.reports.summary() });
       refetch();
       closeSheet();
     },
@@ -443,6 +444,8 @@ export function ScheduleScreen({ navigation, route }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+      queryClient.invalidateQueries({ queryKey: keys.reports.summary() });
+      queryClient.invalidateQueries({ queryKey: keys.payments.all() });
       refetch();
       closeSheet();
     },

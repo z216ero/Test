@@ -22,6 +22,9 @@ import { ScheduleScreen } from '@app/screens/ScheduleScreen';
 import { SlotsScreen } from '@app/screens/SlotsScreen';
 import { TrainerSlotDetailsScreen } from '@app/screens/TrainerSlotDetailsScreen';
 import { TrainerAttendanceQueueScreen } from '@app/screens/TrainerAttendanceQueueScreen';
+import { TrainerClientsScreen } from '@app/screens/TrainerClientsScreen';
+import { TrainerClientFormScreen } from '@app/screens/TrainerClientFormScreen';
+import { TrainerReportScreen } from '@app/screens/TrainerReportScreen';
 import type {
   ClientTabsParamList,
   AuthStackParamList,
@@ -60,6 +63,9 @@ const ProfileStackNavigator = () => (
     <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} />
     <ProfileStack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
     <ProfileStack.Screen name="Notifications" component={NotificationsScreen} />
+    <ProfileStack.Screen name="TrainerClients" component={TrainerClientsScreen} />
+    <ProfileStack.Screen name="TrainerClientForm" component={TrainerClientFormScreen} />
+    <ProfileStack.Screen name="TrainerReport" component={TrainerReportScreen} />
     <ProfileStack.Screen name="LocationSearch" component={LocationSearchScreen} />
   </ProfileStack.Navigator>
 );

@@ -25,6 +25,7 @@ import { t } from '@i18n';
 import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
 import { useToast } from '@ui/feedback/useToast';
+import { AppIcon } from '@ui/AppIcon';
 import { TabScrollView } from '@ui/layout/TabScrollView';
 import { EmptyState } from '@ui/states/EmptyState';
 import { ErrorState } from '@ui/states/ErrorState';
@@ -237,6 +238,14 @@ export function TrainerAttendanceQueueScreen({ navigation }: Props) {
     }
   }, [refetch]);
 
+  const handleBackToSchedule = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('ScheduleHome');
+  }, [navigation]);
+
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
       <TabScrollView
@@ -252,9 +261,14 @@ export function TrainerAttendanceQueueScreen({ navigation }: Props) {
         extraBottom={48}
       >
         <YStack gap="$4">
-          <Text fontSize="$8" fontWeight="700" color="$text">
-            {t('attendanceQueue.title')}
-          </Text>
+          <XStack alignItems="center" gap="$2">
+            <Button unstyled onPress={handleBackToSchedule}>
+              <AppIcon name="chevronLeft" size={18} color="$muted" />
+            </Button>
+            <Text fontSize="$8" fontWeight="700" color="$text">
+              {t('attendanceQueue.title')}
+            </Text>
+          </XStack>
           <XStack
             padding="$1"
             backgroundColor="$surfaceMuted"

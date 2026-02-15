@@ -69,7 +69,20 @@ export function ProfileScreen({ navigation }: Props) {
       onPress: () => navigation.navigate('PersonalInfo'),
     },
     ...(role === 'Trainer'
-      ? []
+      ? [
+          {
+            id: 'trainer-clients',
+            label: t('profile.settings.clients'),
+            icon: 'users' as const,
+            onPress: () => navigation.navigate('TrainerClients'),
+          },
+          {
+            id: 'reports',
+            label: t('profile.settings.reports'),
+            icon: 'history' as const,
+            onPress: () => navigation.navigate('TrainerReport'),
+          },
+        ]
       : [
           {
             id: 'schedule',
