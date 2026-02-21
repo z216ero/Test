@@ -277,4 +277,53 @@ export const getClientBookingHistory = async (
   return enrichPaymentStatuses(bookings, options);
 };
 
+type PendingCountPayload = {
+  count: number;
+};
+
+export const confirmClientBooking = async (
+  bookingId: string,
+  options?: RequestInit
+): Promise<void> => {
+  const response = await customFetch<{ status: number; data: unknown }>(
+    `/client/bookings/${bookingId}/confirm`,
+    {
+      ...options,
+      method: 'POST',
+    }
+  );
+  unwrap(response, t('errors.generic'));
+};
+
+export const declineClientBooking = async (
+  bookingId: string,
+  options?: RequestInit
+): Promise<void> => {
+  const response = await customFetch<{ status: number; data: unknown }>(
+    `/client/bookings/${bookingId}/decline`,
+    {
+      ...options,
+      method: 'POST',
+    }
+  );
+  unwrap(response, t('errors.generic'));
+};
+
+export const getPendingBookingConfirmationsCount = async (
+  options?: RequestInit
+): Promise<number> => {
+  const response = await customFetch<{ status: number; data: unknown }>(
+    '/client/me/pending-booking-confirmations/count',
+    {
+      ...options,
+      method: 'GET',
+    }
+  );
+  const payload = unwrap<PendingCountPayload>(
+    response,
+    t('errors.generic')
+  );
+  return payload.count ?? 0;
+};
+
 

@@ -2,7 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { TextStyle } from 'react-native';
 import { useAppTheme } from '@app/theme/AppThemeContext';
 import { BootstrapScreen } from '@app/screens/BootstrapScreen';
@@ -25,6 +25,9 @@ import { TrainerAttendanceQueueScreen } from '@app/screens/TrainerAttendanceQueu
 import { TrainerClientsScreen } from '@app/screens/TrainerClientsScreen';
 import { TrainerClientFormScreen } from '@app/screens/TrainerClientFormScreen';
 import { TrainerReportScreen } from '@app/screens/TrainerReportScreen';
+import { TrainerAddClientByPhoneScreen } from '@app/screens/TrainerAddClientByPhoneScreen';
+import { ClientRequestsScreen } from '@app/screens/ClientRequestsScreen';
+import { BookingConfirmScreen } from '@app/screens/BookingConfirmScreen';
 import type {
   ClientTabsParamList,
   AuthStackParamList,
@@ -40,6 +43,9 @@ import { config } from '../../../tamagui.config.cjs';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
 import { usePushIndicators } from '@notifications/pushIndicators';
+import {
+  usePendingBookingConfirmationsCount,
+} from '@query/clientBadges';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -64,6 +70,7 @@ const ProfileStackNavigator = () => (
     <ProfileStack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
     <ProfileStack.Screen name="Notifications" component={NotificationsScreen} />
     <ProfileStack.Screen name="TrainerClients" component={TrainerClientsScreen} />
+    <ProfileStack.Screen name="TrainerAddClientByPhone" component={TrainerAddClientByPhoneScreen} />
     <ProfileStack.Screen name="TrainerClientForm" component={TrainerClientFormScreen} />
     <ProfileStack.Screen name="TrainerReport" component={TrainerReportScreen} />
     <ProfileStack.Screen name="LocationSearch" component={LocationSearchScreen} />
@@ -167,8 +174,31 @@ const ScheduleTabIcon = ({ color }: { color: string }) => {
   );
 };
 
+const DotTabIcon = ({ color, showDot, icon }: { color: string; showDot: boolean; icon: Parameters<typeof AppIcon>[0]['name'] }) => (
+  <YStack position="relative" alignItems="center" justifyContent="center">
+    <AppIcon name={icon} color={color} size={22} />
+    {showDot ? (
+      <YStack
+        position="absolute"
+        top={0}
+        right={0}
+        width="$1"
+        height="$1"
+        borderRadius="$6"
+        backgroundColor="$accent"
+      />
+    ) : null}
+  </YStack>
+);
+
 const ClientTabsNavigator = () => {
   const tabBarScreenOptions = useTabBarScreenOptions();
+  const pendingConfirmations = usePendingBookingConfirmationsCount(true);
+  const hasSlotsDot = (pendingConfirmations.data ?? 0) > 0;
+  const slotsTabIcon = useCallback(
+    ({ color }: { color: string }) => <DotTabIcon color={color} icon="calendar" showDot={hasSlotsDot} />,
+    [hasSlotsDot],
+  );
 
   return (
     <ClientTabs.Navigator screenOptions={tabBarScreenOptions}>
@@ -180,7 +210,7 @@ const ClientTabsNavigator = () => {
       <ClientTabs.Screen
         name="Slots"
         component={SlotsStackNavigator}
-        options={{ title: t('tabs.slots'), tabBarIcon: makeTabIcon('calendar') }}
+        options={{ title: t('tabs.slots'), tabBarIcon: slotsTabIcon }}
       />
       <ClientTabs.Screen
         name="Bookings"
@@ -190,7 +220,10 @@ const ClientTabsNavigator = () => {
       <ClientTabs.Screen
         name="Profile"
         component={ProfileStackNavigator}
-        options={{ title: t('tabs.profile'), tabBarIcon: makeTabIcon('user') }}
+        options={{
+          title: t('tabs.profile'),
+          tabBarIcon: makeTabIcon('user'),
+        }}
       />
     </ClientTabs.Navigator>
   );
@@ -264,6 +297,8 @@ export function RootNavigator() {
       <RootStack.Screen name="Bootstrap" component={BootstrapScreen} />
       <RootStack.Screen name="Auth" component={AuthStackNavigator} />
       <RootStack.Screen name="App" component={RoleTabsNavigator} />
+      <RootStack.Screen name="ClientRequests" component={ClientRequestsScreen} />
+      <RootStack.Screen name="BookingConfirm" component={BookingConfirmScreen} />
     </RootStack.Navigator>
   );
 }

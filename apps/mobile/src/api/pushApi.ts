@@ -6,6 +6,8 @@ export type PushPreferences = {
   eventsEnabled: boolean;
   groupMinCancellationEnabled: boolean;
   reminderEnabled: boolean;
+  trainerLinkRequestsEnabled: boolean;
+  clientLinkResponsesEnabled: boolean;
   reminderOffsetMinutes: number;
 };
 

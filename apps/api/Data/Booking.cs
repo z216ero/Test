@@ -9,6 +9,9 @@ public sealed class Booking
     public Guid? TrainerClientId { get; set; }
     public TrainerClient? TrainerClient { get; set; }
     public BookingStatus Status { get; set; }
+    public BookingClientConfirmationStatus ClientConfirmationStatus { get; set; } = BookingClientConfirmationStatus.Confirmed;
+    public DateTime? ClientConfirmationRequestedAtUtc { get; set; }
+    public DateTime? ClientConfirmationRespondedAtUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? UpdatedAtUtc { get; set; }
     public Payment? Payment { get; set; }

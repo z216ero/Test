@@ -5,6 +5,8 @@ import { RefreshControl } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   cancelBooking,
+  confirmClientBooking,
+  declineClientBooking,
   getClientBookingHistory,
   getClientUpcomingBookings,
   type ClientBooking,
@@ -237,6 +239,40 @@ export function BookingsScreen({ navigation }: Props) {
     },
   });
 
+  const confirmMutation = useAppMutation({
+    mutationFn: (bookingId: string) => confirmClientBooking(bookingId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
+      queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
+      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Client') });
+      queryClient.invalidateQueries({ queryKey: keys.pendingBookingConfirmationsCount() });
+      showToast({ type: 'success', title: t('bookingConfirm.confirmed') });
+    },
+    onError: (error) => {
+      const presented = presentApiError(error);
+      if (shouldShowErrorToast(presented)) {
+        showToast({ type: 'error', title: presented.title, message: presented.message });
+      }
+    },
+  });
+
+  const declineMutation = useAppMutation({
+    mutationFn: (bookingId: string) => declineClientBooking(bookingId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
+      queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
+      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Client') });
+      queryClient.invalidateQueries({ queryKey: keys.pendingBookingConfirmationsCount() });
+      showToast({ type: 'success', title: t('bookingConfirm.declined') });
+    },
+    onError: (error) => {
+      const presented = presentApiError(error);
+      if (shouldShowErrorToast(presented)) {
+        showToast({ type: 'error', title: presented.title, message: presented.message });
+      }
+    },
+  });
+
   const renderCard = (
     booking: ClientBooking,
     showActions: boolean,
@@ -254,6 +290,7 @@ export function BookingsScreen({ navigation }: Props) {
     const statusMeta = bookingStatusMeta[statusType];
     const statusLabel = t(compactStatusLabelMap[statusType] ?? statusMeta.labelKey);
     const showPaymentStatus = statusType === 'completed';
+    const isPendingConfirmation = statusType === 'pending_confirmation';
     const paid = isPaidStatus(booking.paymentStatus);
     const trainerProfile: AvailableSlotTrainerDto = {
       id: booking.slot.trainerId,
@@ -272,6 +309,16 @@ export function BookingsScreen({ navigation }: Props) {
       booking.slot.id
       && cancelMutation.isPending
       && cancelMutation.variables === booking.slot.id
+    );
+    const isConfirming = Boolean(
+      booking.slot.bookingId
+      && confirmMutation.isPending
+      && confirmMutation.variables === booking.slot.bookingId
+    );
+    const isDeclining = Boolean(
+      booking.slot.bookingId
+      && declineMutation.isPending
+      && declineMutation.variables === booking.slot.bookingId
     );
 
     return (
@@ -344,6 +391,35 @@ export function BookingsScreen({ navigation }: Props) {
         </XStack>
         {showActions ? (
           <XStack justifyContent="flex-end" gap="$2">
+            {isPendingConfirmation && booking.slot.bookingId ? (
+              <>
+                <Button
+                  backgroundColor="$accent"
+                  color="$accentText"
+                  borderRadius="$4"
+                  minHeight="$9"
+                  paddingHorizontal="$4"
+                  onPress={() => confirmMutation.mutate(booking.slot.bookingId as string)}
+                  disabled={isConfirming || isDeclining}
+                >
+                  {isConfirming ? t('common.loading') : t('bookingConfirm.confirm')}
+                </Button>
+                <Button
+                  backgroundColor="$background"
+                  borderRadius="$4"
+                  borderWidth={1}
+                  borderColor="$danger"
+                  minHeight="$9"
+                  paddingHorizontal="$4"
+                  onPress={() => declineMutation.mutate(booking.slot.bookingId as string)}
+                  disabled={isConfirming || isDeclining}
+                >
+                  <Text color="$danger">
+                    {isDeclining ? t('common.loading') : t('bookings.cancel')}
+                  </Text>
+                </Button>
+              </>
+            ) : null}
             {canCancel ? (
               <Button
                 backgroundColor="$background"

@@ -84,6 +84,8 @@ public sealed class PushService(
                 user.PushEventsEnabled,
                 user.PushGroupMinCancellationEnabled,
                 user.PushReminderEnabled,
+                user.PushTrainerLinkRequestsEnabled,
+                user.PushClientLinkResponsesEnabled,
                 user.PushReminderOffsetMinutes))
             .FirstOrDefaultAsync(cancellationToken);
     }
@@ -104,6 +106,8 @@ public sealed class PushService(
         user.PushEventsEnabled = request.EventsEnabled;
         user.PushGroupMinCancellationEnabled = request.GroupMinCancellationEnabled;
         user.PushReminderEnabled = request.ReminderEnabled;
+        user.PushTrainerLinkRequestsEnabled = request.TrainerLinkRequestsEnabled;
+        user.PushClientLinkResponsesEnabled = request.ClientLinkResponsesEnabled;
         user.PushReminderOffsetMinutes = request.ReminderOffsetMinutes;
         await db.SaveChangesAsync(cancellationToken);
 
@@ -111,6 +115,8 @@ public sealed class PushService(
             user.PushEventsEnabled,
             user.PushGroupMinCancellationEnabled,
             user.PushReminderEnabled,
+            user.PushTrainerLinkRequestsEnabled,
+            user.PushClientLinkResponsesEnabled,
             user.PushReminderOffsetMinutes);
     }
 
@@ -351,6 +357,190 @@ public sealed class PushService(
         }
     }
 
+    public async Task NotifyTrainerClientLinkRequestedAsync(
+        Guid linkId,
+        Guid trainerId,
+        Guid clientId,
+        CancellationToken cancellationToken)
+    {
+        await SafeNotifyAsync(
+            PushEventTypes.TrainerClientLinkRequested,
+            async () =>
+            {
+                var trainerUserId = await GetTrainerUserIdAsync(trainerId, cancellationToken);
+                var payload = await BuildPayloadAsync(
+                    PushEventTypes.TrainerClientLinkRequested,
+                    linkId,
+                    trainerId,
+                    clientId,
+                    DateTime.UtcNow,
+                    trainerUserId,
+                    cancellationReason: null,
+                    cancellationToken,
+                    linkId: linkId,
+                    deeplink: "myapp://profile/requests");
+
+                await SafeSendToUserAsync(clientId, UserRoles.Client, payload, cancellationToken);
+            });
+    }
+
+    public async Task NotifyTrainerClientLinkAcceptedAsync(
+        Guid linkId,
+        Guid trainerId,
+        Guid clientId,
+        CancellationToken cancellationToken)
+    {
+        await SafeNotifyAsync(
+            PushEventTypes.TrainerClientLinkAccepted,
+            async () =>
+            {
+                var trainerUserId = await GetTrainerUserIdAsync(trainerId, cancellationToken);
+                if (!trainerUserId.HasValue)
+                {
+                    return;
+                }
+
+                var payload = await BuildPayloadAsync(
+                    PushEventTypes.TrainerClientLinkAccepted,
+                    linkId,
+                    trainerId,
+                    clientId,
+                    DateTime.UtcNow,
+                    trainerUserId,
+                    cancellationReason: null,
+                    cancellationToken,
+                    linkId: linkId);
+
+                await SafeSendToUserAsync(trainerUserId.Value, UserRoles.Trainer, payload, cancellationToken);
+            });
+    }
+
+    public async Task NotifyTrainerClientLinkRejectedAsync(
+        Guid linkId,
+        Guid trainerId,
+        Guid clientId,
+        CancellationToken cancellationToken)
+    {
+        await SafeNotifyAsync(
+            PushEventTypes.TrainerClientLinkRejected,
+            async () =>
+            {
+                var trainerUserId = await GetTrainerUserIdAsync(trainerId, cancellationToken);
+                if (!trainerUserId.HasValue)
+                {
+                    return;
+                }
+
+                var payload = await BuildPayloadAsync(
+                    PushEventTypes.TrainerClientLinkRejected,
+                    linkId,
+                    trainerId,
+                    clientId,
+                    DateTime.UtcNow,
+                    trainerUserId,
+                    cancellationReason: null,
+                    cancellationToken,
+                    linkId: linkId);
+
+                await SafeSendToUserAsync(trainerUserId.Value, UserRoles.Trainer, payload, cancellationToken);
+            });
+    }
+
+    public async Task NotifyBookingConfirmationRequestedAsync(
+        Guid bookingId,
+        Guid slotId,
+        Guid trainerId,
+        Guid clientId,
+        DateTime startsAtUtc,
+        CancellationToken cancellationToken)
+    {
+        await SafeNotifyAsync(
+            PushEventTypes.BookingConfirmationRequested,
+            async () =>
+            {
+                var trainerUserId = await GetTrainerUserIdAsync(trainerId, cancellationToken);
+                var payload = await BuildPayloadAsync(
+                    PushEventTypes.BookingConfirmationRequested,
+                    slotId,
+                    trainerId,
+                    clientId,
+                    startsAtUtc,
+                    trainerUserId,
+                    cancellationReason: null,
+                    cancellationToken,
+                    bookingId: bookingId,
+                    deeplink: $"myapp://booking/{bookingId}");
+
+                await SafeSendToUserAsync(clientId, UserRoles.Client, payload, cancellationToken);
+            });
+    }
+
+    public async Task NotifyBookingConfirmationConfirmedAsync(
+        Guid bookingId,
+        Guid slotId,
+        Guid trainerId,
+        Guid clientId,
+        DateTime startsAtUtc,
+        CancellationToken cancellationToken)
+    {
+        await SafeNotifyAsync(
+            PushEventTypes.BookingConfirmationConfirmed,
+            async () =>
+            {
+                var trainerUserId = await GetTrainerUserIdAsync(trainerId, cancellationToken);
+                if (!trainerUserId.HasValue)
+                {
+                    return;
+                }
+
+                var payload = await BuildPayloadAsync(
+                    PushEventTypes.BookingConfirmationConfirmed,
+                    slotId,
+                    trainerId,
+                    clientId,
+                    startsAtUtc,
+                    trainerUserId,
+                    cancellationReason: null,
+                    cancellationToken,
+                    bookingId: bookingId);
+
+                await SafeSendToUserAsync(trainerUserId.Value, UserRoles.Trainer, payload, cancellationToken);
+            });
+    }
+
+    public async Task NotifyBookingConfirmationDeclinedAsync(
+        Guid bookingId,
+        Guid slotId,
+        Guid trainerId,
+        Guid clientId,
+        DateTime startsAtUtc,
+        CancellationToken cancellationToken)
+    {
+        await SafeNotifyAsync(
+            PushEventTypes.BookingConfirmationDeclined,
+            async () =>
+            {
+                var trainerUserId = await GetTrainerUserIdAsync(trainerId, cancellationToken);
+                if (!trainerUserId.HasValue)
+                {
+                    return;
+                }
+
+                var payload = await BuildPayloadAsync(
+                    PushEventTypes.BookingConfirmationDeclined,
+                    slotId,
+                    trainerId,
+                    clientId,
+                    startsAtUtc,
+                    trainerUserId,
+                    cancellationReason: null,
+                    cancellationToken,
+                    bookingId: bookingId);
+
+                await SafeSendToUserAsync(trainerUserId.Value, UserRoles.Trainer, payload, cancellationToken);
+            });
+    }
+
     private async Task<Guid?> GetTrainerUserIdAsync(
         Guid trainerId,
         CancellationToken cancellationToken)
@@ -387,6 +577,12 @@ public sealed class PushService(
             PushEventTypes.PaymentMarkedPaid => UserRoles.Trainer,
             PushEventTypes.PaymentMarkedPending => UserRoles.Trainer,
             PushEventTypes.TrainingReminder => UserRoles.Trainer,
+            PushEventTypes.TrainerClientLinkRequested => UserRoles.Trainer,
+            PushEventTypes.TrainerClientLinkAccepted => UserRoles.Client,
+            PushEventTypes.TrainerClientLinkRejected => UserRoles.Client,
+            PushEventTypes.BookingConfirmationRequested => UserRoles.Trainer,
+            PushEventTypes.BookingConfirmationConfirmed => UserRoles.Client,
+            PushEventTypes.BookingConfirmationDeclined => UserRoles.Client,
             _ => UserRoles.Client
         };
 
@@ -406,7 +602,9 @@ public sealed class PushService(
         CancellationToken cancellationToken,
         Guid? bookingId = null,
         Guid? paymentId = null,
-        Guid? trainerClientId = null)
+        Guid? trainerClientId = null,
+        Guid? linkId = null,
+        string? deeplink = null)
     {
         var slotDurationMinutes = await db.TrainingSlots
             .AsNoTracking()
@@ -427,6 +625,7 @@ public sealed class PushService(
             trainerClientId,
             bookingId,
             paymentId,
+            linkId,
             startsAtUtc,
             slotDurationMinutes,
             actorName,
@@ -434,6 +633,7 @@ public sealed class PushService(
             trainerName,
             clientName,
             cancellationReason,
+            deeplink,
             Guid.NewGuid(),
             DateTime.UtcNow);
     }
@@ -534,7 +734,9 @@ public sealed class PushService(
             {
                 user.PushEventsEnabled,
                 user.PushGroupMinCancellationEnabled,
-                user.PushReminderEnabled
+                user.PushReminderEnabled,
+                user.PushTrainerLinkRequestsEnabled,
+                user.PushClientLinkResponsesEnabled
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -546,6 +748,16 @@ public sealed class PushService(
         if (payload.Type == PushEventTypes.TrainingReminder)
         {
             return preferences.PushReminderEnabled;
+        }
+
+        if (payload.Type == PushEventTypes.TrainerClientLinkRequested)
+        {
+            return preferences.PushTrainerLinkRequestsEnabled;
+        }
+
+        if (payload.Type is PushEventTypes.TrainerClientLinkAccepted or PushEventTypes.TrainerClientLinkRejected)
+        {
+            return preferences.PushClientLinkResponsesEnabled;
         }
 
         if (!preferences.PushEventsEnabled)
@@ -598,6 +810,11 @@ public sealed class PushService(
             data["bookingId"] = payload.BookingId.Value.ToString();
         }
 
+        if (payload.LinkId.HasValue)
+        {
+            data["linkId"] = payload.LinkId.Value.ToString();
+        }
+
         if (payload.PaymentId.HasValue)
         {
             data["paymentId"] = payload.PaymentId.Value.ToString();
@@ -639,6 +856,11 @@ public sealed class PushService(
             data["cancellationReason"] = payload.CancellationReason!;
         }
 
+        if (!string.IsNullOrWhiteSpace(payload.Deeplink))
+        {
+            data["deeplink"] = payload.Deeplink!;
+        }
+
         data["occurredAtUtc"] = payload.OccurredAtUtc.ToString("O");
 
         return data;
@@ -649,43 +871,73 @@ public sealed class PushService(
         {
             PushEventTypes.BookingCreated => new Notification
             {
-                Title = "\u041D\u043E\u0432\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C",
-                Body = "\u041A\u043B\u0438\u0435\u043D\u0442 \u0437\u0430\u043F\u0438\u0441\u0430\u043B\u0441\u044F \u043D\u0430 \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0443"
+                Title = "Новая запись",
+                Body = "Клиент записался на тренировку"
             },
             PushEventTypes.BookingCancelled => new Notification
             {
-                Title = "\u041E\u0442\u043C\u0435\u043D\u0430 \u0437\u0430\u043F\u0438\u0441\u0438",
-                Body = "\u041A\u043B\u0438\u0435\u043D\u0442 \u043E\u0442\u043C\u0435\u043D\u0438\u043B \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0443"
+                Title = "Отмена записи",
+                Body = "Клиент отменил тренировку"
             },
             PushEventTypes.SlotCancelledByTrainer => new Notification
             {
-                Title = "\u0422\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
-                Body = "\u0422\u0440\u0435\u043D\u0435\u0440 \u043E\u0442\u043C\u0435\u043D\u0438\u043B \u0437\u0430\u043D\u044F\u0442\u0438\u0435"
+                Title = "Тренировка отменена",
+                Body = "Тренер отменил занятие"
             },
             PushEventTypes.AttendanceMarked => new Notification
             {
-                Title = "\u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0438",
-                Body = "\u0421\u0442\u0430\u0442\u0443\u0441 \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0438 \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D"
+                Title = "Обновление тренировки",
+                Body = "Статус тренировки обновлён"
             },
             PushEventTypes.PaymentMarkedPaid => new Notification
             {
-                Title = "\u041E\u043F\u043B\u0430\u0442\u0430 \u043E\u0442\u043C\u0435\u0447\u0435\u043D\u0430",
-                Body = "\u0421\u0442\u0430\u0442\u0443\u0441 \u043E\u043F\u043B\u0430\u0442\u044B \u0438\u0437\u043C\u0435\u043D\u0451\u043D \u043D\u0430 \u00AB\u041E\u043F\u043B\u0430\u0447\u0435\u043D\u043E\u00BB"
+                Title = "Оплата отмечена",
+                Body = "Статус оплаты изменён на «Оплачено»"
             },
             PushEventTypes.PaymentMarkedPending => new Notification
             {
-                Title = "\u041E\u043F\u043B\u0430\u0442\u0430 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
-                Body = "\u0421\u0442\u0430\u0442\u0443\u0441 \u043E\u043F\u043B\u0430\u0442\u044B \u0438\u0437\u043C\u0435\u043D\u0451\u043D \u043D\u0430 \u00AB\u0412 \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u0438\u00BB"
+                Title = "Оплата обновлена",
+                Body = "Статус оплаты изменён на «В ожидании»"
             },
             PushEventTypes.TrainingReminder => new Notification
             {
-                Title = "\u041D\u0430\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u0435 \u043E \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0435",
-                Body = "\u0421\u043A\u043E\u0440\u043E \u043D\u0430\u0447\u043D\u0451\u0442\u0441\u044F \u0432\u0430\u0448\u0430 \u0442\u0440\u0435\u043D\u0438\u0440\u043E\u0432\u043A\u0430"
+                Title = "Напоминание о тренировке",
+                Body = "Скоро начнётся ваша тренировка"
+            },
+            PushEventTypes.TrainerClientLinkRequested => new Notification
+            {
+                Title = "Запрос от тренера",
+                Body = "Тренер хочет добавить вас в список клиентов"
+            },
+            PushEventTypes.TrainerClientLinkAccepted => new Notification
+            {
+                Title = "Клиент принял запрос",
+                Body = "Связь с клиентом успешно установлена"
+            },
+            PushEventTypes.TrainerClientLinkRejected => new Notification
+            {
+                Title = "Клиент отклонил запрос",
+                Body = "Запрос на связь был отклонён"
+            },
+            PushEventTypes.BookingConfirmationRequested => new Notification
+            {
+                Title = "Тренер записал вас на тренировку",
+                Body = "Подтвердите участие или отклоните запись"
+            },
+            PushEventTypes.BookingConfirmationConfirmed => new Notification
+            {
+                Title = "Клиент подтвердил тренировку",
+                Body = "Назначение подтверждено"
+            },
+            PushEventTypes.BookingConfirmationDeclined => new Notification
+            {
+                Title = "Клиент отклонил тренировку",
+                Body = "Слот освобождён"
             },
             _ => new Notification
             {
-                Title = "\u0423\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0435",
-                Body = "\u0415\u0441\u0442\u044C \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u043E \u0440\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u044E."
+                Title = "Уведомление",
+                Body = "Есть обновление по расписанию."
             }
         };
 
@@ -767,6 +1019,7 @@ public sealed class PushService(
         Guid? TrainerClientId,
         Guid? BookingId,
         Guid? PaymentId,
+        Guid? LinkId,
         DateTime? StartsAtUtc,
         int? SlotDurationMinutes,
         string ActorName,
@@ -774,6 +1027,7 @@ public sealed class PushService(
         string? TrainerName,
         string? ClientName,
         string? CancellationReason,
+        string? Deeplink,
         Guid EventId,
         DateTime OccurredAtUtc);
 }

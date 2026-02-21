@@ -20,6 +20,7 @@ import {
   isFreeSlotPast,
   isUiSlotStatusFinal,
   uiSlotStatusMeta,
+  type UiSlotStatus,
 } from './slotHelpers';
 import type { PaymentMethod } from '@api/trainerSlotsApi';
 
@@ -44,6 +45,10 @@ type SlotActionsSheetProps = {
       method: PaymentMethod | null;
     }
   ) => void;
+  onAssignAnotherClient?: (slot: SlotDto) => void;
+  onMakeSlotOpen?: (slot: SlotDto) => void;
+  isAssigningAnotherClient?: boolean;
+  statusOverride?: UiSlotStatus;
 };
 
 const paymentMethods: PaymentMethod[] = ['Cash', 'Transfer', 'SBP', 'Other'];
@@ -75,8 +80,12 @@ export function SlotActionsSheet({
   isClosingBooking,
   showAttendanceActions,
   onCloseBooking,
+  onAssignAnotherClient,
+  onMakeSlotOpen,
+  isAssigningAnotherClient,
+  statusOverride,
 }: SlotActionsSheetProps) {
-  const statusType = slot ? getUiSlotStatus(slot, nowTs) : null;
+  const statusType = slot ? (statusOverride ?? getUiSlotStatus(slot, nowTs)) : null;
   const statusMeta = statusType ? uiSlotStatusMeta[statusType] : null;
   const statusLabel = statusMeta ? t(statusMeta.labelKey) : null;
   const showStatusIcon = statusType === 'needs_attention';
@@ -106,6 +115,9 @@ export function SlotActionsSheet({
   const isPastFreeSlot = !!slot && isFreeSlotPast(slot, nowTs);
   const isFinalAttendance = !!slot && statusType ? isUiSlotStatusFinal(statusType) : false;
   const isBeforeStart = startTs !== null && nowTs < startTs;
+  const showBookedCancelAction =
+    statusType !== 'client_declined' && (canCancelBooked || showBookedCancelLockedByTime);
+  const canAssignAnotherClient = startTs !== null && nowTs < startTs - CANCEL_FORBIDDEN_WITHIN_MS;
 
   const isActionPending =
     isCancelling || isMarkingCompleted || isMarkingNoShow || isClosingBooking;
@@ -158,7 +170,7 @@ export function SlotActionsSheet({
       open={open}
       onOpenChange={onOpenChange}
       dismissOnSnapToBottom
-      snapPointsMode="fit"
+      snapPointsMode='fit'
       dismissOnOverlayPress
     >
       <Sheet.Overlay
@@ -222,24 +234,24 @@ export function SlotActionsSheet({
               <YStack gap="$3">
                 {canCancelAvailable ? (
                   onCancelSlot ? (
-                  <Button
-                    backgroundColor="$background"
-                    borderWidth={1}
-                    borderColor="$primary"
-                    borderRadius="$4"
-                    height="$10"
-                    onPress={() => onCancelSlot(slot)}
-                    disabled={isActionPending}
-                  >
-                    <XStack alignItems="center" gap="$2">
-                      <AppIcon name="trash" size={18} color="$primary" />
-                      <Text color="$primary">
-                        {isCancelling
-                          ? t('common.loading')
-                          : t('schedule.actions.cancelSlot')}
-                      </Text>
-                    </XStack>
-                  </Button>
+                    <Button
+                      backgroundColor="$background"
+                      borderWidth={1}
+                      borderColor="$primary"
+                      borderRadius="$4"
+                      height="$10"
+                      onPress={() => onCancelSlot(slot)}
+                      disabled={isActionPending}
+                    >
+                      <XStack alignItems="center" gap="$2">
+                        <AppIcon name="trash" size={18} color="$primary" />
+                        <Text color="$primary">
+                          {isCancelling
+                            ? t('common.loading')
+                            : t('schedule.actions.cancelSlot')}
+                        </Text>
+                      </XStack>
+                    </Button>
                   ) : null
                 ) : (
                   <XStack
@@ -259,7 +271,7 @@ export function SlotActionsSheet({
               </YStack>
             ) : null}
 
-            {statusType === 'booked' || statusType === 'needs_attention' ? (
+            {statusType === 'booked' || statusType === 'needs_attention' || statusType === 'pending_confirmation' || statusType === 'client_declined' ? (
               <YStack gap="$3">
                 {canUseCloseForm && canShowComplete ? (
                   <YStack gap="$3">
@@ -437,7 +449,7 @@ export function SlotActionsSheet({
                         </XStack>
                       </Button>
                     ) : null}
-                    {!canMarkAttendance ? (
+                    {!canMarkAttendance && statusType !== 'client_declined' ? (
                       <XStack
                         padding="$4"
                         borderRadius="$4"
@@ -465,26 +477,109 @@ export function SlotActionsSheet({
                     ) : null}
                   </>
                 ) : null}
-                {canCancelBooked || showBookedCancelLockedByTime ? (
-                  onCancelSlot ? (
-                  <Button
-                    backgroundColor="$background"
-                    borderWidth={1}
-                    borderColor="$primary"
+                {statusType === 'pending_confirmation' ? (
+                  <XStack
+                    padding="$4"
                     borderRadius="$4"
-                    height="$10"
-                    onPress={() => onCancelSlot(slot)}
-                    disabled={isActionPending || !canCancelBooked}
+                    backgroundColor="$surfaceMuted"
+                    borderWidth={1}
+                    borderColor="$border"
                   >
-                    <XStack alignItems="center" gap="$2">
-                      <AppIcon name="trash" size={18} color="$primary" />
-                      <Text color="$primary">
-                        {isCancelling
-                          ? t('common.loading')
-                          : t('schedule.actions.cancelTraining')}
+                    <Text fontSize="$3" color="$muted">
+                      {t('schedule.sheet.pendingInfo')}
+                    </Text>
+                  </XStack>
+                ) : null}
+                {statusType === 'client_declined' ? (
+                  <YStack gap="$2">
+                    <Button
+                      unstyled
+                      onPress={() => {
+                        if (onAssignAnotherClient) {
+                          onAssignAnotherClient(slot);
+                        }
+                      }}
+                      disabled={isActionPending || !canAssignAnotherClient}
+                    >
+                      <XStack
+                        minHeight="$10"
+                        borderRadius="$4"
+                        backgroundColor="$accent"
+                        alignItems="center"
+                        justifyContent="center"
+                      >
+                        <Text color="$accentText" fontWeight="600">
+                          {isAssigningAnotherClient
+                            ? t('common.loading')
+                            : t('schedule.actions.assignAnotherClient')}
+                        </Text>
+                      </XStack>
+                    </Button>
+                    {!canAssignAnotherClient ? (
+                      <Text fontSize="$2" color="$muted">
+                        {t('schedule.sheet.assignAnotherUnavailable')}
                       </Text>
-                    </XStack>
-                  </Button>
+                    ) : null}
+                    <Button
+                      unstyled
+                      onPress={() => onMakeSlotOpen?.(slot)}
+                      disabled={isActionPending}
+                    >
+                      <XStack
+                        minHeight="$10"
+                        borderRadius="$4"
+                        borderWidth={1}
+                        borderColor="$border"
+                        backgroundColor="$background"
+                        alignItems="center"
+                        justifyContent="center"
+                      >
+                        <Text color="$text" fontWeight="600">{t('schedule.actions.makeSlotOpen')}</Text>
+                      </XStack>
+                    </Button>
+                    {canCancelAvailable && onCancelSlot ? (
+                      <Button
+                        unstyled
+                        onPress={() => onCancelSlot(slot)}
+                        disabled={isActionPending}
+                      >
+                        <XStack
+                          minHeight="$10"
+                          borderRadius="$4"
+                          borderWidth={1}
+                          borderColor="$primary"
+                          backgroundColor="$background"
+                          alignItems="center"
+                          justifyContent="center"
+                        >
+                          <Text color="$primary" fontWeight="600">
+                            {isCancelling ? t('common.loading') : t('schedule.actions.cancelSlot')}
+                          </Text>
+                        </XStack>
+                      </Button>
+                    ) : null}
+                  </YStack>
+                ) : null}
+                {showBookedCancelAction ? (
+                  onCancelSlot ? (
+                    <Button
+                      backgroundColor="$background"
+                      borderWidth={1}
+                      borderColor="$primary"
+                      borderRadius="$4"
+                      height="$10"
+                      onPress={() => onCancelSlot(slot)}
+                      disabled={isActionPending || !canCancelBooked}
+                    >
+                      <XStack alignItems="center" gap="$2">
+                        <AppIcon name="trash" size={18} color="$primary" />
+                        <Text color="$primary">
+                          {isCancelling
+                            ? t('common.loading')
+                            : t('schedule.actions.cancelTraining')}
+                        </Text>
+                      </XStack>
+                    </Button>
                   ) : null
                 ) : null}
                 {showBookedCancelLockedByTime ? (

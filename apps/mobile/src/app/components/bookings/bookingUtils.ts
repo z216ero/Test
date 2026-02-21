@@ -23,15 +23,18 @@ const isNoShow = (value?: string | null): boolean => {
     || normalized === 'no-show';
 };
 
-export const getBookingStatusType = (slot: SlotDto, nowTs: number = Date.now()): BookingStatusType => {
+export const getBookingStatusType = (slot: SlotDto, _nowTs: number = Date.now()): BookingStatusType => {
   const status = normalize(slot.bookingStatus ?? slot.status);
+  const confirmationStatus = normalize(slot.clientConfirmationStatus);
   if (!status) {
     return 'unknown';
   }
   if (status === 'booked') {
-    const startTs = getSlotStartTimestamp(slot);
-    if (startTs !== null && startTs <= nowTs) {
+    if (confirmationStatus === 'pending') {
       return 'pending_confirmation';
+    }
+    if (confirmationStatus === 'declined') {
+      return 'cancelled';
     }
     return 'booked';
   }
@@ -97,7 +100,7 @@ export const getSlotTimes = (slot: SlotDto): { start: Date; end: Date } | null =
 
 export const isUpcomingBooking = (slot: SlotDto, nowTs: number): boolean => {
   const status = getBookingStatusType(slot, nowTs);
-  if (status !== 'booked') {
+  if (status !== 'booked' && status !== 'pending_confirmation') {
     return false;
   }
   const startTs = getSlotStartTimestamp(slot);
@@ -109,8 +112,7 @@ export const isUpcomingBooking = (slot: SlotDto, nowTs: number): boolean => {
 
 export const isHistoryBooking = (slot: SlotDto, nowTs: number = Date.now()): boolean => {
   const status = getBookingStatusType(slot, nowTs);
-  return status === 'pending_confirmation'
-    || status === 'completed'
+  return status === 'completed'
     || status === 'no_show'
     || status === 'cancelled';
 };

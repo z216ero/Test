@@ -32,7 +32,10 @@ const buildLookupUrl = (path: string): string => {
 };
 
 const fetchLookup = async (path: string, options?: RequestInit): Promise<LookupItem[]> => {
-  const response = await customFetch(buildLookupUrl(path), options);
+  const response = await customFetch<{ status: number; data: unknown }>(
+    buildLookupUrl(path),
+    options
+  );
   const data = unwrap<LookupResponse>(response, 'Unable to load lookups.');
   return data.items ?? [];
 };
@@ -87,7 +90,10 @@ export const getSortOptionLookups = async (options?: RequestInit): Promise<Looku
 
 export const getCities = async (query?: string, options?: RequestInit): Promise<CityDto[]> => {
   const search = query?.trim() ? `?q=${encodeURIComponent(query.trim())}` : '';
-  const response = await customFetch(`/lookups/cities${search}`, options);
+  const response = await customFetch<{ status: number; data: unknown }>(
+    `/lookups/cities${search}`,
+    options
+  );
   return unwrap<CityDto[]>(response, 'Unable to load cities.');
 };
 
@@ -104,6 +110,9 @@ export const getDistricts = async (
     params.push(`q=${encodeURIComponent(query.trim())}`);
   }
   const search = params.length > 0 ? `?${params.join('&')}` : '';
-  const response = await customFetch(`/lookups/districts${search}`, options);
+  const response = await customFetch<{ status: number; data: unknown }>(
+    `/lookups/districts${search}`,
+    options
+  );
   return unwrap<DistrictDto[]>(response, 'Unable to load districts.');
 };

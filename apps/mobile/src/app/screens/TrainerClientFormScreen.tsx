@@ -53,6 +53,16 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
   });
 
   useEffect(() => {
+    if (isEdit || clientQuery.data) {
+      return;
+    }
+    const initialPhone = route.params?.initialPhone?.trim();
+    if (initialPhone) {
+      setPhone(normalizeRussianPhoneInput(initialPhone));
+    }
+  }, [clientQuery.data, isEdit, route.params?.initialPhone]);
+
+  useEffect(() => {
     if (!clientQuery.data) {
       return;
     }
@@ -83,6 +93,10 @@ export function TrainerClientFormScreen({ navigation, route }: Props) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.trainerClients.list() });
+      if (route.params?.returnToList) {
+        navigation.navigate('TrainerClients');
+        return;
+      }
       navigation.goBack();
     },
     onError: (err) => {

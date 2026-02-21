@@ -5,6 +5,10 @@
  * OpenAPI spec version: 1.0
  */
 import { customFetch } from '../api/custom-fetch';
+export interface AssignRegisteredClientRequest {
+  clientUserId?: string;
+}
+
 export interface AuthResponse {
   /** @nullable */
   accessToken?: string | null;
@@ -104,6 +108,12 @@ export interface BookingDto {
   trainerClientId?: string | null;
   /** @nullable */
   status?: string | null;
+  /** @nullable */
+  clientConfirmationStatus?: string | null;
+  /** @nullable */
+  clientConfirmationRequestedAtUtc?: string | null;
+  /** @nullable */
+  clientConfirmationRespondedAtUtc?: string | null;
   createdAtUtc?: string;
   /** @nullable */
   updatedAtUtc?: string | null;
@@ -164,6 +174,10 @@ export interface CreateSlotRequest {
   assignToTrainerClientId?: string | null;
   /** @nullable */
   assignToClientId?: string | null;
+}
+
+export interface CreateTrainerClientLinkRequest {
+  clientUserId?: string;
 }
 
 export interface CreateTrainerClientRequest {
@@ -286,6 +300,14 @@ export interface PaymentListItemDto {
   paidAtUtc?: string | null;
 }
 
+export interface PendingBookingConfirmationsCountDto {
+  count?: number;
+}
+
+export interface PendingCountDto {
+  count?: number;
+}
+
 export interface ProblemDetails {
   /** @nullable */
   type?: string | null;
@@ -304,6 +326,8 @@ export interface PushPreferencesResponse {
   eventsEnabled?: boolean;
   groupMinCancellationEnabled?: boolean;
   reminderEnabled?: boolean;
+  trainerLinkRequestsEnabled?: boolean;
+  clientLinkResponsesEnabled?: boolean;
   reminderOffsetMinutes?: number;
 }
 
@@ -338,6 +362,19 @@ export interface RegisterRequest {
   gender?: string | null;
   /** @nullable */
   specializations?: string[] | null;
+}
+
+export interface SearchTrainerClientByPhoneRequest {
+  /** @nullable */
+  phone?: string | null;
+}
+
+export interface SearchTrainerClientByPhoneResponse {
+  clientUserId?: string;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  maskedPhone?: string | null;
 }
 
 export interface SlotAttendeeDto {
@@ -375,6 +412,8 @@ export interface SlotDto {
   status?: string | null;
   /** @nullable */
   bookingStatus?: string | null;
+  /** @nullable */
+  clientConfirmationStatus?: string | null;
   createdAtUtc?: string;
   /** @nullable */
   clientName?: string | null;
@@ -384,7 +423,7 @@ export interface SlotDto {
   trainerPricePerSession?: number | null;
 }
 
-export interface StringFAnonymousType13 {
+export interface StringFAnonymousType16 {
   /** @nullable */
   status?: string | null;
 }
@@ -405,6 +444,28 @@ export interface TrainerClientDto {
   createdAtUtc?: string;
   /** @nullable */
   updatedAtUtc?: string | null;
+}
+
+export interface TrainerClientLinkDto {
+  id?: string;
+  trainerId?: string;
+  clientUserId?: string;
+  /** @nullable */
+  status?: string | null;
+  requestedAtUtc?: string;
+  /** @nullable */
+  respondedAtUtc?: string | null;
+  lastRequestAtUtc?: string;
+  /** @nullable */
+  rejectedUntilUtc?: string | null;
+  /** @nullable */
+  trainerName?: string | null;
+  /** @nullable */
+  trainerCityName?: string | null;
+  /** @nullable */
+  clientName?: string | null;
+  /** @nullable */
+  clientPhone?: string | null;
 }
 
 export interface TrainerDto {
@@ -457,6 +518,8 @@ export interface UpdatePushPreferencesRequest {
   eventsEnabled?: boolean;
   groupMinCancellationEnabled?: boolean;
   reminderEnabled?: boolean;
+  trainerLinkRequestsEnabled?: boolean;
+  clientLinkResponsesEnabled?: boolean;
   reminderOffsetMinutes?: number;
 }
 
@@ -1164,6 +1227,233 @@ export const postSlotsSlotIdAttendeesClientIdNoShow = async (slotId: string,
 
 
 
+export type postTrainerSlotsSlotIdAssignClientResponse200 = {
+  data: BookingDto
+  status: 200
+}
+
+export type postTrainerSlotsSlotIdAssignClientResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postTrainerSlotsSlotIdAssignClientResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postTrainerSlotsSlotIdAssignClientResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type postTrainerSlotsSlotIdAssignClientResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type postTrainerSlotsSlotIdAssignClientResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postTrainerSlotsSlotIdAssignClientResponseSuccess = (postTrainerSlotsSlotIdAssignClientResponse200) & {
+  headers: Headers;
+};
+export type postTrainerSlotsSlotIdAssignClientResponseError = (postTrainerSlotsSlotIdAssignClientResponse400 | postTrainerSlotsSlotIdAssignClientResponse401 | postTrainerSlotsSlotIdAssignClientResponse403 | postTrainerSlotsSlotIdAssignClientResponse404 | postTrainerSlotsSlotIdAssignClientResponse409) & {
+  headers: Headers;
+};
+
+export type postTrainerSlotsSlotIdAssignClientResponse = (postTrainerSlotsSlotIdAssignClientResponseSuccess | postTrainerSlotsSlotIdAssignClientResponseError)
+
+export const getPostTrainerSlotsSlotIdAssignClientUrl = (slotId: string,) => {
+
+
+  
+
+  return `/trainer/slots/${slotId}/assign-client`
+}
+
+export const postTrainerSlotsSlotIdAssignClient = async (slotId: string,
+    assignRegisteredClientRequest: AssignRegisteredClientRequest, options?: RequestInit): Promise<postTrainerSlotsSlotIdAssignClientResponse> => {
+  
+  return customFetch<postTrainerSlotsSlotIdAssignClientResponse>(getPostTrainerSlotsSlotIdAssignClientUrl(slotId),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      assignRegisteredClientRequest,)
+  }
+);}
+
+
+
+export type postClientBookingsBookingIdConfirmResponse200 = {
+  data: BookingDto
+  status: 200
+}
+
+export type postClientBookingsBookingIdConfirmResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postClientBookingsBookingIdConfirmResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postClientBookingsBookingIdConfirmResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type postClientBookingsBookingIdConfirmResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type postClientBookingsBookingIdConfirmResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postClientBookingsBookingIdConfirmResponseSuccess = (postClientBookingsBookingIdConfirmResponse200) & {
+  headers: Headers;
+};
+export type postClientBookingsBookingIdConfirmResponseError = (postClientBookingsBookingIdConfirmResponse400 | postClientBookingsBookingIdConfirmResponse401 | postClientBookingsBookingIdConfirmResponse403 | postClientBookingsBookingIdConfirmResponse404 | postClientBookingsBookingIdConfirmResponse409) & {
+  headers: Headers;
+};
+
+export type postClientBookingsBookingIdConfirmResponse = (postClientBookingsBookingIdConfirmResponseSuccess | postClientBookingsBookingIdConfirmResponseError)
+
+export const getPostClientBookingsBookingIdConfirmUrl = (bookingId: string,) => {
+
+
+  
+
+  return `/client/bookings/${bookingId}/confirm`
+}
+
+export const postClientBookingsBookingIdConfirm = async (bookingId: string, options?: RequestInit): Promise<postClientBookingsBookingIdConfirmResponse> => {
+  
+  return customFetch<postClientBookingsBookingIdConfirmResponse>(getPostClientBookingsBookingIdConfirmUrl(bookingId),
+  {      
+    ...options,
+    method: 'POST'
+    
+    
+  }
+);}
+
+
+
+export type postClientBookingsBookingIdDeclineResponse200 = {
+  data: BookingDto
+  status: 200
+}
+
+export type postClientBookingsBookingIdDeclineResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postClientBookingsBookingIdDeclineResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postClientBookingsBookingIdDeclineResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type postClientBookingsBookingIdDeclineResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type postClientBookingsBookingIdDeclineResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postClientBookingsBookingIdDeclineResponseSuccess = (postClientBookingsBookingIdDeclineResponse200) & {
+  headers: Headers;
+};
+export type postClientBookingsBookingIdDeclineResponseError = (postClientBookingsBookingIdDeclineResponse400 | postClientBookingsBookingIdDeclineResponse401 | postClientBookingsBookingIdDeclineResponse403 | postClientBookingsBookingIdDeclineResponse404 | postClientBookingsBookingIdDeclineResponse409) & {
+  headers: Headers;
+};
+
+export type postClientBookingsBookingIdDeclineResponse = (postClientBookingsBookingIdDeclineResponseSuccess | postClientBookingsBookingIdDeclineResponseError)
+
+export const getPostClientBookingsBookingIdDeclineUrl = (bookingId: string,) => {
+
+
+  
+
+  return `/client/bookings/${bookingId}/decline`
+}
+
+export const postClientBookingsBookingIdDecline = async (bookingId: string, options?: RequestInit): Promise<postClientBookingsBookingIdDeclineResponse> => {
+  
+  return customFetch<postClientBookingsBookingIdDeclineResponse>(getPostClientBookingsBookingIdDeclineUrl(bookingId),
+  {      
+    ...options,
+    method: 'POST'
+    
+    
+  }
+);}
+
+
+
+export type getClientMePendingBookingConfirmationsCountResponse200 = {
+  data: PendingBookingConfirmationsCountDto
+  status: 200
+}
+
+export type getClientMePendingBookingConfirmationsCountResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getClientMePendingBookingConfirmationsCountResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+    
+export type getClientMePendingBookingConfirmationsCountResponseSuccess = (getClientMePendingBookingConfirmationsCountResponse200) & {
+  headers: Headers;
+};
+export type getClientMePendingBookingConfirmationsCountResponseError = (getClientMePendingBookingConfirmationsCountResponse401 | getClientMePendingBookingConfirmationsCountResponse403) & {
+  headers: Headers;
+};
+
+export type getClientMePendingBookingConfirmationsCountResponse = (getClientMePendingBookingConfirmationsCountResponseSuccess | getClientMePendingBookingConfirmationsCountResponseError)
+
+export const getGetClientMePendingBookingConfirmationsCountUrl = () => {
+
+
+  
+
+  return `/client/me/pending-booking-confirmations/count`
+}
+
+export const getClientMePendingBookingConfirmationsCount = async ( options?: RequestInit): Promise<getClientMePendingBookingConfirmationsCountResponse> => {
+  
+  return customFetch<getClientMePendingBookingConfirmationsCountResponse>(getGetClientMePendingBookingConfirmationsCountUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
 export type patchBookingsBookingIdCloseResponse200 = {
   data: CloseBookingResultDto
   status: 200
@@ -1357,7 +1647,7 @@ export const getClientsMeHistory = async ( options?: RequestInit): Promise<getCl
 
 
 export type getHealthResponse200 = {
-  data: StringFAnonymousType13
+  data: StringFAnonymousType16
   status: 200
 }
     
@@ -2835,6 +3125,528 @@ export const getGetSlotsSlotIdAttendeesUrl = (slotId: string,) => {
 export const getSlotsSlotIdAttendees = async (slotId: string, options?: RequestInit): Promise<getSlotsSlotIdAttendeesResponse> => {
   
   return customFetch<getSlotsSlotIdAttendeesResponse>(getGetSlotsSlotIdAttendeesUrl(slotId),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type postTrainerClientsLinkSearchByPhoneResponse200 = {
+  data: SearchTrainerClientByPhoneResponse
+  status: 200
+}
+
+export type postTrainerClientsLinkSearchByPhoneResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postTrainerClientsLinkSearchByPhoneResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postTrainerClientsLinkSearchByPhoneResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type postTrainerClientsLinkSearchByPhoneResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type postTrainerClientsLinkSearchByPhoneResponseSuccess = (postTrainerClientsLinkSearchByPhoneResponse200) & {
+  headers: Headers;
+};
+export type postTrainerClientsLinkSearchByPhoneResponseError = (postTrainerClientsLinkSearchByPhoneResponse400 | postTrainerClientsLinkSearchByPhoneResponse401 | postTrainerClientsLinkSearchByPhoneResponse403 | postTrainerClientsLinkSearchByPhoneResponse404) & {
+  headers: Headers;
+};
+
+export type postTrainerClientsLinkSearchByPhoneResponse = (postTrainerClientsLinkSearchByPhoneResponseSuccess | postTrainerClientsLinkSearchByPhoneResponseError)
+
+export const getPostTrainerClientsLinkSearchByPhoneUrl = () => {
+
+
+  
+
+  return `/trainer/clients/link/search-by-phone`
+}
+
+export const postTrainerClientsLinkSearchByPhone = async (searchTrainerClientByPhoneRequest: SearchTrainerClientByPhoneRequest, options?: RequestInit): Promise<postTrainerClientsLinkSearchByPhoneResponse> => {
+  
+  return customFetch<postTrainerClientsLinkSearchByPhoneResponse>(getPostTrainerClientsLinkSearchByPhoneUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      searchTrainerClientByPhoneRequest,)
+  }
+);}
+
+
+
+export type postTrainerClientsLinkRequestResponse200 = {
+  data: TrainerClientLinkDto
+  status: 200
+}
+
+export type postTrainerClientsLinkRequestResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postTrainerClientsLinkRequestResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postTrainerClientsLinkRequestResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type postTrainerClientsLinkRequestResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type postTrainerClientsLinkRequestResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postTrainerClientsLinkRequestResponseSuccess = (postTrainerClientsLinkRequestResponse200) & {
+  headers: Headers;
+};
+export type postTrainerClientsLinkRequestResponseError = (postTrainerClientsLinkRequestResponse400 | postTrainerClientsLinkRequestResponse401 | postTrainerClientsLinkRequestResponse403 | postTrainerClientsLinkRequestResponse404 | postTrainerClientsLinkRequestResponse409) & {
+  headers: Headers;
+};
+
+export type postTrainerClientsLinkRequestResponse = (postTrainerClientsLinkRequestResponseSuccess | postTrainerClientsLinkRequestResponseError)
+
+export const getPostTrainerClientsLinkRequestUrl = () => {
+
+
+  
+
+  return `/trainer/clients/link/request`
+}
+
+export const postTrainerClientsLinkRequest = async (createTrainerClientLinkRequest: CreateTrainerClientLinkRequest, options?: RequestInit): Promise<postTrainerClientsLinkRequestResponse> => {
+  
+  return customFetch<postTrainerClientsLinkRequestResponse>(getPostTrainerClientsLinkRequestUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createTrainerClientLinkRequest,)
+  }
+);}
+
+
+
+export type getTrainerClientsLinksResponse200 = {
+  data: TrainerClientLinkDto[]
+  status: 200
+}
+
+export type getTrainerClientsLinksResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getTrainerClientsLinksResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type getTrainerClientsLinksResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type getTrainerClientsLinksResponseSuccess = (getTrainerClientsLinksResponse200) & {
+  headers: Headers;
+};
+export type getTrainerClientsLinksResponseError = (getTrainerClientsLinksResponse401 | getTrainerClientsLinksResponse403 | getTrainerClientsLinksResponse404) & {
+  headers: Headers;
+};
+
+export type getTrainerClientsLinksResponse = (getTrainerClientsLinksResponseSuccess | getTrainerClientsLinksResponseError)
+
+export const getGetTrainerClientsLinksUrl = () => {
+
+
+  
+
+  return `/trainer/clients/links`
+}
+
+export const getTrainerClientsLinks = async ( options?: RequestInit): Promise<getTrainerClientsLinksResponse> => {
+  
+  return customFetch<getTrainerClientsLinksResponse>(getGetTrainerClientsLinksUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type deleteTrainerClientsLinkLinkIdResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteTrainerClientsLinkLinkIdResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type deleteTrainerClientsLinkLinkIdResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type deleteTrainerClientsLinkLinkIdResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type deleteTrainerClientsLinkLinkIdResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type deleteTrainerClientsLinkLinkIdResponseSuccess = (deleteTrainerClientsLinkLinkIdResponse204) & {
+  headers: Headers;
+};
+export type deleteTrainerClientsLinkLinkIdResponseError = (deleteTrainerClientsLinkLinkIdResponse401 | deleteTrainerClientsLinkLinkIdResponse403 | deleteTrainerClientsLinkLinkIdResponse404 | deleteTrainerClientsLinkLinkIdResponse409) & {
+  headers: Headers;
+};
+
+export type deleteTrainerClientsLinkLinkIdResponse = (deleteTrainerClientsLinkLinkIdResponseSuccess | deleteTrainerClientsLinkLinkIdResponseError)
+
+export const getDeleteTrainerClientsLinkLinkIdUrl = (linkId: string,) => {
+
+
+  
+
+  return `/trainer/clients/link/${linkId}`
+}
+
+export const deleteTrainerClientsLinkLinkId = async (linkId: string, options?: RequestInit): Promise<deleteTrainerClientsLinkLinkIdResponse> => {
+  
+  return customFetch<deleteTrainerClientsLinkLinkIdResponse>(getDeleteTrainerClientsLinkLinkIdUrl(linkId),
+  {      
+    ...options,
+    method: 'DELETE'
+    
+    
+  }
+);}
+
+
+
+export type getClientLinksRequestsResponse200 = {
+  data: TrainerClientLinkDto[]
+  status: 200
+}
+
+export type getClientLinksRequestsResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getClientLinksRequestsResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+    
+export type getClientLinksRequestsResponseSuccess = (getClientLinksRequestsResponse200) & {
+  headers: Headers;
+};
+export type getClientLinksRequestsResponseError = (getClientLinksRequestsResponse401 | getClientLinksRequestsResponse403) & {
+  headers: Headers;
+};
+
+export type getClientLinksRequestsResponse = (getClientLinksRequestsResponseSuccess | getClientLinksRequestsResponseError)
+
+export const getGetClientLinksRequestsUrl = () => {
+
+
+  
+
+  return `/client/links/requests`
+}
+
+export const getClientLinksRequests = async ( options?: RequestInit): Promise<getClientLinksRequestsResponse> => {
+  
+  return customFetch<getClientLinksRequestsResponse>(getGetClientLinksRequestsUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type getClientLinksResponse200 = {
+  data: TrainerClientLinkDto[]
+  status: 200
+}
+
+export type getClientLinksResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getClientLinksResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+    
+export type getClientLinksResponseSuccess = (getClientLinksResponse200) & {
+  headers: Headers;
+};
+export type getClientLinksResponseError = (getClientLinksResponse401 | getClientLinksResponse403) & {
+  headers: Headers;
+};
+
+export type getClientLinksResponse = (getClientLinksResponseSuccess | getClientLinksResponseError)
+
+export const getGetClientLinksUrl = () => {
+
+
+  
+
+  return `/client/links`
+}
+
+export const getClientLinks = async ( options?: RequestInit): Promise<getClientLinksResponse> => {
+  
+  return customFetch<getClientLinksResponse>(getGetClientLinksUrl(),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type postClientLinksLinkIdAcceptResponse200 = {
+  data: TrainerClientLinkDto
+  status: 200
+}
+
+export type postClientLinksLinkIdAcceptResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postClientLinksLinkIdAcceptResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postClientLinksLinkIdAcceptResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type postClientLinksLinkIdAcceptResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type postClientLinksLinkIdAcceptResponseSuccess = (postClientLinksLinkIdAcceptResponse200) & {
+  headers: Headers;
+};
+export type postClientLinksLinkIdAcceptResponseError = (postClientLinksLinkIdAcceptResponse400 | postClientLinksLinkIdAcceptResponse401 | postClientLinksLinkIdAcceptResponse403 | postClientLinksLinkIdAcceptResponse404) & {
+  headers: Headers;
+};
+
+export type postClientLinksLinkIdAcceptResponse = (postClientLinksLinkIdAcceptResponseSuccess | postClientLinksLinkIdAcceptResponseError)
+
+export const getPostClientLinksLinkIdAcceptUrl = (linkId: string,) => {
+
+
+  
+
+  return `/client/links/${linkId}/accept`
+}
+
+export const postClientLinksLinkIdAccept = async (linkId: string, options?: RequestInit): Promise<postClientLinksLinkIdAcceptResponse> => {
+  
+  return customFetch<postClientLinksLinkIdAcceptResponse>(getPostClientLinksLinkIdAcceptUrl(linkId),
+  {      
+    ...options,
+    method: 'POST'
+    
+    
+  }
+);}
+
+
+
+export type postClientLinksLinkIdRejectResponse200 = {
+  data: TrainerClientLinkDto
+  status: 200
+}
+
+export type postClientLinksLinkIdRejectResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postClientLinksLinkIdRejectResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postClientLinksLinkIdRejectResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type postClientLinksLinkIdRejectResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type postClientLinksLinkIdRejectResponseSuccess = (postClientLinksLinkIdRejectResponse200) & {
+  headers: Headers;
+};
+export type postClientLinksLinkIdRejectResponseError = (postClientLinksLinkIdRejectResponse400 | postClientLinksLinkIdRejectResponse401 | postClientLinksLinkIdRejectResponse403 | postClientLinksLinkIdRejectResponse404) & {
+  headers: Headers;
+};
+
+export type postClientLinksLinkIdRejectResponse = (postClientLinksLinkIdRejectResponseSuccess | postClientLinksLinkIdRejectResponseError)
+
+export const getPostClientLinksLinkIdRejectUrl = (linkId: string,) => {
+
+
+  
+
+  return `/client/links/${linkId}/reject`
+}
+
+export const postClientLinksLinkIdReject = async (linkId: string, options?: RequestInit): Promise<postClientLinksLinkIdRejectResponse> => {
+  
+  return customFetch<postClientLinksLinkIdRejectResponse>(getPostClientLinksLinkIdRejectUrl(linkId),
+  {      
+    ...options,
+    method: 'POST'
+    
+    
+  }
+);}
+
+
+
+export type deleteClientLinksLinkIdResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteClientLinksLinkIdResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type deleteClientLinksLinkIdResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type deleteClientLinksLinkIdResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type deleteClientLinksLinkIdResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type deleteClientLinksLinkIdResponseSuccess = (deleteClientLinksLinkIdResponse204) & {
+  headers: Headers;
+};
+export type deleteClientLinksLinkIdResponseError = (deleteClientLinksLinkIdResponse401 | deleteClientLinksLinkIdResponse403 | deleteClientLinksLinkIdResponse404 | deleteClientLinksLinkIdResponse409) & {
+  headers: Headers;
+};
+
+export type deleteClientLinksLinkIdResponse = (deleteClientLinksLinkIdResponseSuccess | deleteClientLinksLinkIdResponseError)
+
+export const getDeleteClientLinksLinkIdUrl = (linkId: string,) => {
+
+
+  
+
+  return `/client/links/${linkId}`
+}
+
+export const deleteClientLinksLinkId = async (linkId: string, options?: RequestInit): Promise<deleteClientLinksLinkIdResponse> => {
+  
+  return customFetch<deleteClientLinksLinkIdResponse>(getDeleteClientLinksLinkIdUrl(linkId),
+  {      
+    ...options,
+    method: 'DELETE'
+    
+    
+  }
+);}
+
+
+
+export type getClientMePendingLinkRequestsCountResponse200 = {
+  data: PendingCountDto
+  status: 200
+}
+
+export type getClientMePendingLinkRequestsCountResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getClientMePendingLinkRequestsCountResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+    
+export type getClientMePendingLinkRequestsCountResponseSuccess = (getClientMePendingLinkRequestsCountResponse200) & {
+  headers: Headers;
+};
+export type getClientMePendingLinkRequestsCountResponseError = (getClientMePendingLinkRequestsCountResponse401 | getClientMePendingLinkRequestsCountResponse403) & {
+  headers: Headers;
+};
+
+export type getClientMePendingLinkRequestsCountResponse = (getClientMePendingLinkRequestsCountResponseSuccess | getClientMePendingLinkRequestsCountResponseError)
+
+export const getGetClientMePendingLinkRequestsCountUrl = () => {
+
+
+  
+
+  return `/client/me/pending-link-requests/count`
+}
+
+export const getClientMePendingLinkRequestsCount = async ( options?: RequestInit): Promise<getClientMePendingLinkRequestsCountResponse> => {
+  
+  return customFetch<getClientMePendingLinkRequestsCountResponse>(getGetClientMePendingLinkRequestsCountUrl(),
   {      
     ...options,
     method: 'GET'

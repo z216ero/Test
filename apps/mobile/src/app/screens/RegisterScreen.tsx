@@ -220,10 +220,21 @@ export function RegisterScreen({ navigation, route }: Props) {
   });
 
 
-  const roleOptions = useMemo(
-    () => (rolesQuery.data?.length ? rolesQuery.data : fallbackRoleOptions),
-    [rolesQuery.data]
-  );
+  const roleOptions = useMemo(() => {
+    const source = rolesQuery.data?.length ? rolesQuery.data : fallbackRoleOptions;
+    return [...source].sort((a, b) => {
+      const getOrder = (item: LookupItem) => {
+        if (item.code === 'Client' || item.isClientRole) {
+          return 0;
+        }
+        if (item.code === 'Trainer' || item.isTrainerRole) {
+          return 1;
+        }
+        return 2;
+      };
+      return getOrder(a) - getOrder(b);
+    });
+  }, [rolesQuery.data]);
   const genderOptions = useMemo(
     () => {
       const filtered = (gendersQuery.data ?? []).filter((item) => !item.isAny);
@@ -552,11 +563,11 @@ export function RegisterScreen({ navigation, route }: Props) {
                 <Button
                   key={item.code}
                   size="$3"
-                  backgroundColor={isSelected ? '$background' : '$backgroundSoft'}
-                  color="$text"
+                  backgroundColor={isSelected ? '$accent' : '$backgroundSoft'}
+                  color={isSelected ? '$accentText' : '$text'}
                   fontWeight={isSelected ? '700' : '400'}
                   borderWidth={1}
-                  borderColor="$border"
+                  borderColor={isSelected ? '$accent' : '$border'}
                   borderRadius="$3"
                   onPress={() => {
                     setRole(item.code);
@@ -587,11 +598,11 @@ export function RegisterScreen({ navigation, route }: Props) {
                 <Button
                   key={item.code}
                   size="$3"
-                  backgroundColor={isSelected ? '$background' : '$backgroundSoft'}
-                  color="$text"
+                  backgroundColor={isSelected ? '$accent' : '$backgroundSoft'}
+                  color={isSelected ? '$accentText' : '$text'}
                   fontWeight={isSelected ? '700' : '400'}
                   borderWidth={1}
-                  borderColor="$border"
+                  borderColor={isSelected ? '$accent' : '$border'}
                   borderRadius="$3"
                   onPress={() => {
                     setGender(item.code);

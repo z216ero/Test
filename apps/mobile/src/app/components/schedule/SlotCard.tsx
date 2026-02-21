@@ -9,6 +9,7 @@ import {
   getSlotTimes,
   getUiSlotStatus,
   uiSlotStatusMeta,
+  type UiSlotStatus,
 } from './slotHelpers';
 import { SlotCardIndividual } from './SlotCardIndividual';
 import { SlotCardGroup } from './SlotCardGroup';
@@ -22,6 +23,7 @@ type SlotCardProps = {
     color: 'success' | 'destructive';
     chipText: string;
   } | null;
+  statusOverride?: UiSlotStatus;
 };
 
 export function SlotCard({
@@ -30,9 +32,10 @@ export function SlotCard({
   onPress,
   variant = 'default',
   highlight = null,
+  statusOverride,
 }: SlotCardProps) {
   const { isDark } = useAppTheme();
-  const statusType = getUiSlotStatus(slot, nowTs);
+  const statusType = statusOverride ?? getUiSlotStatus(slot, nowTs);
   const status = uiSlotStatusMeta[statusType];
   const statusLabel = t(status.labelKey);
   const times = getSlotTimes(slot);

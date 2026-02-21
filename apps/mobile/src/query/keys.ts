@@ -34,6 +34,11 @@ export const keys = {
         ? (['trainer', 'clients', 'list', params] as const)
         : (['trainer', 'clients', 'list'] as const),
   },
+  myClients: () => ['trainer', 'clients', 'my-clients'] as const,
+  clientRequests: () => ['client', 'links', 'requests'] as const,
+  pendingLinkRequestsCount: () => ['client', 'links', 'pending-count'] as const,
+  pendingBookingConfirmationsCount: () =>
+    ['client', 'bookings', 'pending-confirmations-count'] as const,
   reports: {
     summary: (params?: GetTrainersMeReportsSummaryParams) =>
       params

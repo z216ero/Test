@@ -3,6 +3,8 @@ import type { TranslationKey } from '@i18n';
 
 export type UiSlotStatus =
   | 'available'
+  | 'pending_confirmation'
+  | 'client_declined'
   | 'booked'
   | 'needs_attention'
   | 'completed'
@@ -26,6 +28,19 @@ export const uiSlotStatusMeta: Record<UiSlotStatus, UiSlotStatusMeta> = {
     labelKey: 'schedule.status.available',
     dotColor: '$accent',
     labelColor: '$text',
+  },
+  pending_confirmation: {
+    labelKey: 'schedule.status.pendingConfirmation',
+    dotColor: WARNING_COLOR,
+    labelColor: WARNING_COLOR,
+    borderColor: WARNING_COLOR,
+    backgroundColor: WARNING_TINT,
+  },
+  client_declined: {
+    labelKey: 'schedule.status.clientDeclined',
+    dotColor: '$danger',
+    labelColor: '$danger',
+    borderColor: '$danger',
   },
   booked: {
     labelKey: 'schedule.status.booked',
@@ -125,6 +140,18 @@ export const getSlotTimes = (slot: SlotDto) => {
 export const getUiSlotStatus = (slot: SlotDto, nowTs: number): UiSlotStatus => {
   const bookingStatus = normalize(slot.bookingStatus);
   const status = normalize(slot.status);
+  const clientConfirmationStatus = normalize(slot.clientConfirmationStatus);
+  const startTs = getStartTimestamp(slot);
+  const hasFutureStart = startTs !== null && startTs > nowTs;
+
+  if (
+    status !== 'cancelled'
+    && bookingStatus === 'cancelled'
+    && clientConfirmationStatus === 'declined'
+    && hasFutureStart
+  ) {
+    return 'client_declined';
+  }
 
   if (status === 'cancelled' || bookingStatus === 'cancelled') {
     return 'cancelled';
@@ -139,12 +166,15 @@ export const getUiSlotStatus = (slot: SlotDto, nowTs: number): UiSlotStatus => {
   }
 
   if (status === 'booked') {
+    if (clientConfirmationStatus === 'pending') {
+      return 'pending_confirmation';
+    }
     if (bookingStatus === 'booked') {
-      const startTs = getStartTimestamp(slot);
-      if (startTs !== null) {
-        const endTs = getSlotEndTimestamp(slot) ?? startTs;
+      const slotStartTs = getStartTimestamp(slot);
+      if (slotStartTs !== null) {
+        const endTs = getSlotEndTimestamp(slot) ?? slotStartTs;
         if (
-          nowTs >= startTs + NO_SHOW_AVAILABLE_AFTER_MS
+          nowTs >= slotStartTs + NO_SHOW_AVAILABLE_AFTER_MS
           || nowTs >= endTs
         ) {
           return 'needs_attention';
@@ -155,10 +185,13 @@ export const getUiSlotStatus = (slot: SlotDto, nowTs: number): UiSlotStatus => {
   }
 
   if ((status === 'available' || status === 'open') && bookingStatus === 'booked') {
-    const startTs = getStartTimestamp(slot);
-    if (startTs !== null) {
-      const endTs = getSlotEndTimestamp(slot) ?? startTs;
-      if (nowTs >= startTs + NO_SHOW_AVAILABLE_AFTER_MS || nowTs >= endTs) {
+    if (clientConfirmationStatus === 'pending') {
+      return 'pending_confirmation';
+    }
+    const slotStartTs = getStartTimestamp(slot);
+    if (slotStartTs !== null) {
+      const endTs = getSlotEndTimestamp(slot) ?? slotStartTs;
+      if (nowTs >= slotStartTs + NO_SHOW_AVAILABLE_AFTER_MS || nowTs >= endTs) {
         return 'needs_attention';
       }
     }
@@ -222,7 +255,7 @@ const isSlotBooked = (slot: SlotDto): boolean =>
   normalize(slot.status) === 'booked' || normalize(slot.bookingStatus) === 'booked';
 
 export const canCancelSlot = (slot: SlotDto, nowTs: number): boolean => {
-  if (!isSlotAvailable(slot)) {
+  if (!isSlotAvailable(slot) && getUiSlotStatus(slot, nowTs) !== 'client_declined') {
     return false;
   }
   const startTs = getStartTimestamp(slot);
@@ -261,11 +294,19 @@ export const isActiveSlotForMainList = (slot: SlotDto, nowTs: number): boolean =
   if (status === 'available') {
     return !isFreeSlotPast(slot, nowTs);
   }
-  if (status === 'booked' || status === 'needs_attention') {
+  if (
+    status === 'pending_confirmation'
+    || status === 'client_declined'
+    || status === 'booked'
+    || status === 'needs_attention'
+  ) {
     return true;
   }
   return true;
 };
+
+export const isClientDeclinedSlot = (slot: SlotDto, nowTs: number): boolean =>
+  getUiSlotStatus(slot, nowTs) === 'client_declined';
 
 export const getClientName = (slot: SlotDto): string | null => {
   const candidate = slot.clientName;

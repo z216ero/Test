@@ -13,6 +13,12 @@ type ReminderEntry = ReminderParams & {
   notificationId: string;
 };
 
+type NotifeeLike = {
+  createChannel?: (payload: { id: string; name: string }) => Promise<void>;
+  createTriggerNotification?: (notification: unknown, trigger: unknown) => Promise<string>;
+  cancelTriggerNotification?: (notificationId: string) => Promise<void>;
+};
+
 const STORAGE_KEY = 'notifications.reminders.v1';
 const ANDROID_CHANNEL_ID = 'training-reminders';
 
@@ -47,12 +53,12 @@ export const createAndroidChannelIfNeeded = async (): Promise<void> => {
     return;
   }
   const module = await getNotifeeModule();
-  const notifee = module?.default ?? module;
+  const notifee = (module?.default ?? module) as NotifeeLike | null;
   if (!notifee) {
     return;
   }
 
-  await notifee.createChannel({
+  await notifee.createChannel?.({
     id: ANDROID_CHANNEL_ID,
     name: 'Training reminders',
   });
@@ -62,9 +68,9 @@ export const scheduleTrainingReminder = async (
   params: ReminderParams
 ): Promise<void> => {
   const module = await getNotifeeModule();
-  const notifee = module?.default ?? module;
+  const notifee = (module?.default ?? module) as NotifeeLike | null;
   const TriggerType = module?.TriggerType;
-  if (!notifee || !TriggerType) {
+  if (!notifee || !TriggerType || !notifee.createTriggerNotification) {
     // TODO: integrate @notifee/react-native for scheduled local notifications.
     return;
   }
@@ -114,8 +120,8 @@ export const cancelTrainingReminder = async (
   }
 
   const module = await getNotifeeModule();
-  const notifee = module?.default ?? module;
-  if (notifee) {
+  const notifee = (module?.default ?? module) as NotifeeLike | null;
+  if (notifee?.cancelTriggerNotification) {
     await notifee.cancelTriggerNotification(entry.notificationId);
   }
 
@@ -138,10 +144,11 @@ export const clearAllTrainingReminders = async (): Promise<void> => {
   const entries = Object.values(map);
 
   const module = await getNotifeeModule();
-  const notifee = module?.default ?? module;
-  if (notifee) {
+  const notifee = (module?.default ?? module) as NotifeeLike | null;
+  const cancelTrigger = notifee?.cancelTriggerNotification;
+  if (cancelTrigger) {
     await Promise.allSettled(
-      entries.map((entry) => notifee.cancelTriggerNotification(entry.notificationId))
+      entries.map((entry) => cancelTrigger(entry.notificationId))
     );
   }
 

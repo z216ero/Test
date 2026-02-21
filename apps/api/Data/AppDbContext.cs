@@ -11,6 +11,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<TrainerProfile> TrainerProfiles => Set<TrainerProfile>();
     public DbSet<ClientProfile> ClientProfiles => Set<ClientProfile>();
     public DbSet<TrainerClient> TrainerClients => Set<TrainerClient>();
+    public DbSet<TrainerClientLink> TrainerClientLinks => Set<TrainerClientLink>();
     public DbSet<TrainingSlot> TrainingSlots => Set<TrainingSlot>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<Payment> Payments => Set<Payment>();
@@ -47,6 +48,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasDefaultValue(true)
                 .IsRequired();
             entity.Property(x => x.PushReminderEnabled)
+                .HasDefaultValue(true)
+                .IsRequired();
+            entity.Property(x => x.PushTrainerLinkRequestsEnabled)
+                .HasDefaultValue(true)
+                .IsRequired();
+            entity.Property(x => x.PushClientLinkResponsesEnabled)
                 .HasDefaultValue(true)
                 .IsRequired();
             entity.Property(x => x.PushReminderOffsetMinutes)
@@ -140,6 +147,36 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<TrainerClientLink>(entity =>
+        {
+            entity.ToTable("trainer_client_links");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Status)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(TrainerClientLinkStatus.Pending)
+                .IsRequired();
+            entity.Property(x => x.RequestedAtUtc)
+                .IsRequired();
+            entity.Property(x => x.RespondedAtUtc);
+            entity.Property(x => x.LastRequestAtUtc)
+                .IsRequired();
+            entity.Property(x => x.RejectedUntilUtc);
+            entity.HasIndex(x => x.TrainerId);
+            entity.HasIndex(x => x.ClientUserId);
+            entity.HasIndex(x => new { x.TrainerId, x.ClientUserId })
+                .IsUnique();
+            entity.HasIndex(x => new { x.ClientUserId, x.Status });
+            entity.HasOne(x => x.TrainerProfile)
+                .WithMany()
+                .HasForeignKey(x => x.TrainerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.ClientUser)
+                .WithMany()
+                .HasForeignKey(x => x.ClientUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<ClientProfile>(entity =>
         {
             entity.ToTable("client_profiles");
@@ -226,6 +263,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasMaxLength(20)
                 .HasDefaultValue(BookingStatus.Booked)
                 .IsRequired();
+            entity.Property(x => x.ClientConfirmationStatus)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(BookingClientConfirmationStatus.Confirmed)
+                .IsRequired();
+            entity.Property(x => x.ClientConfirmationRequestedAtUtc);
+            entity.Property(x => x.ClientConfirmationRespondedAtUtc);
             entity.Property(x => x.CreatedAtUtc)
                 .HasDefaultValueSql("now() at time zone 'utc'");
             entity.Property(x => x.UpdatedAtUtc);
@@ -233,6 +277,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsUnique();
             entity.HasIndex(x => x.ClientId);
             entity.HasIndex(x => x.TrainerClientId);
+            entity.HasIndex(x => new { x.ClientId, x.ClientConfirmationStatus });
             entity.ToTable(tb => tb.HasCheckConstraint(
                 "CK_bookings_client_or_trainer_client",
                 "(\"ClientId\" IS NULL) <> (\"TrainerClientId\" IS NULL)"));

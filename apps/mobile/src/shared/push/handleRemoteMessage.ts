@@ -18,7 +18,13 @@ type PushType =
   | 'slot_cancelled_by_trainer'
   | 'attendance_marked'
   | 'payment_marked_paid'
-  | 'payment_marked_pending';
+  | 'payment_marked_pending'
+  | 'trainer_client_link_requested'
+  | 'trainer_client_link_accepted'
+  | 'trainer_client_link_rejected'
+  | 'booking_confirmation_requested'
+  | 'booking_confirmation_confirmed'
+  | 'booking_confirmation_declined';
 
 type PushPayload = {
   type: PushType;
@@ -38,6 +44,7 @@ type PushPayload = {
   trainerName?: string;
   clientName?: string;
   cancellationReason?: string;
+  deeplink?: string;
 };
 
 const VALID_TYPES = new Set<PushType>([
@@ -47,6 +54,12 @@ const VALID_TYPES = new Set<PushType>([
   'attendance_marked',
   'payment_marked_paid',
   'payment_marked_pending',
+  'trainer_client_link_requested',
+  'trainer_client_link_accepted',
+  'trainer_client_link_rejected',
+  'booking_confirmation_requested',
+  'booking_confirmation_confirmed',
+  'booking_confirmation_declined',
 ]);
 
 const INVALIDATE_DEBOUNCE_MS = 400;
@@ -121,6 +134,7 @@ const parsePayload = (
     trainerName: readString(data.trainerName),
     clientName: readString(data.clientName),
     cancellationReason: readString(data.cancellationReason),
+    deeplink: readString(data.deeplink),
   };
 };
 
@@ -204,6 +218,36 @@ const buildInvalidationKeys = (payload: PushPayload): QueryKey[] => {
     }
   }
 
+  if (payload.type === 'trainer_client_link_requested') {
+    if (includeClient) {
+      list.push(keys.clientRequests());
+      list.push(keys.pendingLinkRequestsCount());
+    }
+    return list;
+  }
+
+  if (payload.type === 'trainer_client_link_accepted' || payload.type === 'trainer_client_link_rejected') {
+    if (includeTrainer) {
+      list.push(keys.myClients());
+    }
+    return list;
+  }
+
+  if (
+    payload.type === 'booking_confirmation_requested'
+    || payload.type === 'booking_confirmation_confirmed'
+    || payload.type === 'booking_confirmation_declined'
+  ) {
+    if (includeClient) {
+      list.push(...collectClientKeys(payload));
+      list.push(keys.pendingBookingConfirmationsCount());
+    }
+    if (includeTrainer) {
+      list.push(keys.myClients());
+      list.push(...collectTrainerKeys());
+    }
+  }
+
   return list;
 };
 
@@ -239,6 +283,17 @@ const buildTrainerHighlight = (payload: PushPayload): SlotHighlight | null => {
     };
   }
 
+  if (payload.type === 'booking_confirmation_declined') {
+    return {
+      eventId: payload.eventId,
+      type: 'booking_declined',
+      color: 'destructive',
+      chipText: 'Отказ',
+      createdAt,
+      seen: false,
+    };
+  }
+
   return null;
 };
 
@@ -268,7 +323,11 @@ export const handleRemoteMessage = async (
 
   if (
     isTrainerTarget
-    && (payload.type === 'booking_created' || payload.type === 'booking_cancelled')
+    && (
+      payload.type === 'booking_created'
+      || payload.type === 'booking_cancelled'
+      || payload.type === 'booking_confirmation_declined'
+    )
   ) {
     await setScheduleBadgeUnread();
     const highlight = buildTrainerHighlight(payload);
@@ -305,4 +364,3 @@ export const handleRemoteMessage = async (
 
   pushInvalidations(keysToInvalidate);
 };
-

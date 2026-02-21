@@ -10,6 +10,9 @@ public static class BookingEndpoints
     public static IEndpointRouteBuilder MapBookingEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/slots/{slotId:guid}").WithTags("Bookings");
+        var trainerAssignments = app.MapGroup("/trainer/slots/{slotId:guid}").WithTags("Bookings");
+        var clientBookings = app.MapGroup("/client/bookings").WithTags("Bookings");
+        var clientGroup = app.MapGroup("/client").WithTags("Bookings");
 
         group.MapPost("/book", async (
             Guid slotId,
@@ -49,6 +52,57 @@ public static class BookingEndpoints
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict)
         .RequireAuthorization();
+
+        trainerAssignments.MapPost("/assign-client", async (
+            Guid slotId,
+            AssignRegisteredClientRequest? request,
+            HttpContext httpContext,
+            BookingService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            if (!string.Equals(role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
+            {
+                return TypedResults.Problem(
+                    title: "Forbidden",
+                    detail: "Only trainers can assign clients to slots.",
+                    statusCode: StatusCodes.Status403Forbidden,
+                    type: "https://errors.trainerapp/forbidden");
+            }
+
+            if (request is null || request.ClientUserId == Guid.Empty)
+            {
+                var errors = new Dictionary<string, string[]>
+                {
+                    ["clientUserId"] = ["ClientUserId is required."]
+                };
+                return Problems.Validation(errors);
+            }
+
+            var result = await service.AssignRegisteredClientToSlotAsync(
+                slotId,
+                userId,
+                request.ClientUserId,
+                cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .RequireAuthorization()
+        .Produces<BookingDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPost("/cancel", async (
             Guid slotId,
@@ -308,6 +362,113 @@ public static class BookingEndpoints
         .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict);
+
+        clientBookings.MapPost("/{bookingId:guid}/confirm", async (
+            Guid bookingId,
+            HttpContext httpContext,
+            BookingService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            if (!string.Equals(role, UserRoles.Client, StringComparison.OrdinalIgnoreCase))
+            {
+                return TypedResults.Problem(
+                    title: "Forbidden",
+                    detail: "Only clients can confirm bookings.",
+                    statusCode: StatusCodes.Status403Forbidden,
+                    type: "https://errors.trainerapp/forbidden");
+            }
+
+            var result = await service.ConfirmClientBookingAsync(bookingId, userId, cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .RequireAuthorization()
+        .Produces<BookingDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
+
+        clientBookings.MapPost("/{bookingId:guid}/decline", async (
+            Guid bookingId,
+            HttpContext httpContext,
+            BookingService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            if (!string.Equals(role, UserRoles.Client, StringComparison.OrdinalIgnoreCase))
+            {
+                return TypedResults.Problem(
+                    title: "Forbidden",
+                    detail: "Only clients can decline bookings.",
+                    statusCode: StatusCodes.Status403Forbidden,
+                    type: "https://errors.trainerapp/forbidden");
+            }
+
+            var result = await service.DeclineClientBookingAsync(bookingId, userId, cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .RequireAuthorization()
+        .Produces<BookingDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
+
+        clientGroup.MapGet("/me/pending-booking-confirmations/count", async (
+            HttpContext httpContext,
+            BookingService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            if (!string.Equals(role, UserRoles.Client, StringComparison.OrdinalIgnoreCase))
+            {
+                return TypedResults.Problem(
+                    title: "Forbidden",
+                    detail: "Only clients can access this resource.",
+                    statusCode: StatusCodes.Status403Forbidden,
+                    type: "https://errors.trainerapp/forbidden");
+            }
+
+            var result = await service.GetPendingBookingConfirmationsCountAsync(userId, cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .RequireAuthorization()
+        .Produces<PendingBookingConfirmationsCountDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden);
 
         return app;
     }

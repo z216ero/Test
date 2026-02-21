@@ -9,12 +9,12 @@ import type {
   CreateSlotRequest,
   GetTrainersTrainerIdSlotsParams,
   SlotDto,
-  TrainerClientDto,
 } from '@generated/api';
 import { ApiError } from '@api/core';
 import { ApiTimeoutError } from '@api/fetcher';
 import { TrainerSlotsOverlapError } from '@api/trainerSlotsApi';
 import { getTrainerClientsList } from '@api/trainerClientsApi';
+import { getTrainerClientLinks } from '@api/clientLinksApi';
 import { t } from '@i18n';
 import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
@@ -44,6 +44,21 @@ export type UseCreateSlotFormStateArgs = {
   onAfterSuccess: (count: number) => void;
   initialDateIsoLocal?: string;
   initialAssignTrainerClientId?: string;
+};
+
+type AssignableClient = {
+  id: string;
+  displayName: string;
+  phone?: string | null;
+  assignToTrainerClientId: string | null;
+  assignToClientId: string | null;
+};
+
+const normalizeSelectedClientId = (value?: string | null): string | null => {
+  if (!value) {
+    return null;
+  }
+  return value.includes(':') ? value : `local:${value}`;
 };
 
 export const MULTI_COUNTS = [2, 3, 4] as const;
@@ -192,7 +207,7 @@ export const useCreateSlotFormState = ({
     initialAssignTrainerClientId ? 'assigned' : 'open'
   );
   const [selectedTrainerClientId, setSelectedTrainerClientId] = useState<string | null>(
-    initialAssignTrainerClientId ?? null
+    normalizeSelectedClientId(initialAssignTrainerClientId)
   );
   const [trainerClientSearch, setTrainerClientSearch] = useState('');
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false);
@@ -283,9 +298,18 @@ export const useCreateSlotFormState = ({
     queryFn: ({ signal }) => loadSlots(dateRange, { signal }),
   });
 
-  const trainerClientsQuery = useAppQuery({
+  const localTrainerClientsQuery = useAppQuery({
     queryKey: keys.trainerClients.list({ status: 'Active' }),
     queryFn: ({ signal }) => getTrainerClientsList({ status: 'Active' }, { signal }),
+  });
+  const linkedTrainerClientsQuery = useAppQuery({
+    queryKey: keys.myClients(),
+    queryFn: ({ signal }) => getTrainerClientLinks().then((items) => {
+      if (signal.aborted) {
+        return [];
+      }
+      return items.filter((item) => (item.status ?? '').toLowerCase() === 'accepted');
+    }),
   });
 
   useEffect(() => {
@@ -293,7 +317,7 @@ export const useCreateSlotFormState = ({
       return;
     }
     setAssignmentMode('assigned');
-    setSelectedTrainerClientId(initialAssignTrainerClientId);
+    setSelectedTrainerClientId(normalizeSelectedClientId(initialAssignTrainerClientId));
   }, [initialAssignTrainerClientId]);
 
   useEffect(() => {
@@ -309,21 +333,45 @@ export const useCreateSlotFormState = ({
     }
   }, [assignmentMode, multiEnabled]);
 
-  const trainerClients = useMemo(
-    () => trainerClientsQuery.data ?? [],
-    [trainerClientsQuery.data]
+  const trainerClientsQuery = useMemo(
+    () => ({
+      isLoading: localTrainerClientsQuery.isLoading || linkedTrainerClientsQuery.isLoading,
+    }),
+    [linkedTrainerClientsQuery.isLoading, localTrainerClientsQuery.isLoading]
   );
+  const trainerClients = useMemo<AssignableClient[]>(() => {
+    const localItems = (localTrainerClientsQuery.data ?? [])
+      .filter((item) => Boolean(item.id))
+      .map((item) => ({
+        id: `local:${item.id}`,
+        displayName: item.displayName?.trim() || t('common.empty'),
+        phone: item.phone,
+        assignToTrainerClientId: item.id ?? null,
+        assignToClientId: null,
+      }));
+    const linkedItems = (linkedTrainerClientsQuery.data ?? [])
+      .filter((item) => Boolean(item.clientUserId))
+      .map((item) => ({
+        id: `linked:${item.clientUserId}`,
+        displayName: item.clientName?.trim() || t('common.empty'),
+        phone: item.clientPhone,
+        assignToTrainerClientId: null,
+        assignToClientId: item.clientUserId ?? null,
+      }));
+    return [...linkedItems, ...localItems];
+  }, [linkedTrainerClientsQuery.data, localTrainerClientsQuery.data]);
   const filteredTrainerClients = useMemo(() => {
     const query = trainerClientSearch.trim().toLowerCase();
     if (!query) {
       return trainerClients;
     }
     return trainerClients.filter((item) =>
-      (item.displayName ?? '').toLowerCase().includes(query)
+      item.displayName.toLowerCase().includes(query)
+      || (item.phone ?? '').toLowerCase().includes(query)
     );
   }, [trainerClientSearch, trainerClients]);
 
-  const selectedTrainerClient = useMemo<TrainerClientDto | null>(
+  const selectedTrainerClient = useMemo<AssignableClient | null>(
     () =>
       trainerClients.find((item) => item.id && item.id === selectedTrainerClientId) ?? null,
     [selectedTrainerClientId, trainerClients]
@@ -558,6 +606,13 @@ export const useCreateSlotFormState = ({
     }
 
     const ranges = buildSequentialRanges(selectedStart, slotCount);
+    const selectedAssignedClient = assignmentMode === 'assigned'
+      ? trainerClients.find((item) => item.id === selectedTrainerClientId)
+      : null;
+    if (assignmentMode === 'assigned' && !selectedAssignedClient) {
+      return;
+    }
+
     const payloads = ranges.map((range) => ({
       startsAtUtc: range.startLocal.toISOString(),
       durationMinutes: SLOT_DURATION_MINUTES,
@@ -566,8 +621,13 @@ export const useCreateSlotFormState = ({
       capacityMax: groupEnabled ? groupCapacityMax : null,
       autoCancelIfMinNotReached: groupEnabled ? groupAutoCancelIfMinNotReached : false,
       assignToTrainerClientId:
-        !groupEnabled && assignmentMode === 'assigned' ? selectedTrainerClientId : null,
-      assignToClientId: null,
+        !groupEnabled && assignmentMode === 'assigned'
+          ? selectedAssignedClient?.assignToTrainerClientId ?? null
+          : null,
+      assignToClientId:
+        !groupEnabled && assignmentMode === 'assigned'
+          ? selectedAssignedClient?.assignToClientId ?? null
+          : null,
     }));
 
     try {

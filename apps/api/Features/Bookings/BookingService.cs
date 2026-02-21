@@ -116,6 +116,9 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                         ClientId = actorClientUserId,
                         TrainerClientId = null,
                         Status = BookingStatus.Booked,
+                        ClientConfirmationStatus = BookingClientConfirmationStatus.Confirmed,
+                        ClientConfirmationRequestedAtUtc = null,
+                        ClientConfirmationRespondedAtUtc = DateTime.UtcNow,
                         CreatedAtUtc = DateTime.UtcNow,
                         UpdatedAtUtc = DateTime.UtcNow
                     };
@@ -138,6 +141,9 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                     slot.Booking.ClientId = actorClientUserId;
                     slot.Booking.TrainerClientId = null;
                     slot.Booking.Status = BookingStatus.Booked;
+                    slot.Booking.ClientConfirmationStatus = BookingClientConfirmationStatus.Confirmed;
+                    slot.Booking.ClientConfirmationRequestedAtUtc = null;
+                    slot.Booking.ClientConfirmationRespondedAtUtc = DateTime.UtcNow;
                     slot.Booking.UpdatedAtUtc = DateTime.UtcNow;
 
                     var existingPayment = await db.Payments
@@ -328,6 +334,373 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
             var dto = await BuildSlotDtoAsync(slotId, cancellationToken);
             return ServiceResult<SlotDto>.Success(dto);
         });
+    }
+
+    public async Task<ServiceResult<BookingDto>> AssignRegisteredClientToSlotAsync(
+        Guid slotId,
+        Guid trainerUserId,
+        Guid clientUserId,
+        CancellationToken cancellationToken)
+    {
+        if (clientUserId == Guid.Empty)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid client",
+                "ClientUserId is required.");
+        }
+
+        var trainerProfileId = await db.TrainerProfiles
+            .AsNoTracking()
+            .Where(t => t.UserId == trainerUserId)
+            .Select(t => (Guid?)t.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (!trainerProfileId.HasValue)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status404NotFound,
+                "Trainer profile not found",
+                "Trainer profile is not available for this user.");
+        }
+
+        var clientExists = await db.Users
+            .AsNoTracking()
+            .AnyAsync(
+                u => u.Id == clientUserId
+                    && u.Role == UserRoles.Client,
+                cancellationToken);
+        if (!clientExists)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Invalid client",
+                "Client user must exist and have Client role.");
+        }
+
+        var hasAcceptedLink = await db.TrainerClientLinks
+            .AsNoTracking()
+            .AnyAsync(
+                l => l.TrainerId == trainerProfileId.Value
+                    && l.ClientUserId == clientUserId
+                    && l.Status == TrainerClientLinkStatus.Accepted,
+                cancellationToken);
+        if (!hasAcceptedLink)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status409Conflict,
+                "Link is required",
+                "Client must accept trainer link request before assignment.",
+                new Dictionary<string, object?> { ["errorCode"] = "link_required" });
+        }
+
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database
+                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+            var slot = await db.TrainingSlots
+                .Include(s => s.Booking)
+                .Include(s => s.TrainerProfile)
+                .FirstOrDefaultAsync(s => s.Id == slotId, cancellationToken);
+            if (slot is null)
+            {
+                return ServiceResult<BookingDto>.Fail(
+                    StatusCodes.Status404NotFound,
+                    "Slot not found",
+                    "Slot does not exist.");
+            }
+
+            if (slot.TrainerId != trainerProfileId.Value)
+            {
+                return ServiceResult<BookingDto>.Fail(
+                    StatusCodes.Status403Forbidden,
+                    "Forbidden",
+                    "Slot does not belong to this trainer.",
+                    new Dictionary<string, object?> { ["errorCode"] = "forbidden" });
+            }
+
+            if (slot.SlotType != TrainingSlotType.Individual)
+            {
+                return ServiceResult<BookingDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Invalid slot type",
+                    "Only individual slots support direct assignment.");
+            }
+
+            if (slot.Status == TrainingSlotStatus.Cancelled)
+            {
+                return ServiceResult<BookingDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Slot not available",
+                    "Cancelled slot cannot be assigned.");
+            }
+
+            if (slot.StartsAtUtc <= DateTime.UtcNow)
+            {
+                return ServiceResult<BookingDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Slot already started",
+                    "Started slot cannot be assigned.");
+            }
+
+            if (slot.Booking is not null && slot.Booking.Status == BookingStatus.Booked)
+            {
+                return ServiceResult<BookingDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Slot already booked",
+                    "Slot already has an active booking.");
+            }
+
+            var startsAtUtc = slot.StartsAtUtc;
+            var endsAtUtc = slot.StartsAtUtc.AddMinutes(slot.DurationMinutes);
+            var conflict = await BookingConflictChecker.FindTimeConflictAsync(
+                db,
+                clientUserId,
+                trainerClientId: null,
+                currentSlotId: slot.Id,
+                startsAtUtc,
+                endsAtUtc,
+                cancellationToken);
+            if (conflict is not null)
+            {
+                return ServiceResult<BookingDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Booking time conflict",
+                    "У этого клиента уже есть запись на это время.",
+                    new Dictionary<string, object?>
+                    {
+                        ["errorCode"] = "booking_time_conflict",
+                        ["conflictSlotId"] = conflict.Value.SlotId,
+                        ["conflictStartsAtUtc"] = conflict.Value.StartsAtUtc.ToString("O")
+                    });
+            }
+
+            var nowUtc = DateTime.UtcNow;
+            Booking booking;
+            if (slot.Booking is null)
+            {
+                booking = new Booking
+                {
+                    Id = Guid.NewGuid(),
+                    SlotId = slot.Id,
+                    ClientId = clientUserId,
+                    TrainerClientId = null,
+                    Status = BookingStatus.Booked,
+                    ClientConfirmationStatus = BookingClientConfirmationStatus.Pending,
+                    ClientConfirmationRequestedAtUtc = nowUtc,
+                    ClientConfirmationRespondedAtUtc = null,
+                    CreatedAtUtc = nowUtc,
+                    UpdatedAtUtc = nowUtc
+                };
+                db.Bookings.Add(booking);
+            }
+            else
+            {
+                booking = slot.Booking;
+                booking.ClientId = clientUserId;
+                booking.TrainerClientId = null;
+                booking.Status = BookingStatus.Booked;
+                booking.ClientConfirmationStatus = BookingClientConfirmationStatus.Pending;
+                booking.ClientConfirmationRequestedAtUtc = nowUtc;
+                booking.ClientConfirmationRespondedAtUtc = null;
+                booking.UpdatedAtUtc = nowUtc;
+            }
+
+            var payment = await db.Payments
+                .FirstOrDefaultAsync(p => p.BookingId == booking.Id, cancellationToken);
+            if (payment is null)
+            {
+                db.Payments.Add(new Payment
+                {
+                    Id = Guid.NewGuid(),
+                    BookingId = booking.Id,
+                    Amount = slot.TrainerProfile?.PricePerSession ?? 0,
+                    Status = PaymentStatus.Pending,
+                    Method = null,
+                    PaidAtUtc = null,
+                    CreatedAtUtc = nowUtc,
+                    UpdatedAtUtc = nowUtc
+                });
+            }
+            else
+            {
+                payment.Status = PaymentStatus.Pending;
+                payment.Method = null;
+                payment.PaidAtUtc = null;
+                payment.UpdatedAtUtc = nowUtc;
+            }
+
+            slot.Status = TrainingSlotStatus.Booked;
+
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (Exception ex) when (IsBookingConflict(ex))
+            {
+                return ServiceResult<BookingDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Slot already booked",
+                    "Slot already has a booking.");
+            }
+
+            await pushService.NotifyBookingConfirmationRequestedAsync(
+                booking.Id,
+                slot.Id,
+                slot.TrainerId,
+                clientUserId,
+                startsAtUtc,
+                cancellationToken);
+
+            return ServiceResult<BookingDto>.Success(ToDto(booking));
+        });
+    }
+
+    public async Task<ServiceResult<BookingDto>> ConfirmClientBookingAsync(
+        Guid bookingId,
+        Guid clientUserId,
+        CancellationToken cancellationToken)
+    {
+        var booking = await db.Bookings
+            .Include(b => b.Slot)
+            .FirstOrDefaultAsync(b => b.Id == bookingId, cancellationToken);
+        if (booking is null || booking.Slot is null)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status404NotFound,
+                "Booking not found",
+                "Booking does not exist.");
+        }
+
+        if (booking.ClientId != clientUserId)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status403Forbidden,
+                "Forbidden",
+                "Booking does not belong to this client.",
+                new Dictionary<string, object?> { ["errorCode"] = "forbidden" });
+        }
+
+        if (booking.Slot.StartsAtUtc <= DateTime.UtcNow)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Booking already started",
+                "Тренировка уже началась, подтверждение недоступно.");
+        }
+
+        if (booking.Status != BookingStatus.Booked)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status409Conflict,
+                "Invalid booking state",
+                "Only active bookings can be confirmed.");
+        }
+
+        if (booking.ClientConfirmationStatus != BookingClientConfirmationStatus.Pending)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status409Conflict,
+                "Already processed",
+                "Booking confirmation has already been processed.");
+        }
+
+        booking.ClientConfirmationStatus = BookingClientConfirmationStatus.Confirmed;
+        booking.ClientConfirmationRespondedAtUtc = DateTime.UtcNow;
+        booking.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+
+        await pushService.NotifyBookingConfirmationConfirmedAsync(
+            booking.Id,
+            booking.SlotId,
+            booking.Slot.TrainerId,
+            clientUserId,
+            booking.Slot.StartsAtUtc,
+            cancellationToken);
+
+        return ServiceResult<BookingDto>.Success(ToDto(booking));
+    }
+
+    public async Task<ServiceResult<BookingDto>> DeclineClientBookingAsync(
+        Guid bookingId,
+        Guid clientUserId,
+        CancellationToken cancellationToken)
+    {
+        var booking = await db.Bookings
+            .Include(b => b.Slot)
+            .FirstOrDefaultAsync(b => b.Id == bookingId, cancellationToken);
+        if (booking is null || booking.Slot is null)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status404NotFound,
+                "Booking not found",
+                "Booking does not exist.");
+        }
+
+        if (booking.ClientId != clientUserId)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status403Forbidden,
+                "Forbidden",
+                "Booking does not belong to this client.",
+                new Dictionary<string, object?> { ["errorCode"] = "forbidden" });
+        }
+
+        if (booking.Slot.StartsAtUtc <= DateTime.UtcNow)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Booking already started",
+                "Тренировка уже началась, подтверждение недоступно.");
+        }
+
+        if (booking.Status != BookingStatus.Booked
+            || booking.ClientConfirmationStatus != BookingClientConfirmationStatus.Pending)
+        {
+            return ServiceResult<BookingDto>.Fail(
+                StatusCodes.Status409Conflict,
+                "Already processed",
+                "Booking confirmation has already been processed.");
+        }
+
+        booking.ClientConfirmationStatus = BookingClientConfirmationStatus.Declined;
+        booking.ClientConfirmationRespondedAtUtc = DateTime.UtcNow;
+        booking.Status = BookingStatus.Cancelled;
+        booking.UpdatedAtUtc = DateTime.UtcNow;
+        booking.Slot.Status = TrainingSlotStatus.Open;
+        await db.SaveChangesAsync(cancellationToken);
+
+        await pushService.NotifyBookingConfirmationDeclinedAsync(
+            booking.Id,
+            booking.SlotId,
+            booking.Slot.TrainerId,
+            clientUserId,
+            booking.Slot.StartsAtUtc,
+            cancellationToken);
+
+        return ServiceResult<BookingDto>.Success(ToDto(booking));
+    }
+
+    public async Task<ServiceResult<PendingBookingConfirmationsCountDto>> GetPendingBookingConfirmationsCountAsync(
+        Guid clientUserId,
+        CancellationToken cancellationToken)
+    {
+        var nowUtc = DateTime.UtcNow;
+        var count = await db.Bookings
+            .AsNoTracking()
+            .CountAsync(
+                b => b.ClientId == clientUserId
+                    && b.Status == BookingStatus.Booked
+                    && b.ClientConfirmationStatus == BookingClientConfirmationStatus.Pending
+                    && b.Slot != null
+                    && b.Slot.Status != TrainingSlotStatus.Cancelled
+                    && b.Slot.StartsAtUtc > nowUtc,
+                cancellationToken);
+
+        return ServiceResult<PendingBookingConfirmationsCountDto>.Success(
+            new PendingBookingConfirmationsCountDto(count));
     }
 
     public async Task<ServiceResult<SlotDto>> CancelSlotAsync(
@@ -998,6 +1371,9 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
             booking.ClientId,
             booking.TrainerClientId,
             booking.Status.ToString(),
+            booking.ClientConfirmationStatus.ToString(),
+            booking.ClientConfirmationRequestedAtUtc,
+            booking.ClientConfirmationRespondedAtUtc,
             booking.CreatedAtUtc,
             booking.UpdatedAtUtc);
 

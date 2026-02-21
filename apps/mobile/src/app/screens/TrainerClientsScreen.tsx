@@ -2,36 +2,52 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useMemo, useState } from 'react';
 import { RefreshControl } from 'react-native';
 import { Sheet } from '@tamagui/sheet';
-import { Button, Text, XStack, YStack } from 'tamagui';
+import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
+import { archiveTrainerClient, getTrainerClientsList } from '@api/trainerClientsApi';
 import {
-  archiveTrainerClient,
-  getTrainerClientsList,
-  updateTrainerClient,
-} from '@api/trainerClientsApi';
-import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
-import type { TrainerClientDto } from '@generated/api';
+  getTrainerClientLinks,
+  revokeTrainerClientLink,
+  type TrainerClientLink,
+} from '@api/clientLinksApi';
 import { t } from '@i18n';
 import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
 import { useQueryClient } from '@tanstack/react-query';
-import { FormInput, PhoneInput } from '@ui/components';
+import { FormInput } from '@ui/components';
 import { useToast } from '@ui/feedback/useToast';
 import { AppIcon } from '@ui/AppIcon';
 import { TabScrollView } from '@ui/layout/TabScrollView';
-import { EmptyState } from '@ui/states/EmptyState';
-import { ErrorState } from '@ui/states/ErrorState';
-import { LoadingState } from '@ui/states/LoadingState';
 import type { ProfileStackParamList } from '@app/navigation/types';
-import { normalizeRussianPhoneInput } from '@utils/phone';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'TrainerClients'>;
 
+type ClientKind = 'local' | 'linked';
+
+type MyClientItem = {
+  key: string;
+  kind: ClientKind;
+  displayName: string;
+  phone?: string | null;
+  localId?: string;
+  link?: TrainerClientLink;
+};
+
+const hiddenOverlayStyle = { opacity: 0 } as const;
+
 const normalize = (value?: string | null): string =>
   (value ?? '').trim().toLowerCase();
-const hiddenOverlayStyle = { opacity: 0 } as const;
-const trimToUndefined = (value: string): string | undefined => {
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+
+const linkStatusLabel = (status?: string): string => {
+  switch ((status ?? '').toLowerCase()) {
+    case 'accepted':
+      return t('trainerClients.statusAccepted');
+    case 'pending':
+      return t('trainerClients.statusPending');
+    case 'rejected':
+      return t('trainerClients.statusRejected');
+    default:
+      return t('common.empty');
+  }
 };
 
 export function TrainerClientsScreen({ navigation }: Props) {
@@ -39,211 +55,122 @@ export function TrainerClientsScreen({ navigation }: Props) {
   const { showToast } = useToast();
   const [search, setSearch] = useState('');
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [activeItem, setActiveItem] = useState<MyClientItem | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [activeClient, setActiveClient] = useState<TrainerClientDto | null>(null);
-  const [editDisplayName, setEditDisplayName] = useState('');
-  const [editPhone, setEditPhone] = useState('');
-  const [editNotes, setEditNotes] = useState('');
-  const [sheetError, setSheetError] = useState<string | null>(null);
 
-  const clientsQuery = useAppQuery({
+  const localQuery = useAppQuery({
     queryKey: keys.trainerClients.list({ status: 'Active' }),
     queryFn: ({ signal }) => getTrainerClientsList({ status: 'Active' }, { signal }),
   });
 
-  const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
-  const filteredClients = useMemo(() => {
+  const linksQuery = useAppQuery({
+    queryKey: keys.myClients(),
+    queryFn: () => getTrainerClientLinks(),
+  });
+
+  const localClients = useMemo(() => localQuery.data ?? [], [localQuery.data]);
+  const linkedClients = useMemo(() => linksQuery.data ?? [], [linksQuery.data]);
+
+  const merged = useMemo<MyClientItem[]>(() => {
+    const localItems = localClients.map((client) => ({
+      key: `local-${client.id}`,
+      kind: 'local' as const,
+      displayName: client.displayName ?? t('common.empty'),
+      phone: client.phone,
+      localId: client.id,
+    }));
+
+    const linkedItems = linkedClients.map((link) => ({
+      key: `link-${link.id}`,
+      kind: 'linked' as const,
+      displayName: link.clientName?.trim() || t('common.empty'),
+      phone: link.clientPhone,
+      link,
+    }));
+
+    return [...linkedItems, ...localItems];
+  }, [linkedClients, localClients]);
+
+  const filtered = useMemo(() => {
     const query = normalize(search);
     if (!query) {
-      return clients;
+      return merged;
     }
 
-    return clients.filter((client) =>
-      normalize(client.displayName).includes(query)
-    );
-  }, [clients, search]);
+    return merged.filter((item) => normalize(item.displayName).includes(query));
+  }, [merged, search]);
 
-  const archiveMutation = useAppMutation({
-    mutationFn: (clientId: string) => archiveTrainerClient(clientId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: keys.trainerClients.list() });
-      setSheetOpen(false);
-      setActiveClient(null);
-    },
-    onError: (err) => {
-      const presented = presentApiError(err);
-      const message = presented.kind === 'conflict'
-        ? t('trainerClients.errorPhoneInUse')
-        : presented.message;
-      setSheetError(message);
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message,
-        });
-      }
-    },
-  });
-
-  const updateMutation = useAppMutation({
-    mutationFn: (payload: { id: string; displayName: string; phone: string; notes: string }) =>
-      updateTrainerClient(payload.id, {
-        displayName: trimToUndefined(payload.displayName),
-        phone: trimToUndefined(payload.phone),
-        notes: trimToUndefined(payload.notes),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: keys.trainerClients.list() });
-      setSheetError(null);
-      setSheetOpen(false);
-      setActiveClient(null);
-    },
-    onError: (err) => {
-      const presented = presentApiError(err);
-      const message = presented.kind === 'conflict'
-        ? t('trainerClients.errorPhoneInUse')
-        : presented.message;
-      setSheetError(message);
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message,
-        });
-      }
-    },
-  });
-
-  const handleRefresh = async () => {
+  const refreshAll = async () => {
     setIsManualRefreshing(true);
     try {
-      await clientsQuery.refetch();
+      await Promise.allSettled([localQuery.refetch(), linksQuery.refetch()]);
     } finally {
       setIsManualRefreshing(false);
     }
   };
 
-  const openClientActions = (client: TrainerClientDto) => {
-    setActiveClient(client);
-    setEditDisplayName(client.displayName ?? '');
-    setEditPhone(client.phone?.trim() ? normalizeRussianPhoneInput(client.phone) : '');
-    setEditNotes(client.notes ?? '');
-    setSheetError(null);
+  const archiveMutation = useAppMutation({
+    mutationFn: (clientId: string) => archiveTrainerClient(clientId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.trainerClients.list() });
+      queryClient.invalidateQueries({ queryKey: keys.myClients() });
+      setSheetOpen(false);
+      setActiveItem(null);
+      showToast({ type: 'success', title: t('trainerClients.removed') });
+    },
+    onError: () => {
+      showToast({ type: 'error', title: t('errors.generic') });
+    },
+  });
+
+  const revokeMutation = useAppMutation({
+    mutationFn: (linkId: string) => revokeTrainerClientLink(linkId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.myClients() });
+      setSheetOpen(false);
+      setActiveItem(null);
+      showToast({ type: 'success', title: t('trainerClients.removed') });
+    },
+    onError: () => {
+      showToast({ type: 'error', title: t('errors.generic') });
+    },
+  });
+
+  const isBusy = archiveMutation.isPending || revokeMutation.isPending;
+
+  const handleRemove = () => {
+    if (!activeItem || isBusy) {
+      return;
+    }
+
+    if (activeItem.kind === 'local' && activeItem.localId) {
+      archiveMutation.mutate(activeItem.localId);
+      return;
+    }
+
+    if (activeItem.kind === 'linked' && activeItem.link?.id) {
+      revokeMutation.mutate(activeItem.link.id);
+    }
+  };
+
+  const openDetails = (item: MyClientItem) => {
+    setActiveItem(item);
     setSheetOpen(true);
   };
 
-  const handleSave = () => {
-    if (!activeClient?.id || updateMutation.isPending) {
-      return;
-    }
-
-    const nameLength = editDisplayName.trim().length;
-    const phoneLength = editPhone.trim().length;
-    const notesLength = editNotes.trim().length;
-    if (nameLength === 0 || nameLength > 100 || phoneLength > 30 || notesLength > 500) {
-      setSheetError(t('trainerClients.form.validation'));
-      return;
-    }
-
-    setSheetError(null);
-    updateMutation.mutate({
-      id: activeClient.id,
-      displayName: editDisplayName,
-      phone: editPhone,
-      notes: editNotes,
-    });
-  };
-
-  const handleCreateTraining = () => {
-    const clientId = activeClient?.id;
-    if (!clientId) {
-      return;
-    }
-    setSheetOpen(false);
-    navigation.getParent()?.navigate('CreateSlot', {
-      assignTrainerClientId: clientId,
-    });
-  };
-
-  const handleArchive = () => {
-    const clientId = activeClient?.id;
-    if (!clientId || archiveMutation.isPending) {
-      return;
-    }
-    setSheetError(null);
-    archiveMutation.mutate(clientId);
-  };
-
-  const renderContent = () => {
-    if (clientsQuery.isLoading) {
-      return <LoadingState />;
-    }
-
-    if (clientsQuery.error) {
-      return <ErrorState error={clientsQuery.error} onRetry={handleRefresh} />;
-    }
-
-    if (filteredClients.length === 0) {
-      return <EmptyState title={t('trainerClients.empty')} />;
-    }
-
-    return (
-      <YStack gap="$3">
-        {filteredClients.map((client) => {
-          const id = client.id ?? `${client.displayName ?? 'client'}`;
-          const phone = client.phone?.trim();
-          const notes = client.notes?.trim();
-          return (
-            <Button
-              key={id}
-              backgroundColor="$background"
-              borderWidth={1}
-              borderColor="$border"
-              borderRadius="$5"
-              minHeight="100"
-              padding="$4"
-              paddingVertical="$3"
-              justifyContent="flex-start"
-              onPress={() => openClientActions(client)}
-              disabled={archiveMutation.isPending || updateMutation.isPending}
-            >
-              <YStack flex={1} gap="$2" alignItems="flex-start">
-                <XStack width="100%" alignItems="center" justifyContent="space-between" gap="$3">
-                  <Text fontSize="$4" fontWeight="700" color="$text" numberOfLines={1} flex={1}>
-                    {client.displayName?.trim() || t('common.empty')}
-                  </Text>
-                  <AppIcon name="chevronRight" size={16} color="$muted" />
-                </XStack>
-                {phone ? (
-                  <Text fontSize="$3" color="$muted" numberOfLines={1}>
-                    {phone}
-                  </Text>
-                ) : null}
-                {notes ? (
-                  <Text fontSize="$3" color="$muted" numberOfLines={1}>
-                    {notes}
-                  </Text>
-                ) : null}
-              </YStack>
-            </Button>
-          );
-        })}
-      </YStack>
-    );
-  };
+  const isLoading = localQuery.isLoading || linksQuery.isLoading;
 
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
       <TabScrollView
-        refreshControl={
+        refreshControl={(
           <RefreshControl
-            refreshing={isManualRefreshing && clientsQuery.isFetching}
-            onRefresh={handleRefresh}
+            refreshing={isManualRefreshing && (localQuery.isFetching || linksQuery.isFetching)}
+            onRefresh={refreshAll}
           />
-        }
+        )}
       >
-        <YStack gap="$4" padding="$6">
+        <YStack padding="$6" gap="$4">
           <XStack alignItems="center" justifyContent="space-between" gap="$3">
             <XStack alignItems="center" gap="$2">
               <Button unstyled onPress={() => navigation.goBack()}>
@@ -259,26 +186,82 @@ export function TrainerClientsScreen({ navigation }: Props) {
               borderRadius="$4"
               minHeight="$10"
               paddingHorizontal="$4"
-              onPress={() => navigation.navigate('TrainerClientForm')}
+              onPress={() => navigation.navigate('TrainerAddClientByPhone')}
             >
               {t('trainerClients.add')}
             </Button>
           </XStack>
+
           <FormInput
             value={search}
             onChangeText={setSearch}
             placeholder={t('trainerClients.searchPlaceholder')}
             height={52}
           />
-          {renderContent()}
+
+          {isLoading ? (
+            <XStack alignItems="center" gap="$2">
+              <Spinner size="small" color="$muted" />
+              <Text fontSize="$3" color="$muted">{t('common.loading')}</Text>
+            </XStack>
+          ) : null}
+
+          {!isLoading && filtered.length === 0 ? (
+            <Text fontSize="$3" color="$muted">{t('trainerClients.empty')}</Text>
+          ) : null}
+
+          <YStack gap="$3">
+            {filtered.map((item) => (
+              <Button
+                key={item.key}
+                backgroundColor="$background"
+                borderWidth={1}
+                borderColor="$border"
+                borderRadius="$5"
+                minHeight="$10"
+                paddingHorizontal="$4"
+                paddingVertical="$3"
+                onPress={() => openDetails(item)}
+              >
+                <XStack alignItems="center" gap="$3" width="100%">
+                  <XStack alignItems="center" gap="$2" flex={1} minWidth={0}>
+                    <Text fontSize="$4" fontWeight="700" color="$text" numberOfLines={1}>
+                      {item.displayName}
+                    </Text>
+                    {item.phone ? (
+                      <Text fontSize="$3" color="$muted" numberOfLines={1}>
+                        {item.phone}
+                      </Text>
+                    ) : null}
+                    {item.kind === 'linked' ? (
+                      <XStack
+                        backgroundColor="$backgroundSoft"
+                        borderWidth={1}
+                        borderColor="$border"
+                        borderRadius="$3"
+                        paddingHorizontal="$2"
+                        paddingVertical="$1"
+                      >
+                        <Text fontSize="$2" color="$muted" numberOfLines={1}>
+                          {linkStatusLabel(item.link?.status)}
+                        </Text>
+                      </XStack>
+                    ) : null}
+                  </XStack>
+                  <AppIcon name="chevronRight" size={16} color="$muted" />
+                </XStack>
+              </Button>
+            ))}
+          </YStack>
         </YStack>
       </TabScrollView>
+
       <Sheet
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         dismissOnSnapToBottom
-        snapPoints={[72]}
-        dismissOnOverlayPress={!archiveMutation.isPending && !updateMutation.isPending}
+        snapPoints={[45]}
+        dismissOnOverlayPress={!isBusy}
       >
         <Sheet.Overlay
           animation="fast"
@@ -295,81 +278,27 @@ export function TrainerClientsScreen({ navigation }: Props) {
         >
           <Sheet.Handle />
           <Text fontSize="$6" fontWeight="700" color="$text">
-            {t('trainerClients.edit')}
+            {activeItem?.displayName ?? t('common.empty')}
           </Text>
-          <YStack gap="$2">
-            <Text fontSize="$3" color="$text">
-              {t('trainerClients.form.name')}
-            </Text>
-            <FormInput
-              value={editDisplayName}
-              onChangeText={setEditDisplayName}
-              placeholder={t('trainerClients.form.namePlaceholder')}
-              maxLength={100}
-              height={52}
-            />
-          </YStack>
-          <YStack gap="$2">
-            <Text fontSize="$3" color="$text">
-              {t('trainerClients.form.phone')}
-            </Text>
-            <PhoneInput
-              value={editPhone}
-              onChangeText={setEditPhone}
-              placeholder={t('trainerClients.form.phonePlaceholder')}
-              maxLength={30}
-              height={52}
-            />
-          </YStack>
-          <YStack gap="$2">
-            <Text fontSize="$3" color="$text">
-              {t('trainerClients.form.notes')}
-            </Text>
-            <FormInput
-              value={editNotes}
-              onChangeText={setEditNotes}
-              placeholder={t('trainerClients.form.notesPlaceholder')}
-              maxLength={500}
-              height={52}
-            />
-          </YStack>
-          {sheetError ? (
-            <Text fontSize="$3" color="$danger">
-              {sheetError}
-            </Text>
-          ) : null}
-          <Button
-            backgroundColor="$accent"
-            color="$accentText"
-            borderRadius="$4"
-            minHeight="$10"
-            onPress={handleSave}
-            disabled={updateMutation.isPending || archiveMutation.isPending}
-          >
-            {updateMutation.isPending ? t('common.loading') : t('profile.personal.save')}
-          </Button>
-          <Button
-            backgroundColor="$background"
-            borderWidth={1}
-            borderColor="$border"
-            borderRadius="$4"
-            minHeight="$10"
-            onPress={handleCreateTraining}
-            disabled={updateMutation.isPending || archiveMutation.isPending}
-          >
-            <Text color="$text">{t('trainerClients.createTraining')}</Text>
-          </Button>
+          <Text fontSize="$3" color="$muted">
+            {activeItem?.phone ?? t('common.empty')}
+          </Text>
+          <Text fontSize="$3" color="$muted">
+            {activeItem?.kind === 'linked'
+              ? t('trainerClients.typeLinked')
+              : t('trainerClients.typeLocal')}
+          </Text>
           <Button
             backgroundColor="$background"
             borderWidth={1}
             borderColor="$danger"
             borderRadius="$4"
             minHeight="$10"
-            onPress={handleArchive}
-            disabled={updateMutation.isPending || archiveMutation.isPending}
+            onPress={handleRemove}
+            disabled={isBusy || !activeItem}
           >
             <Text color="$danger">
-              {archiveMutation.isPending ? t('common.loading') : t('trainerClients.archive')}
+              {isBusy ? t('common.loading') : t('trainerClients.remove')}
             </Text>
           </Button>
         </Sheet.Frame>

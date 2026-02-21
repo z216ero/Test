@@ -114,6 +114,8 @@ export function NotificationsScreen({ navigation }: Props) {
     const shouldSyncPushPreferences =
       typeof partial.inAppBookingEventsEnabled === 'boolean'
       || typeof partial.inAppGroupMinCancellationEventsEnabled === 'boolean'
+      || typeof partial.linkRequestPushEnabled === 'boolean'
+      || typeof partial.linkResponsePushEnabled === 'boolean'
       || typeof partial.enabled === 'boolean'
       || typeof partial.reminderOffsetMinutes === 'number';
 
@@ -123,6 +125,8 @@ export function NotificationsScreen({ navigation }: Props) {
           eventsEnabled: next.inAppBookingEventsEnabled,
           groupMinCancellationEnabled: next.inAppGroupMinCancellationEventsEnabled,
           reminderEnabled: next.enabled,
+          trainerLinkRequestsEnabled: next.linkRequestPushEnabled,
+          clientLinkResponsesEnabled: next.linkResponsePushEnabled,
           reminderOffsetMinutes: next.reminderOffsetMinutes,
         });
       } catch (err) {
@@ -156,6 +160,8 @@ export function NotificationsScreen({ navigation }: Props) {
     reminderOffsetMinutes: 120,
     inAppBookingEventsEnabled: true,
     inAppGroupMinCancellationEventsEnabled: true,
+    linkRequestPushEnabled: true,
+    linkResponsePushEnabled: true,
   };
 
   const role = meQuery.data?.role === 'Trainer' ? 'Trainer' : 'Client';
@@ -318,6 +324,77 @@ export function NotificationsScreen({ navigation }: Props) {
                     disabled={loading || !resolvedSettings.inAppBookingEventsEnabled}
                     backgroundColor={
                       resolvedSettings.inAppGroupMinCancellationEventsEnabled
+                        ? '$accent'
+                        : '$surfaceMuted'
+                    }
+                    borderWidth={1}
+                    borderColor="$border"
+                  >
+                    <Switch.Thumb
+                      backgroundColor="$background"
+                      borderWidth={1}
+                      borderColor="$border"
+                    />
+                  </Switch>
+                </XStack>
+              ) : null}
+            </YStack>
+          </YStack>
+
+          <YStack gap="$3">
+            <Text fontSize="$5" fontWeight="700" color="$text">
+              {t('notifications.links.title')}
+            </Text>
+            <YStack
+              backgroundColor="$background"
+              borderRadius="$5"
+              borderWidth={1}
+              borderColor="$border"
+              padding="$4"
+              gap="$3"
+            >
+              {role === 'Client' ? (
+                <XStack alignItems="center" justifyContent="space-between">
+                  <Text fontSize="$3" color="$text">
+                    {t('notifications.links.clientRequests')}
+                  </Text>
+                  <Switch
+                    size="$7"
+                    checked={resolvedSettings.linkRequestPushEnabled}
+                    onCheckedChange={(value) =>
+                      updateSettings({ linkRequestPushEnabled: Boolean(value) })
+                    }
+                    disabled={loading}
+                    backgroundColor={
+                      resolvedSettings.linkRequestPushEnabled
+                        ? '$accent'
+                        : '$surfaceMuted'
+                    }
+                    borderWidth={1}
+                    borderColor="$border"
+                  >
+                    <Switch.Thumb
+                      backgroundColor="$background"
+                      borderWidth={1}
+                      borderColor="$border"
+                    />
+                  </Switch>
+                </XStack>
+              ) : null}
+              {role === 'Trainer' ? (
+                <XStack alignItems="center" justifyContent="space-between">
+                  <Text fontSize="$3" color="$text">
+                    {t('notifications.links.trainerResponses')}
+                  </Text>
+                  <Switch
+                    size="$7"
+                    checked={resolvedSettings.linkResponsePushEnabled}
+                    onCheckedChange={(value) =>
+                      updateSettings({ linkResponsePushEnabled: Boolean(value) })
+                    }
+                    disabled={loading}
+                    backgroundColor={
+                      resolvedSettings.linkResponsePushEnabled
                         ? '$accent'
                         : '$surfaceMuted'
                     }

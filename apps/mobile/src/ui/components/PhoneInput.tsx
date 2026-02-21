@@ -11,7 +11,7 @@ export function PhoneInput({ value, onChangeText, ...props }: PhoneInputProps) {
   return (
     <FormInput
       value={value}
-      onChangeText={(next) => onChangeText(normalizeRussianPhoneInput(next))}
+      onChangeText={(next: string) => onChangeText(normalizeRussianPhoneInput(next))}
       keyboardType="numeric"
       {...props}
     />

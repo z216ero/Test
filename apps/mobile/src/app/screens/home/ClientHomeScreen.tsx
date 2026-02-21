@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshControl } from 'react-native';
+import { RefreshControl, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, Text, XStack, YStack } from 'tamagui';
@@ -15,6 +15,7 @@ import {
   getSlotStartTimestamp,
   getSlotTimes,
 } from '@app/components/bookings/bookingUtils';
+import type { BookingStatusType } from '@app/components/bookings/bookingUtils';
 import { formatTimeRangeRu } from '@utils/datetime';
 import type { HomeMeState, HomeNavigation, HomeUser } from './types';
 import type { AvailableSlotTrainerDto } from '@generated/api';
@@ -56,7 +57,8 @@ const pickUpcomingBookings = (items: ClientBooking[], nowTs: number): ClientBook
       if (startTs === null || startTs <= nowTs) {
         return false;
       }
-      return getBookingStatusType(booking.slot) === 'booked';
+      const status = getBookingStatusType(booking.slot) as BookingStatusType;
+      return status === 'booked' || status === 'pending_confirmation';
     })
     .slice()
     .sort(sortByStart)
@@ -248,7 +250,8 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
               <Text fontSize="$5" fontWeight="700" color="$text">
                 {t('home.client.upcomingTitle')}
               </Text>
-              <YStack gap="$4">
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <XStack gap="$3" paddingRight="$2">
                 {upcomingBookings.map((booking) => {
                   const times = getSlotTimes(booking.slot);
                   const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : t('common.empty');
@@ -270,7 +273,13 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
                   const key = booking.slot.id ?? booking.slot.startsAtUtc ?? trainerName;
 
                   return (
-                    <Button key={key} unstyled onPress={() => handleDetails(booking)} borderRadius="$5">
+                    <Button
+                      key={key}
+                      unstyled
+                      onPress={() => handleDetails(booking)}
+                      borderRadius="$5"
+                      width={320}
+                    >
                       <YStack
                         gap="$3"
                         padding="$4"
@@ -326,7 +335,8 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
                     </Button>
                   );
                 })}
-              </YStack>
+                </XStack>
+              </ScrollView>
             </YStack>
           ) : null}
 

@@ -4,6 +4,7 @@ import type { ClientBooking } from '@api/bookingsApi';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
+import { getBookingStatusType } from '@app/components/bookings/bookingUtils';
 import { formatTimeRangeRu } from '@utils/datetime';
 import { formatPrice } from '@utils/price';
 
@@ -18,6 +19,9 @@ type TrainerSlotGroupCardProps = {
   canCheckConflicts: boolean;
   nowTs: number;
   onOpenSlot: (slot: SlotDto, trainer: AvailableSlotTrainerDto) => void;
+  onConfirmPending?: (bookingId: string) => void;
+  onDeclinePending?: (bookingId: string) => void;
+  pendingActionBookingId?: string | null;
 };
 
 const getSlotRange = (slot: SlotDto): { start: number; end: number } | null => {
@@ -49,11 +53,11 @@ const hasTimeConflict = (slot: SlotDto, bookings: ClientBooking[]): boolean => {
   });
 };
 
-const isBookedByClient = (slot: SlotDto, bookings: ClientBooking[]): boolean => {
+const getBookingForSlot = (slot: SlotDto, bookings: ClientBooking[]): ClientBooking | null => {
   if (!slot.id) {
-    return false;
+    return null;
   }
-  return bookings.some((booking) => booking.slot.id === slot.id);
+  return bookings.find((booking) => booking.slot.id === slot.id) ?? null;
 };
 
 const normalizeStatus = (value?: string | null) => value?.toLowerCase().trim();
@@ -79,6 +83,9 @@ export function TrainerSlotGroupCard({
   canCheckConflicts,
   nowTs,
   onOpenSlot,
+  onConfirmPending,
+  onDeclinePending,
+  pendingActionBookingId,
 }: TrainerSlotGroupCardProps) {
   const trainer = group.trainer;
   const trainerName = trainer.name ?? t('common.empty');
@@ -147,7 +154,17 @@ export function TrainerSlotGroupCard({
           const isPast = startTs !== null && startTs <= nowTs;
           const open = isSlotOpen(slot);
           const groupSlot = isGroupSlot(slot);
-          const isBookedByCurrentClient = isBookedByClient(slot, bookings);
+          const clientBooking = getBookingForSlot(slot, bookings);
+          const clientBookingStatus = clientBooking
+            ? getBookingStatusType(clientBooking.slot, nowTs)
+            : null;
+          const isPendingConfirmation = clientBookingStatus === 'pending_confirmation';
+          const isBookedByCurrentClient =
+            clientBookingStatus === 'booked' || clientBookingStatus === 'pending_confirmation';
+          const pendingBookingId = isPendingConfirmation
+            ? (clientBooking?.slot.bookingId ?? slot.bookingId ?? null)
+            : null;
+          const isPendingActionBusy = Boolean(pendingBookingId) && pendingActionBookingId === pendingBookingId;
           const occupiedCount = slot.occupiedCount ?? 0;
           const capacityMax = slot.capacityMax ?? null;
           const isFull = slot.isFull ?? (
@@ -163,7 +180,9 @@ export function TrainerSlotGroupCard({
             && !isBookedByCurrentClient;
           const canOpenDetails = Boolean(slot.id) && (isBookable || isBookedByCurrentClient);
           const statusLabel = isBookedByCurrentClient
-            ? t('slots.status.bookedByYou')
+            ? isPendingConfirmation
+              ? t('slots.status.pendingConfirmation')
+              : t('slots.status.bookedByYou')
             : conflict
             ? t('slots.status.conflict')
             : isFull
@@ -172,7 +191,7 @@ export function TrainerSlotGroupCard({
                 ? t('slots.status.available')
                 : t('slots.status.unavailable');
           const statusColor = isBookedByCurrentClient
-            ? '$accent'
+            ? isPendingConfirmation ? '$primary' : '$accent'
             : conflict
             ? '$danger'
             : isFull
@@ -185,10 +204,24 @@ export function TrainerSlotGroupCard({
             <Button
               key={slot.id ?? `${slot.startsAtUtc ?? 'slot'}-${timeLabel}`}
               unstyled
-              backgroundColor={isBookable ? '$background' : '$surfaceMuted'}
+              backgroundColor={
+                isPendingConfirmation
+                  ? '$background'
+                  : isBookable
+                    ? '$background'
+                    : '$surfaceMuted'
+              }
               borderRadius="$4"
               borderWidth={1}
-              borderColor={isBookedByCurrentClient ? '$accent' : isBookable ? '$border' : '$surfaceMuted'}
+              borderColor={
+                isPendingConfirmation
+                  ? '$primary'
+                  : isBookedByCurrentClient
+                    ? '$accent'
+                    : isBookable
+                      ? '$border'
+                      : '$surfaceMuted'
+              }
               padding="$3"
               alignItems="stretch"
               onPress={() => {
@@ -205,7 +238,11 @@ export function TrainerSlotGroupCard({
                 </Text>
                 <XStack alignItems="center" gap="$2">
                   {isBookedByCurrentClient ? (
-                    <AppIcon name="check" size={14} color="$accent" />
+                    <AppIcon
+                      name={isPendingConfirmation ? 'info' : 'check'}
+                      size={14}
+                      color={isPendingConfirmation ? '$primary' : '$accent'}
+                    />
                   ) : null}
                   {groupSlot ? (
                     <>
@@ -227,6 +264,33 @@ export function TrainerSlotGroupCard({
               <Text fontSize="$2" color={statusColor} marginTop="$1">
                 {statusLabel}
               </Text>
+              {isPendingConfirmation && pendingBookingId ? (
+                <XStack gap="$2" marginTop="$3">
+                  <Button
+                    flex={1}
+                    backgroundColor="$accent"
+                    color="$accentText"
+                    borderRadius="$3"
+                    minHeight="$9"
+                    disabled={isPendingActionBusy}
+                    onPress={() => onConfirmPending?.(pendingBookingId)}
+                  >
+                    {t('bookingConfirm.confirm')}
+                  </Button>
+                  <Button
+                    flex={1}
+                    backgroundColor="$background"
+                    borderWidth={1}
+                    borderColor="$danger"
+                    borderRadius="$3"
+                    minHeight="$9"
+                    disabled={isPendingActionBusy}
+                    onPress={() => onDeclinePending?.(pendingBookingId)}
+                  >
+                    <Text color="$danger">{t('bookingConfirm.decline')}</Text>
+                  </Button>
+                </XStack>
+              ) : null}
             </Button>
           );
         })}

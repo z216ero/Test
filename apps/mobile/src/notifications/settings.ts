@@ -5,6 +5,8 @@ export type NotificationSettings = {
   reminderOffsetMinutes: number;
   inAppBookingEventsEnabled: boolean;
   inAppGroupMinCancellationEventsEnabled: boolean;
+  linkRequestPushEnabled: boolean;
+  linkResponsePushEnabled: boolean;
 };
 
 const STORAGE_KEY = 'notifications.settings.v1';
@@ -14,6 +16,8 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   reminderOffsetMinutes: 120,
   inAppBookingEventsEnabled: true,
   inAppGroupMinCancellationEventsEnabled: true,
+  linkRequestPushEnabled: true,
+  linkResponsePushEnabled: true,
 };
 
 const coerceSettings = (value: Partial<NotificationSettings> | null): NotificationSettings => ({
@@ -25,6 +29,10 @@ const coerceSettings = (value: Partial<NotificationSettings> | null): Notificati
   inAppGroupMinCancellationEventsEnabled:
     value?.inAppGroupMinCancellationEventsEnabled
     ?? DEFAULT_SETTINGS.inAppGroupMinCancellationEventsEnabled,
+  linkRequestPushEnabled:
+    value?.linkRequestPushEnabled ?? DEFAULT_SETTINGS.linkRequestPushEnabled,
+  linkResponsePushEnabled:
+    value?.linkResponsePushEnabled ?? DEFAULT_SETTINGS.linkResponsePushEnabled,
 });
 
 export const getNotificationSettings = async (): Promise<NotificationSettings> => {

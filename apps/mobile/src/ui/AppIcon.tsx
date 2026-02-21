@@ -1,6 +1,6 @@
 import type { ComponentType, ReactElement } from 'react';
 import type { LucideProps } from 'lucide-react-native';
-import { useTheme } from 'tamagui';
+import { useTheme } from '@tamagui/core';
 import { iconsMap } from './icons';
 import type { AppIconName } from './icons';
 import config from '../../tamagui.config.cjs';

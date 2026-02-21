@@ -268,6 +268,11 @@ public sealed class SlotService(AppDbContext db, PushService pushService)
 
             if (hasAssignment)
             {
+                var nowBookingUtc = DateTime.UtcNow;
+                var confirmationStatus = assignedClientId.HasValue
+                    ? BookingClientConfirmationStatus.Pending
+                    : BookingClientConfirmationStatus.Confirmed;
+
                 var booking = new Booking
                 {
                     Id = Guid.NewGuid(),
@@ -275,8 +280,11 @@ public sealed class SlotService(AppDbContext db, PushService pushService)
                     ClientId = assignedClientId,
                     TrainerClientId = assignedTrainerClientId,
                     Status = BookingStatus.Booked,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow
+                    ClientConfirmationStatus = confirmationStatus,
+                    ClientConfirmationRequestedAtUtc = assignedClientId.HasValue ? nowBookingUtc : null,
+                    ClientConfirmationRespondedAtUtc = assignedClientId.HasValue ? null : nowBookingUtc,
+                    CreatedAtUtc = nowBookingUtc,
+                    UpdatedAtUtc = nowBookingUtc
                 };
                 db.Bookings.Add(booking);
                 db.Payments.Add(new Payment
@@ -297,12 +305,21 @@ public sealed class SlotService(AppDbContext db, PushService pushService)
 
             if (assignedClientId.HasValue)
             {
-                await pushService.NotifyBookingCreatedAsync(
-                    entity.Id,
-                    trainerId,
-                    assignedClientId.Value,
-                    normalizedStart,
-                    cancellationToken);
+                var createdBooking = await db.Bookings
+                    .AsNoTracking()
+                    .Where(b => b.SlotId == entity.Id)
+                    .Select(b => (Guid?)b.Id)
+                    .FirstOrDefaultAsync(cancellationToken);
+                if (createdBooking.HasValue)
+                {
+                    await pushService.NotifyBookingConfirmationRequestedAsync(
+                        createdBooking.Value,
+                        entity.Id,
+                        trainerId,
+                        assignedClientId.Value,
+                        normalizedStart,
+                        cancellationToken);
+                }
             }
 
             return ServiceResult<SlotDto>.Success(
@@ -941,6 +958,16 @@ public sealed class SlotService(AppDbContext db, PushService pushService)
         return null;
     }
 
+    private static string? ResolveClientConfirmationStatus(TrainingSlot slot)
+    {
+        if (slot.SlotType != TrainingSlotType.Individual)
+        {
+            return null;
+        }
+
+        return slot.Booking?.ClientConfirmationStatus.ToString();
+    }
+
     public static SlotDto ToDto(
         TrainingSlot slot,
         string? clientName,
@@ -970,6 +997,7 @@ public sealed class SlotService(AppDbContext db, PushService pushService)
             isFull,
             slot.Status.ToString(),
             ResolveBookingStatus(slot),
+            ResolveClientConfirmationStatus(slot),
             slot.CreatedAtUtc,
             clientName,
             clientAvatarUrl,

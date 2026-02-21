@@ -8,6 +8,7 @@ import type {
   TrainerDto,
 } from '@generated/api';
 import {
+  postTrainerSlotsSlotIdAssignClient,
   getTrainersMe,
   getSlotsSlotIdAttendees,
   postSlotsSlotIdAttendeesClientIdComplete,
@@ -248,6 +249,23 @@ export const closeTrainerBooking = async (
       options
     );
     return unwrap<CloseBookingResultDto>(response, t('errors.generic'));
+  } catch (error) {
+    throw mapAttendanceError(error);
+  }
+};
+
+export const assignRegisteredClientToSlot = async (
+  slotId: string,
+  clientUserId: string,
+  options?: RequestInit
+): Promise<BookingDto> => {
+  try {
+    const response = await postTrainerSlotsSlotIdAssignClient(
+      slotId,
+      { clientUserId },
+      options
+    );
+    return unwrap<BookingDto>(response, t('errors.generic'));
   } catch (error) {
     throw mapAttendanceError(error);
   }

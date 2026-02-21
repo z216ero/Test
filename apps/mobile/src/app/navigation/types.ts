@@ -45,7 +45,8 @@ export type ProfileStackParamList = {
   PersonalInfo: { locationSelection?: LocationSelection } | undefined;
   Notifications: undefined;
   TrainerClients: undefined;
-  TrainerClientForm: { clientId?: string } | undefined;
+  TrainerAddClientByPhone: undefined;
+  TrainerClientForm: { clientId?: string; initialPhone?: string; returnToList?: boolean } | undefined;
   TrainerReport: undefined;
   LocationSearch: LocationSearchParams;
 };
@@ -87,5 +88,7 @@ export type RootStackParamList = {
   Bootstrap: undefined;
   Auth: NavigatorScreenParams<AuthStackParamList>;
   App: { role: UserRole } | undefined;
+  ClientRequests: undefined;
+  BookingConfirm: { bookingId: string };
 };
 

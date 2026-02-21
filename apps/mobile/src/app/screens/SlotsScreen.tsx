@@ -7,16 +7,22 @@ import { useEffect, useMemo, useState } from 'react';
 import { Platform, RefreshControl } from 'react-native';
 import { XStack, YStack } from 'tamagui';
 import type { SlotDto } from '@generated/api';
-import { getClientUpcomingBookings } from '@api/bookingsApi';
+import {
+  confirmClientBooking,
+  declineClientBooking,
+  getClientUpcomingBookings,
+} from '@api/bookingsApi';
 import { me } from '@api/authApi';
 import { getAvailableSlotsForClient } from '@api/slotsApi';
 import { presentApiError } from '@api/ApiErrorPresenter';
 import { getGenderLookups, getSpecializationLookups } from '@api/lookupsApi';
 import { t } from '@i18n';
-import { useAppQuery } from '@query/hooks';
+import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
+import { useQueryClient } from '@tanstack/react-query';
 import { IOSDatePickerCard } from '@ui/components';
 import { Banner } from '@ui/feedback/Banner';
+import { useToast } from '@ui/feedback/useToast';
 import { TabScrollView } from '@ui/layout/TabScrollView';
 import { EmptyState } from '@ui/states/EmptyState';
 import { DateStrip } from '@app/components/schedule/DateStrip';
@@ -114,6 +120,8 @@ const SlotsSkeleton = () => (
 );
 
 export function SlotsScreen({ navigation }: Props) {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [selectedDate, setSelectedDate] = useState(() => startOfLocalDay(new Date()));
   const [filters, setFilters] = useState<ClientSlotsFilters>(DEFAULT_CLIENT_SLOTS_FILTERS);
   const [filtersReady, setFiltersReady] = useState(false);
@@ -123,6 +131,7 @@ export function SlotsScreen({ navigation }: Props) {
   const [activeSlot, setActiveSlot] = useState<SlotDto | null>(null);
   const [activeTrainer, setActiveTrainer] = useState<SlotGroup['trainer'] | null>(null);
   const [slotDetailsSheetOpen, setSlotDetailsSheetOpen] = useState(false);
+  const [pendingActionBookingId, setPendingActionBookingId] = useState<string | null>(null);
 
   const specializationsQuery = useAppQuery({
     queryKey: keys.lookups.specializations(),
@@ -240,6 +249,46 @@ export function SlotsScreen({ navigation }: Props) {
   const bookings = bookingsQuery.data ?? [];
   const canCheckConflicts = bookingsQuery.isSuccess && !bookingsQuery.isFetching;
   const nowTs = Date.now();
+
+  const invalidateClientData = () => {
+    queryClient.invalidateQueries({ queryKey: keys.slots.available() });
+    queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
+    queryClient.invalidateQueries({ queryKey: keys.pendingBookingConfirmationsCount() });
+  };
+
+  const confirmPendingMutation = useAppMutation({
+    mutationFn: async (bookingId: string) => {
+      setPendingActionBookingId(bookingId);
+      await confirmClientBooking(bookingId);
+    },
+    onSuccess: () => {
+      setPendingActionBookingId(null);
+      invalidateClientData();
+      showToast({ type: 'success', title: t('bookingConfirm.confirmed') });
+    },
+    onError: (error) => {
+      setPendingActionBookingId(null);
+      const presented = presentApiError(error);
+      showToast({ type: 'error', title: presented.title, message: presented.message });
+    },
+  });
+
+  const declinePendingMutation = useAppMutation({
+    mutationFn: async (bookingId: string) => {
+      setPendingActionBookingId(bookingId);
+      await declineClientBooking(bookingId);
+    },
+    onSuccess: () => {
+      setPendingActionBookingId(null);
+      invalidateClientData();
+      showToast({ type: 'success', title: t('bookingConfirm.declined') });
+    },
+    onError: (error) => {
+      setPendingActionBookingId(null);
+      const presented = presentApiError(error);
+      showToast({ type: 'error', title: presented.title, message: presented.message });
+    },
+  });
 
   const groups = useMemo(() => {
     const rawGroups = slotsQuery.data ?? [];
@@ -373,6 +422,9 @@ export function SlotsScreen({ navigation }: Props) {
             bookings={bookings}
             canCheckConflicts={canCheckConflicts}
             nowTs={nowTs}
+            pendingActionBookingId={pendingActionBookingId}
+            onConfirmPending={(bookingId) => confirmPendingMutation.mutate(bookingId)}
+            onDeclinePending={(bookingId) => declinePendingMutation.mutate(bookingId)}
             onOpenSlot={(slot, trainer) => {
               setActiveSlot(slot);
               setActiveTrainer(trainer);

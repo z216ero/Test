@@ -8,8 +8,15 @@ public sealed record BookingDto(
     Guid? ClientId,
     Guid? TrainerClientId,
     string Status,
+    string ClientConfirmationStatus,
+    DateTime? ClientConfirmationRequestedAtUtc,
+    DateTime? ClientConfirmationRespondedAtUtc,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc);
+
+public sealed record AssignRegisteredClientRequest(Guid ClientUserId);
+
+public sealed record PendingBookingConfirmationsCountDto(int Count);
 
 public sealed record CloseBookingRequest(
     string? Attendance,

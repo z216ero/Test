@@ -8,10 +8,14 @@ public sealed record PushPreferencesResponse(
     bool EventsEnabled,
     bool GroupMinCancellationEnabled,
     bool ReminderEnabled,
+    bool TrainerLinkRequestsEnabled,
+    bool ClientLinkResponsesEnabled,
     int ReminderOffsetMinutes);
 
 public sealed record UpdatePushPreferencesRequest(
     bool EventsEnabled,
     bool GroupMinCancellationEnabled,
     bool ReminderEnabled,
+    bool TrainerLinkRequestsEnabled,
+    bool ClientLinkResponsesEnabled,
     int ReminderOffsetMinutes);

@@ -6,7 +6,7 @@ export type ScheduleBadgeState = {
   updatedAt: number;
 };
 
-export type SlotHighlightType = 'booking_created' | 'booking_cancelled';
+export type SlotHighlightType = 'booking_created' | 'booking_cancelled' | 'booking_declined';
 export type SlotHighlightColor = 'success' | 'destructive';
 
 export type SlotHighlight = {
@@ -21,6 +21,7 @@ export type SlotHighlight = {
 export type PushIndicatorsState = {
   scheduleBadge: ScheduleBadgeState;
   slotHighlights: Record<string, SlotHighlight>;
+  releasedDeclinedSlots: Record<string, number>;
   recentEventIds: Record<string, number>;
 };
 
@@ -32,6 +33,7 @@ const MAX_RECENT_EVENTS = 100;
 const DEFAULT_STATE: PushIndicatorsState = {
   scheduleBadge: { hasUnread: false, updatedAt: 0 },
   slotHighlights: {},
+  releasedDeclinedSlots: {},
   recentEventIds: {},
 };
 
@@ -48,6 +50,7 @@ const coerceState = (value: Partial<PushIndicatorsState> | null): PushIndicators
     updatedAt: value?.scheduleBadge?.updatedAt ?? DEFAULT_STATE.scheduleBadge.updatedAt,
   },
   slotHighlights: value?.slotHighlights ?? DEFAULT_STATE.slotHighlights,
+  releasedDeclinedSlots: value?.releasedDeclinedSlots ?? DEFAULT_STATE.releasedDeclinedSlots,
   recentEventIds: value?.recentEventIds ?? DEFAULT_STATE.recentEventIds,
 });
 
@@ -56,6 +59,11 @@ const cleanupState = (state: PushIndicatorsState): PushIndicatorsState => {
   const slotHighlights = Object.fromEntries(
     Object.entries(state.slotHighlights).filter(([, highlight]) =>
       now - highlight.createdAt <= HIGHLIGHT_TTL_MS
+    )
+  );
+  const releasedDeclinedSlots = Object.fromEntries(
+    Object.entries(state.releasedDeclinedSlots).filter(([, ts]) =>
+      now - ts <= HIGHLIGHT_TTL_MS
     )
   );
 
@@ -69,6 +77,7 @@ const cleanupState = (state: PushIndicatorsState): PushIndicatorsState => {
   return {
     scheduleBadge: state.scheduleBadge,
     slotHighlights,
+    releasedDeclinedSlots,
     recentEventIds,
   };
 };
@@ -153,6 +162,22 @@ export const upsertSlotHighlight = async (
     slotHighlights: {
       ...state.slotHighlights,
       [slotId]: highlight,
+    },
+    releasedDeclinedSlots:
+      highlight.type === 'booking_declined'
+        ? Object.fromEntries(
+            Object.entries(state.releasedDeclinedSlots).filter(([id]) => id !== slotId)
+          )
+        : state.releasedDeclinedSlots,
+  }));
+};
+
+export const markDeclinedSlotReleased = async (slotId: string): Promise<void> => {
+  await updateState((state) => ({
+    ...state,
+    releasedDeclinedSlots: {
+      ...state.releasedDeclinedSlots,
+      [slotId]: Date.now(),
     },
   }));
 };

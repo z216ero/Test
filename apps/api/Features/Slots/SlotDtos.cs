@@ -25,6 +25,7 @@ public sealed record SlotDto(
     bool? IsFull,
     string Status,
     string? BookingStatus,
+    string? ClientConfirmationStatus,
     DateTime CreatedAtUtc,
     string? ClientName,
     string? ClientAvatarUrl,

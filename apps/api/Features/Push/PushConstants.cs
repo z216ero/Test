@@ -29,6 +29,12 @@ public static class PushEventTypes
     public const string PaymentMarkedPaid = "payment_marked_paid";
     public const string PaymentMarkedPending = "payment_marked_pending";
     public const string TrainingReminder = "training_reminder";
+    public const string TrainerClientLinkRequested = "trainer_client_link_requested";
+    public const string TrainerClientLinkAccepted = "trainer_client_link_accepted";
+    public const string TrainerClientLinkRejected = "trainer_client_link_rejected";
+    public const string BookingConfirmationRequested = "booking_confirmation_requested";
+    public const string BookingConfirmationConfirmed = "booking_confirmation_confirmed";
+    public const string BookingConfirmationDeclined = "booking_confirmation_declined";
 }
 
 public static class PushCancellationReasons

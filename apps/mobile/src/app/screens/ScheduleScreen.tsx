@@ -6,14 +6,18 @@ import {
 } from '@react-native-community/datetimepicker';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, RefreshControl } from 'react-native';
-import { Button, Text, YStack } from 'tamagui';
+import { ScrollView } from '@tamagui/scroll-view';
+import { Sheet } from '@tamagui/sheet';
+import { Button, Input, Text, YStack } from 'tamagui';
 import {
   attendanceActionsAvailable,
+  assignRegisteredClientToSlot,
   cancelTrainerSlot,
   closeTrainerBooking,
   getMyTrainerSlots,
   type PaymentMethod,
 } from '@api/trainerSlotsApi';
+import { getTrainerClientLinks } from '@api/clientLinksApi';
 import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
 import type { SlotDto } from '@generated/api';
 import { t } from '@i18n';
@@ -33,6 +37,7 @@ import { SlotCard } from '@app/components/schedule/SlotCard';
 import {
   canMarkNoShow,
   canMarkCompleted,
+  isClientDeclinedSlot,
   isActiveSlotForMainList,
   isAttendanceFinalStatus,
   CANCEL_FORBIDDEN_WITHIN_MS,
@@ -42,6 +47,7 @@ import {
 import { type QueryKey, useQueryClient } from '@tanstack/react-query';
 import {
   clearScheduleBadge,
+  markDeclinedSlotReleased,
   markSlotHighlightSeen,
   usePushIndicators,
 } from '@notifications/pushIndicators';
@@ -95,7 +101,7 @@ export function ScheduleScreen({ navigation, route }: Props) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { contentBottomPadding } = useTabBarPadding();
-  const { slotHighlights } = usePushIndicators();
+  const { slotHighlights, releasedDeclinedSlots } = usePushIndicators();
   const initialDateIsoLocal = route.params?.initialDateIsoLocal;
 
   const [selectedDate, setSelectedDate] = useState(() =>
@@ -109,6 +115,10 @@ export function ScheduleScreen({ navigation, route }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [completedExpanded, setCompletedExpanded] = useState(false);
+  const [reassignSheetOpen, setReassignSheetOpen] = useState(false);
+  const [reassignSlot, setReassignSlot] = useState<SlotDto | null>(null);
+  const [reassignSearch, setReassignSearch] = useState('');
+  const [releasedDeclinedSlotsLocal, setReleasedDeclinedSlotsLocal] = useState<Record<string, boolean>>({});
   const todayRef = useRef(todayDate);
 
   useEffect(() => {
@@ -154,6 +164,16 @@ export function ScheduleScreen({ navigation, route }: Props) {
     },
   });
 
+  const linkedClientsQuery = useAppQuery({
+    queryKey: keys.myClients(),
+    queryFn: ({ signal }) => getTrainerClientLinks().then((items) => {
+      if (signal.aborted) {
+        return [];
+      }
+      return items.filter((item) => (item.status ?? '').toLowerCase() === 'accepted');
+    }),
+  });
+
   useFocusEffect(
     useCallback(() => {
       const nextToday = startOfLocalDay(new Date());
@@ -186,6 +206,12 @@ export function ScheduleScreen({ navigation, route }: Props) {
   );
 
   const selectedKey = buildDateKey(selectedDate);
+  const isDeclinedReleased = useCallback((slotId?: string | null) => {
+    if (!slotId) {
+      return false;
+    }
+    return Boolean(releasedDeclinedSlotsLocal[slotId] || releasedDeclinedSlots[slotId]);
+  }, [releasedDeclinedSlots, releasedDeclinedSlotsLocal]);
 
   useEffect(() => {
     if (!isLoading && !error) {
@@ -237,6 +263,9 @@ export function ScheduleScreen({ navigation, route }: Props) {
         return;
       }
       if (status === 'booked' || status === 'needs_attention') {
+        booked += 1;
+      }
+      if (status === 'pending_confirmation' || status === 'client_declined') {
         booked += 1;
       }
     });
@@ -334,6 +363,12 @@ export function ScheduleScreen({ navigation, route }: Props) {
   const closeSheet = () => {
     setSheetOpen(false);
     setActiveSlot(null);
+  };
+
+  const closeReassignSheet = () => {
+    setReassignSheetOpen(false);
+    setReassignSlot(null);
+    setReassignSearch('');
   };
 
   const updateSlotsCache = useCallback((slotId: string, updater: (slot: SlotDto) => SlotDto) => {
@@ -474,6 +509,34 @@ export function ScheduleScreen({ navigation, route }: Props) {
     },
   });
 
+  const assignAnotherClientMutation = useAppMutation({
+    mutationFn: ({
+      slotId,
+      clientUserId,
+    }: {
+      slotId: string;
+      clientUserId: string;
+    }) => assignRegisteredClientToSlot(slotId, clientUserId),
+    onSuccess: (_data, _variables) => {
+      queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
+      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+      queryClient.invalidateQueries({ queryKey: keys.myClients() });
+      closeReassignSheet();
+      closeSheet();
+      showToast({ type: 'success', title: t('schedule.actions.assignedAnotherClient') });
+    },
+    onError: (err) => {
+      const presented = presentApiError(err);
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
+    },
+  });
+
   const confirmCancelSlot = (slot: SlotDto) => {
     if (!slot.id || cancelMutation.isPending) {
       return;
@@ -565,6 +628,13 @@ export function ScheduleScreen({ navigation, route }: Props) {
             nowTs={nowTs}
             onPress={slot.id ? () => openSlot(slot) : undefined}
             highlight={getHighlightForSlot(slot)}
+            statusOverride={
+              slot.id
+                && isClientDeclinedSlot(slot, nowTs)
+                && !isDeclinedReleased(slot.id)
+                ? 'client_declined'
+                : undefined
+            }
           />
         ))}
         {showCompletedTodaySection ? (
@@ -653,6 +723,13 @@ export function ScheduleScreen({ navigation, route }: Props) {
       <SlotActionsSheet
         open={sheetOpen}
         slot={activeSlot}
+        statusOverride={
+          activeSlot?.id
+            && isClientDeclinedSlot(activeSlot, nowTs)
+            && !isDeclinedReleased(activeSlot.id)
+            ? 'client_declined'
+            : undefined
+        }
         nowTs={nowTs}
         onOpenChange={(open) => {
           if (!open) {
@@ -687,7 +764,129 @@ export function ScheduleScreen({ navigation, route }: Props) {
         isMarkingNoShow={false}
         isClosingBooking={closeBookingMutation.isPending}
         showAttendanceActions={attendanceActionsAvailable}
+        onAssignAnotherClient={(slot) => {
+          if (!slot.id) {
+            return;
+          }
+          setReassignSlot(slot);
+          setReassignSheetOpen(true);
+        }}
+        onMakeSlotOpen={(slot) => {
+          if (!slot.id) {
+            return;
+          }
+          setReleasedDeclinedSlotsLocal((current) => ({ ...current, [slot.id as string]: true }));
+          markDeclinedSlotReleased(slot.id).catch(() => {});
+          closeSheet();
+        }}
+        isAssigningAnotherClient={assignAnotherClientMutation.isPending}
       />
+      <Sheet
+        open={reassignSheetOpen}
+        onOpenChange={(open: boolean) => {
+          if (!open) {
+            closeReassignSheet();
+            return;
+          }
+          setReassignSheetOpen(open);
+        }}
+        modal
+        dismissOnSnapToBottom
+        snapPoints={[85]}
+        dismissOnOverlayPress
+      >
+        <Sheet.Overlay
+          animation="fast"
+          enterStyle={{ opacity: 0 }}
+          exitStyle={{ opacity: 0 }}
+          backgroundColor="rgba(15, 23, 42, 0.2)"
+        />
+        <Sheet.Frame
+          padding="$5"
+          paddingBottom="$7"
+          gap="$4"
+          backgroundColor="$backgroundSoft"
+          borderTopWidth={1}
+          borderTopColor="$border"
+          borderTopLeftRadius="$6"
+          borderTopRightRadius="$6"
+        >
+          <Sheet.Handle />
+          <Text fontSize="$5" fontWeight="700" color="$text">
+            {t('schedule.actions.assignAnotherClient')}
+          </Text>
+          <Input
+            value={reassignSearch}
+            onChangeText={setReassignSearch}
+            placeholder={t('createSlot.assignmentSearchPlaceholder')}
+            color="$text"
+            placeholderTextColor="$muted"
+            backgroundColor="$background"
+            borderWidth={1}
+            borderColor="$border"
+            borderRadius="$4"
+            minHeight="$10"
+          />
+          {linkedClientsQuery.isLoading ? (
+            <Text fontSize="$3" color="$muted">{t('common.loading')}</Text>
+          ) : null}
+          {!linkedClientsQuery.isLoading && (linkedClientsQuery.data ?? []).length === 0 ? (
+            <Text fontSize="$3" color="$muted">{t('schedule.actions.noAcceptedClients')}</Text>
+          ) : null}
+          <ScrollView maxHeight={360} showsVerticalScrollIndicator={false}>
+            <YStack gap="$2" paddingBottom="$2">
+              {(linkedClientsQuery.data ?? [])
+                .filter((item) => {
+                  const q = reassignSearch.trim().toLowerCase();
+                  if (!q) {
+                    return true;
+                  }
+                  return (item.clientName ?? '').toLowerCase().includes(q)
+                    || (item.clientPhone ?? '').toLowerCase().includes(q);
+                })
+                .map((item) => (
+                  <Button
+                    key={item.id}
+                    backgroundColor="$background"
+                    borderWidth={1}
+                    borderColor="$border"
+                    borderRadius="$4"
+                    minHeight="$10"
+                    justifyContent="flex-start"
+                    paddingHorizontal="$4"
+                    onPress={() => {
+                      if (!reassignSlot?.id || !item.clientUserId) {
+                        return;
+                      }
+                      assignAnotherClientMutation.mutate({
+                        slotId: reassignSlot.id,
+                        clientUserId: item.clientUserId,
+                      });
+                    }}
+                    disabled={assignAnotherClientMutation.isPending || !item.clientUserId}
+                  >
+                    <YStack alignItems="flex-start" gap="$1">
+                      <Text color="$text" fontWeight="600">{item.clientName ?? t('common.empty')}</Text>
+                      {item.clientPhone ? (
+                        <Text fontSize="$2" color="$muted">{item.clientPhone}</Text>
+                      ) : null}
+                    </YStack>
+                  </Button>
+                ))}
+            </YStack>
+          </ScrollView>
+          <Button
+            backgroundColor="$background"
+            borderWidth={1}
+            borderColor="$border"
+            borderRadius="$4"
+            minHeight="$10"
+            onPress={closeReassignSheet}
+          >
+            <Text color="$text">{t('profile.personal.cancel')}</Text>
+          </Button>
+        </Sheet.Frame>
+      </Sheet>
     </YStack>
   );
 }

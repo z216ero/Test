@@ -87,6 +87,7 @@ public sealed class ClientService(AppDbContext db)
             .Select(booking => ToSessionDto(
                 booking.Slot!,
                 booking.Status,
+                booking.ClientConfirmationStatus,
                 trainerAvatarIds,
                 occupiedCounts,
                 trainerRatings)));
@@ -201,6 +202,7 @@ public sealed class ClientService(AppDbContext db)
             .Select(booking => ToSessionDto(
                 booking.Slot!,
                 booking.Status,
+                booking.ClientConfirmationStatus,
                 trainerAvatarIds,
                 occupiedCounts,
                 trainerRatings)));
@@ -274,10 +276,17 @@ public sealed class ClientService(AppDbContext db)
     private static UpcomingSessionDto ToSessionDto(
         TrainingSlot slot,
         BookingStatus bookingStatus,
+        BookingClientConfirmationStatus clientConfirmationStatus,
         HashSet<Guid> trainerAvatarIds,
         IReadOnlyDictionary<Guid, int> occupiedCounts,
         IReadOnlyDictionary<Guid, double?> trainerRatings)
-        => ToSessionDto(slot, bookingStatus.ToString(), trainerAvatarIds, occupiedCounts, trainerRatings);
+        => ToSessionDto(
+            slot,
+            bookingStatus.ToString(),
+            clientConfirmationStatus.ToString(),
+            trainerAvatarIds,
+            occupiedCounts,
+            trainerRatings);
 
     private static UpcomingSessionDto ToSessionDto(
         TrainingSlot slot,
@@ -285,11 +294,12 @@ public sealed class ClientService(AppDbContext db)
         HashSet<Guid> trainerAvatarIds,
         IReadOnlyDictionary<Guid, int> occupiedCounts,
         IReadOnlyDictionary<Guid, double?> trainerRatings)
-        => ToSessionDto(slot, attendeeStatus.ToString(), trainerAvatarIds, occupiedCounts, trainerRatings);
+        => ToSessionDto(slot, attendeeStatus.ToString(), null, trainerAvatarIds, occupiedCounts, trainerRatings);
 
     private static UpcomingSessionDto ToSessionDto(
         TrainingSlot slot,
         string bookingStatus,
+        string? clientConfirmationStatus,
         HashSet<Guid> trainerAvatarIds,
         IReadOnlyDictionary<Guid, int> occupiedCounts,
         IReadOnlyDictionary<Guid, double?> trainerRatings)
@@ -309,7 +319,7 @@ public sealed class ClientService(AppDbContext db)
         var trainerWorksWithGender = trainerProfile?.WorksWithGender.ToString();
 
         return new UpcomingSessionDto(
-            ToSlotDto(slot, bookingStatus, occupiedCounts),
+            ToSlotDto(slot, bookingStatus, clientConfirmationStatus, occupiedCounts),
             trainerName,
             trainerCityName,
             trainerDistrictName,
@@ -408,6 +418,7 @@ public sealed class ClientService(AppDbContext db)
     private static SlotDto ToSlotDto(
         TrainingSlot slot,
         string bookingStatus,
+        string? clientConfirmationStatus,
         IReadOnlyDictionary<Guid, int> occupiedCounts)
     {
         var occupiedCount = slot.SlotType == TrainingSlotType.Group
@@ -433,6 +444,7 @@ public sealed class ClientService(AppDbContext db)
             isFull,
             slot.Status.ToString(),
             bookingStatus,
+            clientConfirmationStatus,
             slot.CreatedAtUtc,
             null,
             null,

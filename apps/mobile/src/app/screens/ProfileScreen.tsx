@@ -17,6 +17,9 @@ import { Avatar, useAuthorizedImageSource } from '@ui/components';
 import { ProfileSettingsList, type ProfileSettingsItem } from './profile/ui/ProfileSettingsList';
 import { ProfileSupportSheet } from './profile/ui/ProfileSupportSheet';
 import { ProfileTrainerRating } from './profile/ui/ProfileTrainerRating';
+import {
+  usePendingLinkRequestsCount,
+} from '@query/clientBadges';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
 
@@ -47,6 +50,9 @@ export function ProfileScreen({ navigation }: Props) {
   const role = me?.role === 'Trainer' ? 'Trainer' : 'Client';
   const roleLabel =
     role === 'Trainer' ? t('profile.roleTrainer') : t('profile.roleClient');
+  const pendingLinks = usePendingLinkRequestsCount(role === 'Client');
+  const hasRequestsBadge = role === 'Client'
+    && (pendingLinks.data ?? 0) > 0;
 
   const trainerRating = me?.trainerRating;
   const trainerRatingCount = me?.trainerRatingCount;
@@ -84,6 +90,25 @@ export function ProfileScreen({ navigation }: Props) {
           },
         ]
       : [
+          {
+            id: 'requests',
+            label: t('profile.settings.requests'),
+            icon: 'users' as const,
+            rightSlot: hasRequestsBadge ? (
+              <YStack
+                width="$1"
+                height="$1"
+                borderRadius="$6"
+                backgroundColor="$accent"
+              />
+            ) : undefined,
+            onPress: () => {
+              const rootNavigation =
+                navigation.getParent()
+                  ?.getParent<NativeStackNavigationProp<RootStackParamList>>();
+              rootNavigation?.navigate('ClientRequests');
+            },
+          },
           {
             id: 'schedule',
             label: t('profile.settings.bookings'),

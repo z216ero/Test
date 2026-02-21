@@ -52,6 +52,8 @@ const syncPushPreferencesFromSettings = async (): Promise<void> => {
     eventsEnabled: settings.inAppBookingEventsEnabled,
     groupMinCancellationEnabled: settings.inAppGroupMinCancellationEventsEnabled,
     reminderEnabled: settings.enabled,
+    trainerLinkRequestsEnabled: settings.linkRequestPushEnabled,
+    clientLinkResponsesEnabled: settings.linkResponsePushEnabled,
     reminderOffsetMinutes: settings.reminderOffsetMinutes,
   });
 };

@@ -49,6 +49,7 @@ const navigationRef = createNavigationContainerRef<RootStackParamList>();
 function AppContent() {
   const { isDark, themeName } = useAppTheme();
   const resumeInvalidateRef = useRef(0);
+  const pendingDeeplinkRef = useRef<string | null>(null);
   const navigationTheme = isDark ? DarkTheme : DefaultTheme;
 
   const redirectToAuth = useCallback(() => {
@@ -77,6 +78,55 @@ function AppContent() {
     }
   }, [redirectToAuth]);
 
+  const navigateByDeeplink = useCallback((deeplink: string) => {
+    if (!navigationRef.isReady()) {
+      pendingDeeplinkRef.current = deeplink;
+      return;
+    }
+
+    const bookingMatch = deeplink.match(/^myapp:\/\/booking\/([^/?#]+)$/i);
+    if (bookingMatch?.[1]) {
+      navigationRef.navigate('BookingConfirm', {
+        bookingId: decodeURIComponent(bookingMatch[1]),
+      });
+      return;
+    }
+
+    if (/^myapp:\/\/profile\/requests$/i.test(deeplink)) {
+      navigationRef.navigate('ClientRequests');
+    }
+  }, []);
+
+  const handleNotificationNavigation = useCallback((message: {
+    data?: Record<string, unknown> | null;
+  } | null) => {
+    const data = message?.data ?? {};
+    const deeplink = typeof data.deeplink === 'string' ? data.deeplink.trim() : '';
+    if (deeplink) {
+      navigateByDeeplink(deeplink);
+      return;
+    }
+
+    if (data.type === 'booking_confirmation_requested' && typeof data.bookingId === 'string') {
+      navigateByDeeplink(`myapp://booking/${data.bookingId}`);
+      return;
+    }
+
+    if (data.type === 'trainer_client_link_requested') {
+      navigateByDeeplink('myapp://profile/requests');
+    }
+  }, [navigateByDeeplink]);
+
+  const handleNavigationReady = useCallback(() => {
+    const deeplink = pendingDeeplinkRef.current;
+    if (!deeplink) {
+      return;
+    }
+
+    pendingDeeplinkRef.current = null;
+    navigateByDeeplink(deeplink);
+  }, [navigateByDeeplink]);
+
   useEffect(() => {
     const messaging = getMessaging(getApp());
     const unsubscribeMessage = onMessage(messaging, (message) =>
@@ -85,6 +135,7 @@ function AppContent() {
     const unsubscribeOpened = onNotificationOpenedApp(messaging, (message) => {
       if (message) {
         handleRemoteMessage(message, { source: 'opened' });
+        handleNotificationNavigation(message);
       }
     });
     const unsubscribeToken = registerPushTokenRefreshListener();
@@ -95,6 +146,7 @@ function AppContent() {
       .then((message) => {
         if (message) {
           handleRemoteMessage(message, { source: 'initial' });
+          handleNotificationNavigation(message);
         }
       })
       .catch(() => {});
@@ -113,6 +165,8 @@ function AppContent() {
       queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
       queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
       queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Client') });
+      queryClient.invalidateQueries({ queryKey: keys.pendingLinkRequestsCount() });
+      queryClient.invalidateQueries({ queryKey: keys.pendingBookingConfirmationsCount() });
       ensureSessionIsValid().catch(() => {});
     });
 
@@ -124,7 +178,7 @@ function AppContent() {
       unsubscribeToken();
       resumeSubscription.remove();
     };
-  }, [ensureSessionIsValid]);
+  }, [ensureSessionIsValid, handleNotificationNavigation]);
 
   return (
     <SafeAreaProvider>
@@ -143,7 +197,11 @@ function AppContent() {
             <PortalProvider shouldAddRootHost>
               <QueryClientProvider client={queryClient}>
                 <ToastProvider>
-                  <NavigationContainer ref={navigationRef} theme={navigationTheme}>
+                  <NavigationContainer
+                    ref={navigationRef}
+                    theme={navigationTheme}
+                    onReady={handleNavigationReady}
+                  >
                     <RootNavigator />
                   </NavigationContainer>
                 </ToastProvider>
