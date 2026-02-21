@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
@@ -17,7 +17,7 @@ import {
   type PaymentMethod as BookingPaymentMethod,
 } from '@api/paymentsApi';
 import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
-import type { PaymentDto, SlotAttendeeDto, SlotDto } from '@generated/api';
+import type { PaymentDto } from '@generated/api';
 import { t } from '@i18n';
 import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
@@ -26,73 +26,23 @@ import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
 import type { ScheduleStackParamList } from '@app/navigation/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppIcon } from '@ui/AppIcon';
-import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 import {
   canCancelBookedSlot,
   canCancelSlot,
 } from '@app/components/schedule/slotHelpers';
+import { TrainerSlotGroupSection } from './slot-details/ui/TrainerSlotGroupSection';
+import { TrainerSlotPaymentSection } from './slot-details/ui/TrainerSlotPaymentSection';
+import {
+  getSlotTimes,
+  getStatusLabel,
+  isCancelledAttendee,
+  isGroupSlot,
+} from './slot-details/slotDetailsUtils';
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, 'SlotDetails'>;
 
 const ATTENDEES_POLL_INTERVAL_MS = 10 * 1000;
 const BOOKING_PAYMENT_METHODS: BookingPaymentMethod[] = ['Cash', 'Transfer', 'SBP', 'Other'];
-
-const getSlotTimes = (slot: SlotDto) => {
-  if (!slot.startsAtUtc) {
-    return null;
-  }
-  const start = new Date(slot.startsAtUtc);
-  if (Number.isNaN(start.getTime())) {
-    return null;
-  }
-  const duration = slot.durationMinutes ?? 0;
-  const end = duration
-    ? new Date(start.getTime() + duration * 60 * 1000)
-    : start;
-  return { start, end };
-};
-
-const getStatusLabel = (status?: string | null) => {
-  if (!status) {
-    return t('common.empty');
-  }
-
-  switch (status.toLowerCase()) {
-    case 'open':
-    case 'available':
-      return t('status.open');
-    case 'booked':
-      return t('status.booked');
-    case 'cancelled':
-      return t('status.cancelled');
-    case 'completed':
-      return t('status.completed');
-    case 'noshow':
-    case 'no_show':
-    case 'no-show':
-      return t('status.noShow');
-    default:
-      return status;
-  }
-};
-
-const getPaymentMethodLabel = (method: BookingPaymentMethod) => {
-  switch (method) {
-    case 'Cash':
-      return t('payments.method.cash');
-    case 'Transfer':
-      return t('payments.method.transfer');
-    case 'SBP':
-      return t('payments.method.sbp');
-    default:
-      return t('payments.method.other');
-  }
-};
-
-const normalize = (value?: string | null) => value?.toLowerCase().trim();
-const isGroupSlot = (slot: SlotDto) => normalize(slot.slotType) === 'group';
-const isBookedAttendee = (attendee: SlotAttendeeDto) => normalize(attendee.status) === 'booked';
-const isCancelledAttendee = (attendee: SlotAttendeeDto) => normalize(attendee.status) === 'cancelled';
 
 export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   const { slot } = route.params;
@@ -142,6 +92,18 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
     }
   };
 
+  const handleMutationError = useCallback((err: unknown) => {
+    const presented = presentApiError(err);
+    setActionError(presented.message);
+    if (shouldShowErrorToast(presented)) {
+      showToast({
+        type: 'error',
+        title: presented.title,
+        message: presented.message,
+      });
+    }
+  }, [showToast]);
+
   const completeMutation = useAppMutation({
     mutationFn: (payload: { bookingId: string }) =>
       closeTrainerBooking(payload.bookingId, 'Completed', { markPaid: false, method: null }),
@@ -149,17 +111,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
       invalidateTrainerData();
       navigation.goBack();
     },
-    onError: (err) => {
-      const presented = presentApiError(err);
-      setActionError(presented.message);
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message: presented.message,
-        });
-      }
-    },
+    onError: handleMutationError,
   });
 
   const noShowMutation = useAppMutation({
@@ -169,17 +121,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
       invalidateTrainerData();
       navigation.goBack();
     },
-    onError: (err) => {
-      const presented = presentApiError(err);
-      setActionError(presented.message);
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message: presented.message,
-        });
-      }
-    },
+    onError: handleMutationError,
   });
 
   const cancelMutation = useAppMutation({
@@ -188,17 +130,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
       invalidateTrainerData();
       navigation.goBack();
     },
-    onError: (err) => {
-      const presented = presentApiError(err);
-      setActionError(presented.message);
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message: presented.message,
-        });
-      }
-    },
+    onError: handleMutationError,
   });
 
   const attendeeCompleteMutation = useAppMutation({
@@ -207,17 +139,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
     onSuccess: () => {
       invalidateTrainerData();
     },
-    onError: (err) => {
-      const presented = presentApiError(err);
-      setActionError(presented.message);
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message: presented.message,
-        });
-      }
-    },
+    onError: handleMutationError,
   });
 
   const attendeeNoShowMutation = useAppMutation({
@@ -226,17 +148,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
     onSuccess: () => {
       invalidateTrainerData();
     },
-    onError: (err) => {
-      const presented = presentApiError(err);
-      setActionError(presented.message);
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message: presented.message,
-        });
-      }
-    },
+    onError: handleMutationError,
   });
 
   const markPaidMutation = useAppMutation({
@@ -248,17 +160,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
       }
       invalidateTrainerData();
     },
-    onError: (err) => {
-      const presented = presentApiError(err);
-      setActionError(presented.message);
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message: presented.message,
-        });
-      }
-    },
+    onError: handleMutationError,
   });
 
   const markPendingMutation = useAppMutation({
@@ -269,17 +171,7 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
       }
       invalidateTrainerData();
     },
-    onError: (err) => {
-      const presented = presentApiError(err);
-      setActionError(presented.message);
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message: presented.message,
-        });
-      }
-    },
+    onError: handleMutationError,
   });
 
   const canMarkIndividual =
@@ -394,112 +286,34 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
         </YStack>
 
         {group ? (
-          <YStack gap="$3">
-            <Text fontSize="$4" fontWeight="700" color="$text">
-              {t('slotDetails.participantsTitle')}
-            </Text>
-            {attendeesQuery.isLoading ? (
-              <Text fontSize="$3" color="$muted">{t('common.loading')}</Text>
-            ) : null}
-            {attendees.map((attendee) => {
-              const attendeeStatus = getStatusLabel(attendee.status);
-              const showActions = isBookedAttendee(attendee);
-              const canShowCompleteAction = showActions && canCompleteNow;
-              const canShowNoShowAction = showActions && canNoShowNow;
-              return (
-                <YStack
-                  key={attendee.clientId ?? `attendee-${attendee.clientName}`}
-                  padding="$3"
-                  borderWidth={1}
-                  borderColor="$border"
-                  borderRadius="$4"
-                  gap="$2"
-                  backgroundColor="$background"
-                >
-                  <XStack justifyContent="space-between" alignItems="center">
-                    <XStack alignItems="center" gap="$3" flex={1}>
-                      <TrainerAvatar
-                        name={attendee.clientName}
-                        avatarUrl={attendee.clientAvatarUrl}
-                        size="$8"
-                      />
-                      <Text fontSize="$4" color="$text" flex={1}>
-                        {attendee.clientName ?? t('common.empty')}
-                      </Text>
-                    </XStack>
-                    <Text fontSize="$3" color="$muted">
-                      {attendeeStatus}
-                    </Text>
-                  </XStack>
-                  {canShowCompleteAction || canShowNoShowAction ? (
-                    <XStack gap="$2">
-                      {canShowCompleteAction ? (
-                        <Button
-                          flex={1}
-                          backgroundColor="$accent"
-                          color="$accentText"
-                          borderRadius="$4"
-                          minHeight="$9"
-                          onPress={() => {
-                            if (!slot.id || !attendee.clientId) {
-                              return;
-                            }
-                            attendeeCompleteMutation.mutate({
-                              slotId: slot.id,
-                              clientId: attendee.clientId,
-                            });
-                          }}
-                          disabled={!canMutateAttendee}
-                        >
-                          {t('slotDetails.markCompleted')}
-                        </Button>
-                      ) : null}
-                      {canShowNoShowAction ? (
-                        <Button
-                          flex={1}
-                          backgroundColor="$background"
-                          borderRadius="$4"
-                          borderWidth={1}
-                          borderColor="$danger"
-                          minHeight="$9"
-                          onPress={() => {
-                            if (!slot.id || !attendee.clientId) {
-                              return;
-                            }
-                            attendeeNoShowMutation.mutate({
-                              slotId: slot.id,
-                              clientId: attendee.clientId,
-                            });
-                          }}
-                          disabled={!canMutateAttendee}
-                        >
-                          <Text color="$danger">{t('slotDetails.markNoShow')}</Text>
-                        </Button>
-                      ) : null}
-                    </XStack>
-                  ) : null}
-                </YStack>
-              );
-            })}
-            {canCancelGroupSlot ? (
-              <Button
-                backgroundColor="$background"
-                borderRadius="$4"
-                borderWidth={1}
-                borderColor="$primary"
-                minHeight="$9"
-                paddingHorizontal="$4"
-                onPress={handleCancelGroupSlot}
-                disabled={cancelMutation.isPending}
-              >
-                <Text color="$primary">
-                  {cancelMutation.isPending
-                    ? t('common.loading')
-                    : t('schedule.actions.cancelSlot')}
-                </Text>
-              </Button>
-            ) : null}
-          </YStack>
+          <TrainerSlotGroupSection
+            attendees={attendees}
+            isLoading={attendeesQuery.isLoading}
+            canCompleteNow={canCompleteNow}
+            canNoShowNow={canNoShowNow}
+            canMutateAttendee={canMutateAttendee}
+            onCompleteAttendee={(clientId) => {
+              if (!slot.id) {
+                return;
+              }
+              attendeeCompleteMutation.mutate({
+                slotId: slot.id,
+                clientId,
+              });
+            }}
+            onNoShowAttendee={(clientId) => {
+              if (!slot.id) {
+                return;
+              }
+              attendeeNoShowMutation.mutate({
+                slotId: slot.id,
+                clientId,
+              });
+            }}
+            canCancelGroupSlot={canCancelGroupSlot}
+            onCancelGroupSlot={handleCancelGroupSlot}
+            isCancelling={cancelMutation.isPending}
+          />
         ) : null}
 
         {canMarkIndividual ? (
@@ -536,87 +350,29 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
           </YStack>
         ) : null}
 
-        {canTogglePayment ? (
-          <YStack
-            gap="$3"
-            padding="$4"
-            borderRadius="$4"
-            borderWidth={1}
-            borderColor="$border"
-            backgroundColor="$background"
-          >
-            <Text fontSize="$4" fontWeight="700" color="$text">
-              {t('slotDetails.paymentTitle')}
-            </Text>
-            <Text fontSize="$3" color="$muted">
-              {paymentStatus === 'paid'
-                ? t('bookings.payment.paid')
-                : t('bookings.payment.unpaid')}
-            </Text>
-            {paymentStatus !== 'paid' ? (
-              <YStack gap="$2">
-                <XStack gap="$2" flexWrap="wrap">
-                  {BOOKING_PAYMENT_METHODS.map((method) => {
-                    const selected = method === selectedPaymentMethod;
-                    return (
-                      <Button
-                        key={method}
-                        backgroundColor={selected ? '$surfaceMuted' : '$background'}
-                        borderWidth={1}
-                        borderColor={selected ? '$accent' : '$border'}
-                        borderRadius="$4"
-                        minHeight="$8"
-                        onPress={() => setSelectedPaymentMethod(method)}
-                        disabled={isPaymentPending}
-                      >
-                        <Text color="$text" fontSize="$2" fontWeight={selected ? '700' : '600'}>
-                          {getPaymentMethodLabel(method)}
-                        </Text>
-                      </Button>
-                    );
-                  })}
-                </XStack>
-                <Button
-                  backgroundColor="$accent"
-                  color="$accentText"
-                  borderRadius="$4"
-                  minHeight="$9"
-                  onPress={() => {
-                    if (!slot.bookingId || isPaymentPending) {
-                      return;
-                    }
-                    markPaidMutation.mutate({
-                      bookingId: slot.bookingId,
-                      method: selectedPaymentMethod,
-                    });
-                  }}
-                  disabled={isPaymentPending}
-                >
-                  {isPaymentPending ? t('common.loading') : t('slotDetails.paymentMarkPaid')}
-                </Button>
-              </YStack>
-            ) : (
-              <Button
-                backgroundColor="$background"
-                borderRadius="$4"
-                borderWidth={1}
-                borderColor="$border"
-                minHeight="$9"
-                onPress={() => {
-                  if (!slot.bookingId || isPaymentPending) {
-                    return;
-                  }
-                  markPendingMutation.mutate(slot.bookingId);
-                }}
-                disabled={isPaymentPending}
-              >
-                <Text color="$text">
-                  {isPaymentPending ? t('common.loading') : t('slotDetails.paymentMarkPending')}
-                </Text>
-              </Button>
-            )}
-          </YStack>
-        ) : null}
+        <TrainerSlotPaymentSection
+          canTogglePayment={canTogglePayment}
+          paymentStatus={paymentStatus}
+          methods={BOOKING_PAYMENT_METHODS}
+          selectedMethod={selectedPaymentMethod}
+          onSelectMethod={setSelectedPaymentMethod}
+          onMarkPaid={() => {
+            if (!slot.bookingId || isPaymentPending) {
+              return;
+            }
+            markPaidMutation.mutate({
+              bookingId: slot.bookingId,
+              method: selectedPaymentMethod,
+            });
+          }}
+          onMarkPending={() => {
+            if (!slot.bookingId || isPaymentPending) {
+              return;
+            }
+            markPendingMutation.mutate(slot.bookingId);
+          }}
+          isPending={isPaymentPending}
+        />
 
         {actionError ? (
           <Text fontSize="$3" color="$primary">

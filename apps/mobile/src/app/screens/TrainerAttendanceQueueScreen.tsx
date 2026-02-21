@@ -30,6 +30,7 @@ import { TabScrollView } from '@ui/layout/TabScrollView';
 import { EmptyState } from '@ui/states/EmptyState';
 import { ErrorState } from '@ui/states/ErrorState';
 import { formatDateRu } from '@utils/datetime';
+import { addDays, buildDateKey, endOfLocalDay, startOfLocalDay } from '@utils/localDate';
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, 'AttendanceQueue'>;
 
@@ -44,24 +45,6 @@ type SlotDateSection = {
 const NOW_REFRESH_INTERVAL_MS = 30 * 1000;
 const PAST_DATE_RANGE_DAYS = 30;
 const FUTURE_DATE_RANGE_DAYS = 14;
-
-const startOfLocalDay = (value: Date) =>
-  new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
-
-const endOfLocalDay = (value: Date) =>
-  new Date(value.getFullYear(), value.getMonth(), value.getDate(), 23, 59, 59, 999);
-
-const addDays = (value: Date, days: number) => {
-  const next = new Date(value);
-  next.setDate(next.getDate() + days);
-  return next;
-};
-
-const buildDateKey = (value: Date): string => {
-  const month = `${value.getMonth() + 1}`.padStart(2, '0');
-  const day = `${value.getDate()}`.padStart(2, '0');
-  return `${value.getFullYear()}-${month}-${day}`;
-};
 
 const compareByStartAsc = (left: SlotDto, right: SlotDto) => {
   const leftStart = getSlotStartTimestamp(left) ?? 0;

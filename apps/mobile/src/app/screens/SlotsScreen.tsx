@@ -5,7 +5,7 @@ import {
 } from '@react-native-community/datetimepicker';
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, RefreshControl } from 'react-native';
-import { XStack, YStack } from 'tamagui';
+import { YStack } from 'tamagui';
 import type { SlotDto } from '@generated/api';
 import {
   confirmClientBooking,
@@ -24,7 +24,7 @@ import { IOSDatePickerCard } from '@ui/components';
 import { Banner } from '@ui/feedback/Banner';
 import { useToast } from '@ui/feedback/useToast';
 import { TabScrollView } from '@ui/layout/TabScrollView';
-import { EmptyState } from '@ui/states/EmptyState';
+import { addDays, endOfLocalDay, startOfLocalDay } from '@utils/localDate';
 import { DateStrip } from '@app/components/schedule/DateStrip';
 import { FilterSheet } from '@app/components/slots/FilterSheet';
 import {
@@ -36,88 +36,19 @@ import {
 import type { SlotsStackParamList } from '@app/navigation/types';
 import { SlotsHeader } from './slots/ui/SlotsHeader';
 import { ClientSlotDetailsSheet } from './slots/ui/ClientSlotDetailsSheet';
-import { type SlotGroup, TrainerSlotGroupCard } from './slots/ui/TrainerSlotGroupCard';
+import type { SlotGroup } from './slots/ui/TrainerSlotGroupCard';
+import { SlotsGroupsContent } from './slots/ui/SlotsGroupsContent';
+import {
+  getAnyCode,
+  getDefaultCode,
+  normalizeFilters,
+  sortSlotsByStart,
+} from './slots/slotFilterUtils';
 
 const DATE_RANGE_DAYS = 14;
 const LIVE_REFRESH_INTERVAL_MS = 15 * 1000;
 
-const startOfLocalDay = (value: Date) =>
-  new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
-
-const endOfLocalDay = (value: Date) =>
-  new Date(value.getFullYear(), value.getMonth(), value.getDate(), 23, 59, 59, 999);
-
-const addDays = (value: Date, days: number) => {
-  const next = new Date(value);
-  next.setDate(next.getDate() + days);
-  return next;
-};
-
-const getDefaultCode = (items: { code: string; isDefault?: boolean }[]) =>
-  items.find((item) => item.isDefault)?.code ?? items[0]?.code ?? '';
-
-const getAnyCode = (items: { code: string; isAny?: boolean }[]) =>
-  items.find((item) => item.isAny)?.code ?? '';
-
-const sortByOrder = (values: string[], order: Map<string, number>): string[] =>
-  [...new Set(values)].sort((left, right) => {
-    const leftIndex = order.get(left) ?? Number.MAX_SAFE_INTEGER;
-    const rightIndex = order.get(right) ?? Number.MAX_SAFE_INTEGER;
-    return leftIndex - rightIndex;
-  });
-
-const normalizeFilters = (
-  filters: ClientSlotsFilters,
-  specializationOrder: Map<string, number>,
-  allowedSpecializations: Set<string>,
-  defaultGender: string,
-  canFilterDistrict: boolean
-): ClientSlotsFilters => {
-  const specializations = filters.specializations.filter((item) => allowedSpecializations.has(item));
-  const gender = filters.gender || defaultGender;
-  const districtOnly = canFilterDistrict ? filters.districtOnly : false;
-  return {
-    gender,
-    specializations: sortByOrder(specializations, specializationOrder),
-    districtOnly,
-  };
-};
-
-const sortSlotsByStart = (left: SlotDto, right: SlotDto) => {
-  const leftTs = left.startsAtUtc ? new Date(left.startsAtUtc).getTime() : 0;
-  const rightTs = right.startsAtUtc ? new Date(right.startsAtUtc).getTime() : 0;
-  return leftTs - rightTs;
-};
-
 type Props = NativeStackScreenProps<SlotsStackParamList, 'SlotsList'>;
-
-const SlotsSkeleton = () => (
-  <YStack gap="$4">
-    {Array.from({ length: 2 }).map((_, index) => (
-      <YStack
-        key={`skeleton-${index}`}
-        gap="$3"
-        padding="$4"
-        backgroundColor="$background"
-        borderRadius="$5"
-        borderWidth={1}
-        borderColor="$border"
-      >
-        <XStack gap="$3" alignItems="center">
-          <YStack width="$10" height="$10" borderRadius="$6" backgroundColor="$surfaceMuted" />
-          <YStack gap="$2" flex={1}>
-            <YStack height={16} width="60%" backgroundColor="$surfaceMuted" borderRadius="$3" />
-            <YStack height={12} width="40%" backgroundColor="$surfaceMuted" borderRadius="$3" />
-          </YStack>
-        </XStack>
-        <YStack gap="$2">
-          <YStack height={14} width="80%" backgroundColor="$surfaceMuted" borderRadius="$3" />
-          <YStack height={14} width="70%" backgroundColor="$surfaceMuted" borderRadius="$3" />
-        </YStack>
-      </YStack>
-    ))}
-  </YStack>
-);
 
 export function SlotsScreen({ navigation }: Props) {
   const queryClient = useQueryClient();
@@ -388,54 +319,6 @@ export function SlotsScreen({ navigation }: Props) {
     }
   };
 
-  const renderContent = () => {
-    if (!filtersReady || !lookupsReady || slotsQuery.isLoading) {
-      return <SlotsSkeleton />;
-    }
-
-    if (groups.length === 0) {
-      if (hasActiveFilters) {
-        return (
-          <EmptyState
-            title={t('slots.empty.filtersTitle')}
-            ctaLabel={t('slots.empty.resetFilters')}
-            onCtaPress={handleResetFilters}
-          />
-        );
-      }
-
-      return (
-        <EmptyState
-          title={t('slots.empty.dateTitle')}
-          ctaLabel={t('slots.empty.changeDate')}
-          onCtaPress={openDatePicker}
-        />
-      );
-    }
-
-    return (
-      <YStack gap="$4">
-        {groups.map((group) => (
-          <TrainerSlotGroupCard
-            key={group.trainer.id ?? `trainer-${group.trainer.name ?? 'unknown'}`}
-            group={group}
-            bookings={bookings}
-            canCheckConflicts={canCheckConflicts}
-            nowTs={nowTs}
-            pendingActionBookingId={pendingActionBookingId}
-            onConfirmPending={(bookingId) => confirmPendingMutation.mutate(bookingId)}
-            onDeclinePending={(bookingId) => declinePendingMutation.mutate(bookingId)}
-            onOpenSlot={(slot, trainer) => {
-              setActiveSlot(slot);
-              setActiveTrainer(trainer);
-              setSlotDetailsSheetOpen(true);
-            }}
-          />
-        ))}
-      </YStack>
-    );
-  };
-
   const showErrorBanner = Boolean(slotsQuery.error);
   const errorMessage = slotsQuery.error
     ? presentApiError(slotsQuery.error).message
@@ -487,7 +370,26 @@ export function SlotsScreen({ navigation }: Props) {
             />
           ) : null}
 
-          {renderContent()}
+          <SlotsGroupsContent
+            filtersReady={filtersReady}
+            lookupsReady={lookupsReady}
+            isLoading={slotsQuery.isLoading}
+            groups={groups}
+            hasActiveFilters={hasActiveFilters}
+            onResetFilters={handleResetFilters}
+            onOpenDatePicker={openDatePicker}
+            bookings={bookings}
+            canCheckConflicts={canCheckConflicts}
+            nowTs={nowTs}
+            pendingActionBookingId={pendingActionBookingId}
+            onConfirmPending={(bookingId) => confirmPendingMutation.mutate(bookingId)}
+            onDeclinePending={(bookingId) => declinePendingMutation.mutate(bookingId)}
+            onOpenSlot={(slot, trainer) => {
+              setActiveSlot(slot);
+              setActiveTrainer(trainer);
+              setSlotDetailsSheetOpen(true);
+            }}
+          />
         </YStack>
       </TabScrollView>
 

@@ -1,6 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Linking } from 'react-native';
 import { ScrollView } from '@tamagui/scroll-view';
 import { Button, Switch, Text, XStack, YStack } from 'tamagui';
 import { AppIcon } from '@ui/AppIcon';
@@ -25,13 +24,11 @@ import {
 import { onSettingsChanged } from '@notifications/orchestrator';
 import { updatePushPreferences } from '@api/pushApi';
 import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
+import { isSameLocalDay } from '@utils/localDate';
+import { NotificationJournalSection } from './notifications/ui/NotificationJournalSection';
+import { NotificationSystemSection } from './notifications/ui/NotificationSystemSection';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Notifications'>;
-
-const isSameLocalDay = (left: Date, right: Date) =>
-  left.getFullYear() === right.getFullYear()
-  && left.getMonth() === right.getMonth()
-  && left.getDate() === right.getDate();
 
 const formatEventTime = (iso: string): string => {
   const date = new Date(iso);
@@ -412,120 +409,13 @@ export function NotificationsScreen({ navigation }: Props) {
             </YStack>
           </YStack>
 
-          <YStack gap="$3">
-            <Text fontSize="$5" fontWeight="700" color="$text">
-              {t('notifications.system.title')}
-            </Text>
-            <YStack
-              backgroundColor="$background"
-              borderRadius="$5"
-              borderWidth={1}
-              borderColor="$border"
-              padding="$4"
-              gap="$3"
-            >
-              <XStack alignItems="center" gap="$3">
-                <AppIcon name="settings" size={18} color="$muted" />
-                <Text fontSize="$3" color="$text" flex={1}>
-                  {t('notifications.system.permissions')}
-                </Text>
-                <AppIcon name="chevronRight" size={18} color="$muted" />
-              </XStack>
-              <Button
-                backgroundColor="$background"
-                borderRadius="$4"
-                borderWidth={1}
-                borderColor="$border"
-                paddingHorizontal="$3"
-                paddingVertical="$2"
-                onPress={() => Linking.openSettings()}
-                height="$9"
-              >
-                <Text fontSize="$3" color="$text">
-                  {t('notifications.system.openSettings')}
-                </Text>
-              </Button>
-            </YStack>
-          </YStack>
-
-          <YStack gap="$3">
-            <XStack alignItems="center" justifyContent="space-between">
-              <Text fontSize="$5" fontWeight="700" color="$text">
-                {t('notifications.journal.title')}
-              </Text>
-              <Button
-                backgroundColor="$background"
-                borderRadius="$4"
-                borderWidth={1}
-                borderColor="$border"
-                paddingHorizontal="$3"
-                paddingVertical="$2"
-                onPress={handleClearEvents}
-                disabled={events.length === 0}
-                height="$9"
-              >
-                <Text fontSize="$3" color="$text">
-                  {t('notifications.journal.clear')}
-                </Text>
-              </Button>
-            </XStack>
-            <YStack
-              backgroundColor="$background"
-              borderRadius="$5"
-              borderWidth={1}
-              borderColor="$border"
-              padding="$4"
-              height="300"
-            >
-              <ScrollView>
-                <YStack gap="$3">
-                  {events.length === 0 ? (
-                    <Text fontSize="$3" color="$muted">
-                      {t('notifications.journal.empty')}
-                    </Text>
-                  ) : (
-                    events.map((event) => (
-                      <Button
-                        key={event.id}
-                        unstyled
-                        onPress={() => handleEventPress(event.id)}
-                      >
-                        <XStack gap="$3" alignItems="flex-start">
-                          <AppIcon
-                            name="calendar"
-                            size={18}
-                            color="$muted"
-                          />
-                          <YStack flex={1} gap="$1">
-                            <XStack alignItems="center" gap="$2">
-                              {event.isRead ? null : (
-                                <YStack
-                                  width="$1"
-                                  height="$1"
-                                  borderRadius="$6"
-                                  backgroundColor="$accent"
-                                  marginTop="$1"
-                                />
-                              )}
-                              <Text fontSize="$3" fontWeight="700" color="$text">
-                                {event.title}
-                              </Text>
-                            </XStack>
-                            <Text fontSize="$3" color="$text" numberOfLines={2}>
-                              {event.description}
-                            </Text>
-                            <Text fontSize="$2" color="$muted">
-                              {formatEventTime(event.occurredAtUtc)}
-                            </Text>
-                          </YStack>
-                        </XStack>
-                      </Button>
-                    ))
-                  )}
-                </YStack>
-              </ScrollView>
-            </YStack>
-          </YStack>
+          <NotificationSystemSection />
+          <NotificationJournalSection
+            events={events}
+            onClearEvents={handleClearEvents}
+            onPressEvent={handleEventPress}
+            formatEventTime={formatEventTime}
+          />
         </YStack>
       </ScrollView>
     </YStack>

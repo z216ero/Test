@@ -1,153 +1,95 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import {
-  DateTimePickerAndroid,
-  type DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Platform, RefreshControl } from 'react-native';
-import { ScrollView } from '@tamagui/scroll-view';
-import { Sheet } from '@tamagui/sheet';
-import { Button, Input, Text, YStack } from 'tamagui';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Platform, RefreshControl } from 'react-native';
+import { Button, Text, YStack } from 'tamagui';
 import {
   attendanceActionsAvailable,
-  assignRegisteredClientToSlot,
-  cancelTrainerSlot,
-  closeTrainerBooking,
   getMyTrainerSlots,
-  type PaymentMethod,
 } from '@api/trainerSlotsApi';
 import { getTrainerClientLinks } from '@api/clientLinksApi';
-import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
 import type { SlotDto } from '@generated/api';
 import { t } from '@i18n';
-import { useAppMutation, useAppQuery } from '@query/hooks';
+import { useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
 import { IOSDatePickerCard } from '@ui/components';
 import { useToast } from '@ui/feedback/useToast';
 import { useTabBarPadding } from '@ui/layout/useTabBarPadding';
 import { TabScrollView } from '@ui/layout/TabScrollView';
 import { AppIcon } from '@ui/AppIcon';
-import { EmptyState } from '@ui/states/EmptyState';
-import { ErrorState } from '@ui/states/ErrorState';
+import { buildDateKey } from '@utils/localDate';
 import type { ScheduleStackParamList } from '@app/navigation/types';
 import { DateStrip } from '@app/components/schedule/DateStrip';
 import { SlotActionsSheet } from '@app/components/schedule/SlotActionsSheet';
-import { SlotCard } from '@app/components/schedule/SlotCard';
 import {
   canMarkNoShow,
   canMarkCompleted,
   isClientDeclinedSlot,
   isActiveSlotForMainList,
-  isAttendanceFinalStatus,
-  CANCEL_FORBIDDEN_WITHIN_MS,
   getUiSlotStatus,
   shouldShowInCompletedToday,
 } from '@app/components/schedule/slotHelpers';
-import { type QueryKey, useQueryClient } from '@tanstack/react-query';
 import {
   clearScheduleBadge,
   markDeclinedSlotReleased,
-  markSlotHighlightSeen,
   usePushIndicators,
 } from '@notifications/pushIndicators';
-import { ScheduleCompletedTodaySection } from './schedule/ui/ScheduleCompletedTodaySection';
-import { ScheduleSkeleton } from './schedule/ui/ScheduleSkeleton';
+import { useScheduleSlotMutations } from './schedule/useScheduleSlotMutations';
+import { ScheduleSlotsContent } from './schedule/ui/ScheduleSlotsContent';
+import { ScheduleReassignSheet } from './schedule/ui/ScheduleReassignSheet';
+import { useScheduleDateState } from './schedule/useScheduleDateState';
+import { confirmCancelSlot } from './schedule/confirmCancelSlot';
+import { useScheduleSheetState } from './schedule/useScheduleSheetState';
 
-const FUTURE_DATE_RANGE_DAYS = 14;
-const PAST_DATE_RANGE_DAYS = 14;
 const NOW_REFRESH_INTERVAL_MS = 30 * 1000;
 
-const startOfLocalDay = (value: Date) =>
-  new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
-
-const addDays = (value: Date, days: number) => {
-  const next = new Date(value);
-  next.setDate(next.getDate() + days);
-  return next;
-};
-
-const isSameLocalDay = (left: Date, right: Date) =>
-  left.getFullYear() === right.getFullYear()
-  && left.getMonth() === right.getMonth()
-  && left.getDate() === right.getDate();
-
-const buildDateKey = (value: Date): string => {
-  const month = `${value.getMonth() + 1}`.padStart(2, '0');
-  const day = `${value.getDate()}`.padStart(2, '0');
-  return `${value.getFullYear()}-${month}-${day}`;
-};
-
-const sortByStart = (a: SlotDto, b: SlotDto) => {
-  const aTime = a.startsAtUtc ? new Date(a.startsAtUtc).getTime() : 0;
-  const bTime = b.startsAtUtc ? new Date(b.startsAtUtc).getTime() : 0;
-  return aTime - bTime;
-};
+const sortByStart = (a: SlotDto, b: SlotDto) => (a.startsAtUtc ? new Date(a.startsAtUtc).getTime() : 0) - (b.startsAtUtc ? new Date(b.startsAtUtc).getTime() : 0);
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, 'ScheduleHome'>;
 
-const resolveInitialSelectedDate = (initialDateIsoLocal?: string): Date => {
-  if (!initialDateIsoLocal) {
-    return startOfLocalDay(new Date());
-  }
-  const parsed = new Date(initialDateIsoLocal);
-  if (Number.isNaN(parsed.getTime())) {
-    return startOfLocalDay(new Date());
-  }
-  return startOfLocalDay(parsed);
-};
-
 export function ScheduleScreen({ navigation, route }: Props) {
-  const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { contentBottomPadding } = useTabBarPadding();
   const { slotHighlights, releasedDeclinedSlots } = usePushIndicators();
   const initialDateIsoLocal = route.params?.initialDateIsoLocal;
+  const {
+    activeSlot,
+    setActiveSlot,
+    sheetOpen,
+    setSheetOpen,
+    reassignSheetOpen,
+    setReassignSheetOpen,
+    reassignSlot,
+    setReassignSlot,
+    reassignSearch,
+    setReassignSearch,
+    openSlot,
+    closeSheet,
+    closeReassignSheet,
+  } = useScheduleSheetState({ navigation });
 
-  const [selectedDate, setSelectedDate] = useState(() =>
-    resolveInitialSelectedDate(initialDateIsoLocal)
-  );
-  const [todayDate, setTodayDate] = useState(() => startOfLocalDay(new Date()));
-  const [tomorrowDate, setTomorrowDate] = useState(() => addDays(startOfLocalDay(new Date()), 1));
-  const [pickerVisible, setPickerVisible] = useState(false);
+  const {
+    selectedDate,
+    todayDate,
+    tomorrowDate,
+    pickerVisible,
+    setPickerVisible,
+    dateRange,
+    minDate,
+    maxDate,
+    visibleDates,
+    isSelectedToday,
+    isPastDay,
+    canCreateSlot,
+    handleSelectDate,
+    handleDateChange,
+    openDatePicker,
+  } = useScheduleDateState({ initialDateIsoLocal });
+
   const [slotMarkers, setSlotMarkers] = useState<Record<string, boolean>>({});
-  const [activeSlot, setActiveSlot] = useState<SlotDto | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [completedExpanded, setCompletedExpanded] = useState(false);
-  const [reassignSheetOpen, setReassignSheetOpen] = useState(false);
-  const [reassignSlot, setReassignSlot] = useState<SlotDto | null>(null);
-  const [reassignSearch, setReassignSearch] = useState('');
   const [releasedDeclinedSlotsLocal, setReleasedDeclinedSlotsLocal] = useState<Record<string, boolean>>({});
-  const todayRef = useRef(todayDate);
-
-  useEffect(() => {
-    todayRef.current = todayDate;
-  }, [todayDate]);
-
-  useEffect(() => {
-    const nextDate = resolveInitialSelectedDate(initialDateIsoLocal);
-    setSelectedDate((current) =>
-      isSameLocalDay(current, nextDate) ? current : nextDate
-    );
-  }, [initialDateIsoLocal]);
-
-  const dateRange = useMemo(() => {
-    const dayStart = startOfLocalDay(selectedDate);
-    const dayEnd = new Date(
-      dayStart.getFullYear(),
-      dayStart.getMonth(),
-      dayStart.getDate(),
-      23,
-      59,
-      59,
-      999
-    );
-    return {
-      fromUtc: dayStart.toISOString(),
-      toUtc: dayEnd.toISOString(),
-    };
-  }, [selectedDate]);
 
   const {
     data: slots = [],
@@ -176,13 +118,6 @@ export function ScheduleScreen({ navigation, route }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      const nextToday = startOfLocalDay(new Date());
-      const nextTomorrow = addDays(nextToday, 1);
-      setTodayDate((prev) => (isSameLocalDay(prev, nextToday) ? prev : nextToday));
-      setTomorrowDate((prev) => (isSameLocalDay(prev, nextTomorrow) ? prev : nextTomorrow));
-      setSelectedDate((current) =>
-        isSameLocalDay(current, todayRef.current) ? nextToday : current
-      );
       if (!isLoading && isStale) {
         refetch();
       }
@@ -226,25 +161,12 @@ export function ScheduleScreen({ navigation, route }: Props) {
     setCompletedExpanded(false);
   }, [selectedKey]);
 
-  const minDate = useMemo(() => addDays(todayDate, -PAST_DATE_RANGE_DAYS), [todayDate]);
-  const maxDate = useMemo(() => addDays(todayDate, FUTURE_DATE_RANGE_DAYS), [todayDate]);
-
-  const visibleDates = useMemo(() =>
-    Array.from({ length: PAST_DATE_RANGE_DAYS + FUTURE_DATE_RANGE_DAYS + 1 }).map((_, index) =>
-      addDays(minDate, index)
-    ), [minDate]
-  );
-
   const sortedSlots = useMemo(() => slots.slice().sort(sortByStart), [slots]);
 
   const activeSlots = useMemo(
     () => sortedSlots.filter((slot) => isActiveSlotForMainList(slot, nowTs)),
     [sortedSlots, nowTs]
   );
-
-  const isSelectedToday = isSameLocalDay(selectedDate, todayDate);
-  const isPastDay = selectedDate.getTime() < todayDate.getTime();
-  const canCreateSlot = selectedDate.getTime() >= todayDate.getTime();
 
   const completedTodaySlots = useMemo(() => {
     if (!isSelectedToday) {
@@ -300,33 +222,6 @@ export function ScheduleScreen({ navigation, route }: Props) {
     }
   };
 
-  const handleSelectDate = (value: Date) => {
-    setSelectedDate(startOfLocalDay(value));
-  };
-
-  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
-    if (event.type === 'dismissed' && Platform.OS === 'android') {
-      return;
-    }
-    if (date) {
-      handleSelectDate(date);
-    }
-  };
-
-  const openDatePicker = () => {
-    if (Platform.OS === 'android') {
-      DateTimePickerAndroid.open({
-        value: selectedDate,
-        mode: 'date',
-        minimumDate: minDate,
-        maximumDate: maxDate,
-        onChange: handleDateChange,
-      });
-      return;
-    }
-    setPickerVisible(true);
-  };
-
   const handleCreateSlot = () => {
     if (!canCreateSlot) {
       return;
@@ -346,310 +241,18 @@ export function ScheduleScreen({ navigation, route }: Props) {
     }
     return { color: highlight.color, chipText: highlight.chipText };
   }, [slotHighlights]);
-
-  const openSlot = (slot: SlotDto) => {
-    if (!slot.id) {
-      return;
-    }
-    if ((slot.slotType ?? '').toLowerCase() === 'group') {
-      navigation.navigate('SlotDetails', { slot });
-      return;
-    }
-    markSlotHighlightSeen(slot.id).catch(() => {});
-    setActiveSlot(slot);
-    setSheetOpen(true);
-  };
-
-  const closeSheet = () => {
-    setSheetOpen(false);
-    setActiveSlot(null);
-  };
-
-  const closeReassignSheet = () => {
-    setReassignSheetOpen(false);
-    setReassignSlot(null);
-    setReassignSearch('');
-  };
-
-  const updateSlotsCache = useCallback((slotId: string, updater: (slot: SlotDto) => SlotDto) => {
-    queryClient.setQueriesData<SlotDto[]>(
-      { queryKey: keys.trainerSlots.mine() },
-      (current) => {
-        if (!current) {
-          return current;
-        }
-        let changed = false;
-        const next = current.map((slot) => {
-          if (slot.id !== slotId) {
-            return slot;
-          }
-          changed = true;
-          return updater(slot);
-        });
-        return changed ? next : current;
-      }
-    );
-  }, [queryClient]);
-
-  const rollbackSlotsCache = useCallback((snapshot: Array<[QueryKey, SlotDto[] | undefined]>) => {
-    snapshot.forEach(([key, data]) => {
-      queryClient.setQueryData(key, data);
-    });
-  }, [queryClient]);
-
-  type SlotsSnapshot = Array<[QueryKey, SlotDto[] | undefined]>;
-  type SlotsContext = { snapshot: SlotsSnapshot; activeSlot?: SlotDto | null };
-
-  const cancelMutation = useAppMutation<SlotDto, unknown, string, SlotsContext>({
-    mutationFn: (slotId: string) => cancelTrainerSlot(slotId),
-    onMutate: async (slotId) => {
-      await queryClient.cancelQueries({ queryKey: keys.trainerSlots.mine() });
-      const snapshot = queryClient.getQueriesData<SlotDto[]>({ queryKey: keys.trainerSlots.mine() });
-      const activeSlotSnapshot = activeSlot;
-      updateSlotsCache(slotId, (slot) => ({
-        ...slot,
-        status: 'Cancelled',
-        bookingStatus: 'Cancelled',
-      }));
-      setActiveSlot((current) =>
-        current && current.id === slotId
-          ? { ...current, status: 'Cancelled', bookingStatus: 'Cancelled' }
-          : current
-      );
-      return { snapshot, activeSlot: activeSlotSnapshot };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
-      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
-      queryClient.invalidateQueries({ queryKey: keys.payments.all() });
-      queryClient.invalidateQueries({ queryKey: keys.reports.summary() });
-      refetch();
-      closeSheet();
-    },
-    onError: (err, _variables, context) => {
-      if (context?.snapshot) {
-        rollbackSlotsCache(context.snapshot);
-      }
-      if (context?.activeSlot) {
-        setActiveSlot(context.activeSlot);
-      }
-      const presented = presentApiError(err);
-      const message =
-        presented.kind === 'conflict' || presented.kind === 'notFound'
-          ? t('schedule.errorChanged')
-          : presented.kind === 'network' || presented.kind === 'timeout'
-            ? t('schedule.errorNetwork')
-            : presented.message;
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message,
-        });
-      }
-    },
+  const {
+    cancelMutation,
+    closeBookingMutation,
+    assignAnotherClientMutation,
+  } = useScheduleSlotMutations({
+    activeSlot,
+    setActiveSlot,
+    refetch,
+    closeSheet,
+    closeReassignSheet,
+    showToast,
   });
-
-  type CloseBookingVariables = {
-    slotId: string;
-    bookingId: string;
-    attendance: 'Completed' | 'NoShow';
-    markPaid: boolean;
-    method: PaymentMethod | null;
-  };
-
-  const closeBookingMutation = useAppMutation<unknown, unknown, CloseBookingVariables, SlotsContext>({
-    mutationFn: ({ bookingId, attendance, markPaid, method }: CloseBookingVariables) =>
-      closeTrainerBooking(bookingId, attendance, { markPaid, method }),
-    onMutate: async ({ slotId, attendance }) => {
-      await queryClient.cancelQueries({ queryKey: keys.trainerSlots.mine() });
-      const snapshot = queryClient.getQueriesData<SlotDto[]>({ queryKey: keys.trainerSlots.mine() });
-      const activeSlotSnapshot = activeSlot;
-      updateSlotsCache(slotId, (slot) => ({
-        ...slot,
-        bookingStatus: attendance,
-      }));
-      setActiveSlot((current) =>
-        current && current.id === slotId
-          ? { ...current, bookingStatus: attendance }
-          : current
-      );
-      return { snapshot, activeSlot: activeSlotSnapshot };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
-      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
-      queryClient.invalidateQueries({ queryKey: keys.reports.summary() });
-      queryClient.invalidateQueries({ queryKey: keys.payments.all() });
-      refetch();
-      closeSheet();
-    },
-    onError: (err, _variables, context) => {
-      if (context?.snapshot) {
-        rollbackSlotsCache(context.snapshot);
-      }
-      if (context?.activeSlot) {
-        setActiveSlot(context.activeSlot);
-      }
-      const presented = presentApiError(err);
-      const message = presented.kind === 'conflict'
-        ? t('schedule.close.errorConflict')
-        : presented.kind === 'notFound'
-          ? t('schedule.close.errorNotFound')
-          : presented.kind === 'network' || presented.kind === 'timeout'
-            ? t('schedule.errorNetwork')
-            : presented.message;
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message,
-        });
-      }
-    },
-  });
-
-  const assignAnotherClientMutation = useAppMutation({
-    mutationFn: ({
-      slotId,
-      clientUserId,
-    }: {
-      slotId: string;
-      clientUserId: string;
-    }) => assignRegisteredClientToSlot(slotId, clientUserId),
-    onSuccess: (_data, _variables) => {
-      queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
-      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
-      queryClient.invalidateQueries({ queryKey: keys.myClients() });
-      closeReassignSheet();
-      closeSheet();
-      showToast({ type: 'success', title: t('schedule.actions.assignedAnotherClient') });
-    },
-    onError: (err) => {
-      const presented = presentApiError(err);
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message: presented.message,
-        });
-      }
-    },
-  });
-
-  const confirmCancelSlot = (slot: SlotDto) => {
-    if (!slot.id || cancelMutation.isPending) {
-      return;
-    }
-
-    const startTs = slot.startsAtUtc ? new Date(slot.startsAtUtc).getTime() : null;
-    const hasValidStart = startTs !== null && !Number.isNaN(startTs);
-    const statusRaw = slot.status?.toLowerCase().trim();
-    const isBooked = statusRaw === 'booked';
-    const isFinalAttendance = isAttendanceFinalStatus(slot);
-    const isWithinThirtyMinutes = hasValidStart && nowTs >= startTs - CANCEL_FORBIDDEN_WITHIN_MS;
-
-    const title = isBooked
-      ? isWithinThirtyMinutes
-        ? t('schedule.actions.cancelTrainingConfirmSoonTitle')
-        : t('schedule.actions.cancelTrainingConfirmTitle')
-      : t('schedule.actions.cancelSlotConfirmTitle');
-    const message = isBooked
-      ? isWithinThirtyMinutes
-        ? t('schedule.actions.cancelTrainingConfirmSoonMessage')
-        : t('schedule.actions.cancelTrainingConfirmMessage')
-      : t('schedule.actions.cancelSlotConfirmMessage');
-
-    if (isBooked && isFinalAttendance) {
-      return;
-    }
-
-    Alert.alert(
-      title,
-      message,
-      [
-        { text: t('profile.personal.cancel'), style: 'cancel' },
-        {
-          text: isBooked
-            ? t('schedule.actions.cancelTrainingConfirm')
-            : t('schedule.actions.cancelSlotConfirm'),
-          style: 'destructive',
-          onPress: () => cancelMutation.mutate(slot.id as string),
-        },
-      ]
-    );
-  };
-
-  const renderContent = () => {
-    if (isLoading) {
-      return <ScheduleSkeleton />;
-    }
-
-    if (error) {
-      return <ErrorState error={error} onRetry={refetch} />;
-    }
-
-    const visibleSlots = isPastDay
-      ? sortedSlots.filter((slot) => getUiSlotStatus(slot, nowTs) !== 'available')
-      : activeSlots;
-    const showCompletedTodaySection = isSelectedToday && completedTodaySlots.length > 0;
-
-    if (visibleSlots.length === 0) {
-      if (showCompletedTodaySection) {
-        return (
-          <YStack gap="$4">
-            <ScheduleCompletedTodaySection
-              open={completedExpanded}
-              count={completedTodaySlots.length}
-              slots={completedTodaySlots}
-              nowTs={nowTs}
-              onToggle={() => setCompletedExpanded((prev) => !prev)}
-              getHighlight={getHighlightForSlot}
-            />
-          </YStack>
-        );
-      }
-
-      return (
-        <EmptyState
-          title={t('schedule.emptyDay')}
-          ctaLabel={canCreateSlot ? t('schedule.createCta') : undefined}
-          onCtaPress={canCreateSlot ? handleCreateSlot : undefined}
-        />
-      );
-    }
-
-    return (
-      <YStack gap="$4">
-        {visibleSlots.map((slot) => (
-          <SlotCard
-            key={slot.id ?? `${slot.startsAtUtc ?? 'slot'}`}
-            slot={slot}
-            nowTs={nowTs}
-            onPress={slot.id ? () => openSlot(slot) : undefined}
-            highlight={getHighlightForSlot(slot)}
-            statusOverride={
-              slot.id
-                && isClientDeclinedSlot(slot, nowTs)
-                && !isDeclinedReleased(slot.id)
-                ? 'client_declined'
-                : undefined
-            }
-          />
-        ))}
-        {showCompletedTodaySection ? (
-          <ScheduleCompletedTodaySection
-            open={completedExpanded}
-            count={completedTodaySlots.length}
-            slots={completedTodaySlots}
-            nowTs={nowTs}
-            onToggle={() => setCompletedExpanded((prev) => !prev)}
-            getHighlight={getHighlightForSlot}
-          />
-        ) : null}
-      </YStack>
-    );
-  };
 
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
@@ -666,11 +269,9 @@ export function ScheduleScreen({ navigation, route }: Props) {
         extraBottom={72}
       >
         <YStack gap="$4">
-          {/* Заголовок экрана */}
           <Text fontSize="$8" fontWeight="700" color="$text">
             {t('schedule.title')}
           </Text>
-          {/* Лента дат и календарь */}
           <DateStrip
             dates={visibleDates}
             selectedDate={selectedDate}
@@ -680,7 +281,6 @@ export function ScheduleScreen({ navigation, route }: Props) {
             onSelectDate={handleSelectDate}
             onOpenCalendar={openDatePicker}
           />
-          {/* iOS-пикер даты */}
           {pickerVisible && Platform.OS === 'ios' ? (
             <IOSDatePickerCard
               value={selectedDate}
@@ -690,17 +290,31 @@ export function ScheduleScreen({ navigation, route }: Props) {
               onClose={() => setPickerVisible(false)}
             />
           ) : null}
-          {/* Сводка по дню */}
           {summaryLabel ? (
             <Text fontSize="$4" fontWeight="600" color="$text">
               {summaryLabel}
             </Text>
           ) : null}
-          {/* Основной список слотов */}
-          {renderContent()}
+          <ScheduleSlotsContent
+            isLoading={isLoading}
+            error={error}
+            onRetry={refetch}
+            isPastDay={isPastDay}
+            sortedSlots={sortedSlots}
+            activeSlots={activeSlots}
+            nowTs={nowTs}
+            canCreateSlot={canCreateSlot}
+            isSelectedToday={isSelectedToday}
+            completedTodaySlots={completedTodaySlots}
+            completedExpanded={completedExpanded}
+            onToggleCompleted={() => setCompletedExpanded((prev) => !prev)}
+            onCreateSlot={handleCreateSlot}
+            onOpenSlot={openSlot}
+            getHighlightForSlot={getHighlightForSlot}
+            isDeclinedReleased={isDeclinedReleased}
+          />
         </YStack>
       </TabScrollView>
-      {/* FAB: создание слота */}
       {canCreateSlot ? (
         <Button
           position="absolute"
@@ -719,7 +333,6 @@ export function ScheduleScreen({ navigation, route }: Props) {
           <AppIcon name="plus" size={22} color="$accentText" />
         </Button>
       ) : null}
-      {/* Bottom sheet действий со слотом */}
       <SlotActionsSheet
         open={sheetOpen}
         slot={activeSlot}
@@ -738,7 +351,12 @@ export function ScheduleScreen({ navigation, route }: Props) {
             setSheetOpen(open);
           }
         }}
-        onCancelSlot={confirmCancelSlot}
+        onCancelSlot={(slot) => confirmCancelSlot({
+          slot,
+          nowTs,
+          isPending: cancelMutation.isPending,
+          onConfirm: (slotId) => cancelMutation.mutate(slotId),
+        })}
         onMarkCompleted={undefined}
         onMarkNoShow={undefined}
         onCloseBooking={({ slot, attendance, markPaid, method }) => {
@@ -781,112 +399,26 @@ export function ScheduleScreen({ navigation, route }: Props) {
         }}
         isAssigningAnotherClient={assignAnotherClientMutation.isPending}
       />
-      <Sheet
+      <ScheduleReassignSheet
         open={reassignSheetOpen}
-        onOpenChange={(open: boolean) => {
+        onOpenChange={(open) => {
           if (!open) {
             closeReassignSheet();
             return;
           }
           setReassignSheetOpen(open);
         }}
-        modal
-        dismissOnSnapToBottom
-        snapPoints={[85]}
-        dismissOnOverlayPress
-      >
-        <Sheet.Overlay
-          animation="fast"
-          enterStyle={{ opacity: 0 }}
-          exitStyle={{ opacity: 0 }}
-          backgroundColor="rgba(15, 23, 42, 0.2)"
-        />
-        <Sheet.Frame
-          padding="$5"
-          paddingBottom="$7"
-          gap="$4"
-          backgroundColor="$backgroundSoft"
-          borderTopWidth={1}
-          borderTopColor="$border"
-          borderTopLeftRadius="$6"
-          borderTopRightRadius="$6"
-        >
-          <Sheet.Handle />
-          <Text fontSize="$5" fontWeight="700" color="$text">
-            {t('schedule.actions.assignAnotherClient')}
-          </Text>
-          <Input
-            value={reassignSearch}
-            onChangeText={setReassignSearch}
-            placeholder={t('createSlot.assignmentSearchPlaceholder')}
-            color="$text"
-            placeholderTextColor="$muted"
-            backgroundColor="$background"
-            borderWidth={1}
-            borderColor="$border"
-            borderRadius="$4"
-            minHeight="$10"
-          />
-          {linkedClientsQuery.isLoading ? (
-            <Text fontSize="$3" color="$muted">{t('common.loading')}</Text>
-          ) : null}
-          {!linkedClientsQuery.isLoading && (linkedClientsQuery.data ?? []).length === 0 ? (
-            <Text fontSize="$3" color="$muted">{t('schedule.actions.noAcceptedClients')}</Text>
-          ) : null}
-          <ScrollView maxHeight={360} showsVerticalScrollIndicator={false}>
-            <YStack gap="$2" paddingBottom="$2">
-              {(linkedClientsQuery.data ?? [])
-                .filter((item) => {
-                  const q = reassignSearch.trim().toLowerCase();
-                  if (!q) {
-                    return true;
-                  }
-                  return (item.clientName ?? '').toLowerCase().includes(q)
-                    || (item.clientPhone ?? '').toLowerCase().includes(q);
-                })
-                .map((item) => (
-                  <Button
-                    key={item.id}
-                    backgroundColor="$background"
-                    borderWidth={1}
-                    borderColor="$border"
-                    borderRadius="$4"
-                    minHeight="$10"
-                    justifyContent="flex-start"
-                    paddingHorizontal="$4"
-                    onPress={() => {
-                      if (!reassignSlot?.id || !item.clientUserId) {
-                        return;
-                      }
-                      assignAnotherClientMutation.mutate({
-                        slotId: reassignSlot.id,
-                        clientUserId: item.clientUserId,
-                      });
-                    }}
-                    disabled={assignAnotherClientMutation.isPending || !item.clientUserId}
-                  >
-                    <YStack alignItems="flex-start" gap="$1">
-                      <Text color="$text" fontWeight="600">{item.clientName ?? t('common.empty')}</Text>
-                      {item.clientPhone ? (
-                        <Text fontSize="$2" color="$muted">{item.clientPhone}</Text>
-                      ) : null}
-                    </YStack>
-                  </Button>
-                ))}
-            </YStack>
-          </ScrollView>
-          <Button
-            backgroundColor="$background"
-            borderWidth={1}
-            borderColor="$border"
-            borderRadius="$4"
-            minHeight="$10"
-            onPress={closeReassignSheet}
-          >
-            <Text color="$text">{t('profile.personal.cancel')}</Text>
-          </Button>
-        </Sheet.Frame>
-      </Sheet>
+        search={reassignSearch}
+        onSearchChange={setReassignSearch}
+        clients={linkedClientsQuery.data ?? []}
+        isLoading={linkedClientsQuery.isLoading}
+        isAssigning={assignAnotherClientMutation.isPending}
+        selectedSlotId={reassignSlot?.id}
+        onAssign={({ slotId, clientUserId }) => {
+          assignAnotherClientMutation.mutate({ slotId, clientUserId });
+        }}
+        onClose={closeReassignSheet}
+      />
     </YStack>
   );
 }

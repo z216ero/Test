@@ -4,11 +4,7 @@ import { Button, Text, XStack, YStack } from 'tamagui';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
 import { formatDateRu } from '@utils/datetime';
-
-const isSameLocalDay = (left: Date, right: Date) =>
-  left.getFullYear() === right.getFullYear()
-  && left.getMonth() === right.getMonth()
-  && left.getDate() === right.getDate();
+import { buildDateKey, isSameLocalDay } from '@utils/localDate';
 
 const formatWeekdayShort = (value: Date): string => {
   const raw = new Intl.DateTimeFormat('ru-RU', {
@@ -16,12 +12,6 @@ const formatWeekdayShort = (value: Date): string => {
   }).format(value);
   const cleaned = raw.replace('.', '').trim();
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-};
-
-const buildDateKey = (value: Date): string => {
-  const month = `${value.getMonth() + 1}`.padStart(2, '0');
-  const day = `${value.getDate()}`.padStart(2, '0');
-  return `${value.getFullYear()}-${month}-${day}`;
 };
 
 type DateStripProps = {

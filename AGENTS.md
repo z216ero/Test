@@ -85,6 +85,7 @@ Infrastructure:
 - If a suitable shared component does not exist, create a small reusable component instead of duplicating markup/logic across screens.
 - Do not create oversized modules: split screens/components/services into smaller focused units when a file starts growing significantly.
 - Treat `400+` lines in one module as unacceptable; refactor earlier into smaller components/hooks/helpers.
+- Exception scope for line-count rule: generated artifacts (`src/generated/**`), migration snapshots/designers, and localization dictionaries (`src/i18n/*.ts`) may exceed `400` lines.
 
 ## UI stack & style
 

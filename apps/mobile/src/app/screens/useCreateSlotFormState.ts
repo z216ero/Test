@@ -20,6 +20,7 @@ import { useAppMutation, useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
 import { useToast } from '@ui/feedback/useToast';
 import { formatTimeRangeRu } from '@utils/datetime';
+import { addDays, isSameLocalDay, startOfLocalDay } from '@utils/localDate';
 import {
   buildTimeGrid,
   computeRange,
@@ -63,20 +64,6 @@ const normalizeSelectedClientId = (value?: string | null): string | null => {
 
 export const MULTI_COUNTS = [2, 3, 4] as const;
 const FUTURE_DATE_RANGE_DAYS = 14;
-
-const startOfLocalDay = (value: Date) =>
-  new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
-
-const isSameLocalDay = (left: Date, right: Date) =>
-  left.getFullYear() === right.getFullYear()
-  && left.getMonth() === right.getMonth()
-  && left.getDate() === right.getDate();
-
-const addDays = (value: Date, days: number): Date => {
-  const next = new Date(value);
-  next.setDate(next.getDate() + days);
-  return next;
-};
 
 const parseLocalDate = (value?: string | null): Date | null => {
   if (!value) {

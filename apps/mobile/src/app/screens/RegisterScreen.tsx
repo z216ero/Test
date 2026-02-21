@@ -3,7 +3,7 @@ import type {
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Text, XStack, YStack } from 'tamagui';
+import { Text, YStack } from 'tamagui';
 import { me, register } from '@api/authApi';
 import { presentApiError } from '@api/ApiErrorPresenter';
 import { ApiError } from '@api/core';
@@ -27,166 +27,17 @@ import { getDefaultLookupCode } from '@app/utils/lookups';
 import type { LookupItem } from '@api/lookupsApi';
 import { SelectFieldButton } from '@ui/components';
 import { normalizeRussianPhoneInput, russianPhoneToE164 } from '@utils/phone';
+import {
+  fallbackGenderOptions,
+  fallbackRoleOptions,
+  getRegisterApiFieldErrors,
+  type RegisterField,
+  type RegisterFieldErrors,
+  validateRegisterForm,
+} from './register/registerFormValidation';
+import { RegisterLookupsSection } from './register/ui/RegisterLookupsSection';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
-
-const fallbackRoleOptions: LookupItem[] = [
-  {
-    code: 'Client',
-    label: 'Client',
-    isDefault: true,
-    isTrainerRole: false,
-    isClientRole: true,
-  },
-  {
-    code: 'Trainer',
-    label: 'Trainer',
-    isDefault: false,
-    isTrainerRole: true,
-    isClientRole: false,
-  },
-];
-
-const fallbackGenderOptions: LookupItem[] = [
-  { code: 'Male', label: 'Male', isDefault: true, isAny: false },
-  { code: 'Female', label: 'Female', isDefault: false, isAny: false },
-];
-
-const getRoleLabel = (code: string): string => {
-  if (code === 'Trainer') {
-    return t('auth.register.roleTrainer');
-  }
-  if (code === 'Client') {
-    return t('auth.register.roleClient');
-  }
-  return code;
-};
-
-const getGenderLabel = (code: string): string => {
-  if (code === 'Male') {
-    return t('auth.register.genderMale');
-  }
-  if (code === 'Female') {
-    return t('auth.register.genderFemale');
-  }
-  return code;
-};
-
-type RegisterField = 'email' | 'password' | 'confirmPassword' | 'name' | 'phoneNumber' | 'cityName';
-type RegisterFieldErrors = Partial<Record<RegisterField, string>>;
-
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const minPasswordLength = 8;
-const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d).+$/;
-
-const getProblemErrors = (details: unknown): Record<string, string[]> => {
-  if (!details || typeof details !== 'object' || !('errors' in details)) {
-    return {};
-  }
-
-  const errors = (details as { errors?: unknown }).errors;
-  if (!errors || typeof errors !== 'object') {
-    return {};
-  }
-
-  return Object.entries(errors as Record<string, unknown>).reduce<Record<string, string[]>>(
-    (acc, [key, value]) => {
-      if (Array.isArray(value)) {
-        const messages = value.filter((item): item is string => typeof item === 'string');
-        if (messages.length > 0) {
-          acc[key.toLowerCase()] = messages;
-        }
-      }
-      return acc;
-    },
-    {}
-  );
-};
-
-const firstProblemError = (errors: Record<string, string[]>, fieldKeys: string[]): string | null => {
-  for (const key of fieldKeys) {
-    const message = errors[key.toLowerCase()]?.[0];
-    if (message) {
-      return message;
-    }
-  }
-
-  return null;
-};
-
-const getRegisterApiFieldErrors = (error: ApiError): RegisterFieldErrors => {
-  const errors = getProblemErrors(error.details);
-  if (Object.keys(errors).length === 0) {
-    return {};
-  }
-
-  const emailError = firstProblemError(errors, ['email', 'Email']);
-  const passwordError = firstProblemError(errors, ['password', 'Password']);
-  const nameError = firstProblemError(errors, ['name', 'Name']);
-  const phoneError = firstProblemError(errors, ['phoneNumber', 'PhoneNumber']);
-  const cityError = firstProblemError(errors, ['cityName', 'CityName']);
-
-  return {
-    ...(emailError ? { email: emailError } : {}),
-    ...(passwordError ? { password: passwordError } : {}),
-    ...(nameError ? { name: nameError } : {}),
-    ...(phoneError ? { phoneNumber: phoneError } : {}),
-    ...(cityError ? { cityName: cityError } : {}),
-  };
-};
-
-const validateRegisterForm = (values: {
-  email: string;
-  password: string;
-  confirmPassword: string;
-  name: string;
-  cityName: string;
-  phoneNumber: string;
-}): RegisterFieldErrors => {
-  const errors: RegisterFieldErrors = {};
-
-  const emailValue = values.email.trim();
-  const nameValue = values.name.trim();
-  const cityValue = values.cityName.trim();
-  const phoneValue = values.phoneNumber.trim();
-
-  if (!emailValue) {
-    errors.email = t('auth.register.emailRequired');
-  } else if (!emailPattern.test(emailValue)) {
-    errors.email = t('auth.register.emailInvalid');
-  }
-
-  if (!values.password) {
-    errors.password = t('auth.register.passwordRequired');
-  } else if (
-    values.password.length < minPasswordLength
-    || !passwordPattern.test(values.password)
-  ) {
-    errors.password = t('auth.register.passwordRules');
-  }
-
-  if (!values.confirmPassword) {
-    errors.confirmPassword = t('auth.register.passwordConfirmRequired');
-  } else if (values.confirmPassword !== values.password) {
-    errors.confirmPassword = t('auth.register.passwordMismatch');
-  }
-
-  if (!nameValue) {
-    errors.name = t('auth.register.nameRequired');
-  } else if (nameValue.length < 2) {
-    errors.name = t('auth.register.nameMin');
-  }
-
-  if (!cityValue) {
-    errors.cityName = t('auth.register.cityRequired');
-  }
-
-  if (phoneValue && !russianPhoneToE164(phoneValue)) {
-    errors.phoneNumber = t('auth.register.phoneInvalid');
-  }
-
-  return errors;
-};
 
 export function RegisterScreen({ navigation, route }: Props) {
   const [email, setEmail] = useState('');
@@ -219,7 +70,6 @@ export function RegisterScreen({ navigation, route }: Props) {
     queryFn: ({ signal }) => getSpecializationLookups({ signal }),
   });
 
-
   const roleOptions = useMemo(() => {
     const source = rolesQuery.data?.length ? rolesQuery.data : fallbackRoleOptions;
     return [...source].sort((a, b) => {
@@ -235,42 +85,27 @@ export function RegisterScreen({ navigation, route }: Props) {
       return getOrder(a) - getOrder(b);
     });
   }, [rolesQuery.data]);
-  const genderOptions = useMemo(
-    () => {
-      const filtered = (gendersQuery.data ?? []).filter((item) => !item.isAny);
-      return filtered.length > 0 ? filtered : fallbackGenderOptions;
-    },
-    [gendersQuery.data]
-  );
-  const specializationOptions = useMemo(
-    () => specializationsQuery.data ?? [],
-    [specializationsQuery.data]
-  );
+  const genderOptions = useMemo(() => {
+    const filtered = (gendersQuery.data ?? []).filter((item) => !item.isAny);
+    return filtered.length > 0 ? filtered : fallbackGenderOptions;
+  }, [gendersQuery.data]);
+  const specializationOptions = useMemo(() => specializationsQuery.data ?? [], [specializationsQuery.data]);
 
   const defaultRole = useMemo(() => getDefaultLookupCode(roleOptions), [roleOptions]);
   const defaultGender = useMemo(() => getDefaultLookupCode(genderOptions), [genderOptions]);
-  const defaultSpecialization = useMemo(
-    () => getDefaultLookupCode(specializationOptions),
-    [specializationOptions]
-  );
+  const defaultSpecialization = useMemo(() => getDefaultLookupCode(specializationOptions), [specializationOptions]);
 
   useEffect(() => {
     if (!role && defaultRole) {
       setRole(defaultRole);
     }
-  }, [defaultRole, role]);
-
-  useEffect(() => {
     if (!gender && defaultGender) {
       setGender(defaultGender);
     }
-  }, [defaultGender, gender]);
-
-  useEffect(() => {
     if (!specialization && defaultSpecialization) {
       setSpecialization(defaultSpecialization);
     }
-  }, [defaultSpecialization, specialization]);
+  }, [defaultGender, defaultRole, defaultSpecialization, gender, role, specialization]);
 
   useEffect(() => {
     const selection = route.params?.locationSelection;
@@ -552,112 +387,30 @@ export function RegisterScreen({ navigation, route }: Props) {
             }}
           />
         </YStack>
-        <YStack gap="$2">
-          <Text fontSize="$3" color="$muted">
-            {t('auth.register.role')}
-          </Text>
-          <XStack gap="$2" padding="$2" backgroundColor="$backgroundSoft" borderRadius="$3">
-            {roleOptions.map((item) => {
-              const isSelected = role === item.code;
-              return (
-                <Button
-                  key={item.code}
-                  size="$3"
-                  backgroundColor={isSelected ? '$accent' : '$backgroundSoft'}
-                  color={isSelected ? '$accentText' : '$text'}
-                  fontWeight={isSelected ? '700' : '400'}
-                  borderWidth={1}
-                  borderColor={isSelected ? '$accent' : '$border'}
-                  borderRadius="$3"
-                  onPress={() => {
-                    setRole(item.code);
-                    setError(null);
-                  }}
-                  flex={1}
-                  minHeight="$10"
-                >
-                  {getRoleLabel(item.code)}
-                </Button>
-              );
-            })}
-          </XStack>
-          {didAttemptSubmit && !role ? (
-            <Text fontSize="$2" color="$danger">
-              {t('auth.register.roleRequired')}
-            </Text>
-          ) : null}
-        </YStack>
-        <YStack gap="$2">
-          <Text fontSize="$3" color="$muted">
-            {t('profile.personal.genderUserLabel')}
-          </Text>
-          <XStack gap="$2" padding="$2" backgroundColor="$backgroundSoft" borderRadius="$3">
-            {genderOptions.map((item) => {
-              const isSelected = gender === item.code;
-              return (
-                <Button
-                  key={item.code}
-                  size="$3"
-                  backgroundColor={isSelected ? '$accent' : '$backgroundSoft'}
-                  color={isSelected ? '$accentText' : '$text'}
-                  fontWeight={isSelected ? '700' : '400'}
-                  borderWidth={1}
-                  borderColor={isSelected ? '$accent' : '$border'}
-                  borderRadius="$3"
-                  onPress={() => {
-                    setGender(item.code);
-                    setError(null);
-                  }}
-                  flex={1}
-                  minHeight="$10"
-                >
-                  {getGenderLabel(item.code)}
-                </Button>
-              );
-            })}
-          </XStack>
-          {didAttemptSubmit && !gender ? (
-            <Text fontSize="$2" color="$danger">
-              {t('auth.register.genderRequired')}
-            </Text>
-          ) : null}
-        </YStack>
-        {isTrainer ? (
-          <YStack gap="$2">
-            <Text fontSize="$3" color="$muted">
-              {t('auth.register.specialization')}
-            </Text>
-            <XStack gap="$2" flexWrap="wrap">
-              {specializationOptions.map((item) => {
-                const isSelected = specialization === item.code;
-                return (
-                  <Button
-                    key={item.code}
-                    size="$3"
-                    backgroundColor={isSelected ? '$background' : '$surfaceMuted'}
-                    color="$text"
-                    fontWeight={isSelected ? '700' : '400'}
-                    borderWidth={1}
-                    borderColor="$border"
-                    borderRadius="$3"
-                    onPress={() => {
-                      setSpecialization(item.code);
-                      setError(null);
-                    }}
-                    minHeight="$9"
-                  >
-                    {item.label}
-                  </Button>
-                );
-              })}
-            </XStack>
-            {didAttemptSubmit && specializationOptions.length > 0 && !specialization ? (
-              <Text fontSize="$2" color="$danger">
-                {t('auth.register.specializationRequired')}
-              </Text>
-            ) : null}
-          </YStack>
-        ) : null}
+        <RegisterLookupsSection
+          roleOptions={roleOptions}
+          selectedRole={role}
+          onSelectRole={(value) => {
+            setRole(value);
+            setError(null);
+          }}
+          showRoleError={didAttemptSubmit && !role}
+          genderOptions={genderOptions}
+          selectedGender={gender}
+          onSelectGender={(value) => {
+            setGender(value);
+            setError(null);
+          }}
+          showGenderError={didAttemptSubmit && !gender}
+          isTrainer={isTrainer}
+          specializationOptions={specializationOptions}
+          selectedSpecialization={specialization}
+          onSelectSpecialization={(value) => {
+            setSpecialization(value);
+            setError(null);
+          }}
+          showSpecializationError={didAttemptSubmit && specializationOptions.length > 0 && !specialization}
+        />
         {error ? <AuthError message={error} /> : null}
         <AuthPrimaryButton onPress={handleRegister} disabled={registerMutation.isPending}>
           {registerMutation.isPending ? t('auth.register.loading') : t('auth.register.cta')}

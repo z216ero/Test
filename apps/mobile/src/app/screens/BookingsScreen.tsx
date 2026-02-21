@@ -2,7 +2,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl } from 'react-native';
-import { Button, Text, XStack, YStack } from 'tamagui';
+import { Button, Text, YStack } from 'tamagui';
 import {
   cancelBooking,
   confirmClientBooking,
@@ -22,25 +22,19 @@ import { Banner } from '@ui/feedback/Banner';
 import { ErrorState } from '@ui/states/ErrorState';
 import { LoadingState } from '@ui/states/LoadingState';
 import { TabScrollView } from '@ui/layout/TabScrollView';
-import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
+import { formatDateRu } from '@utils/datetime';
+import { buildDateKey } from '@utils/localDate';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  bookingStatusMeta,
-  type BookingStatusType,
-  canCancelBooking,
-  getBookingStatusType,
   getSlotTimes,
   isHistoryBooking,
   isUpcomingBooking,
 } from '@app/components/bookings/bookingUtils';
-import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
+import { BookingCard } from '@app/components/bookings/BookingCard';
+import { BookingsTabSelector, type BookingTab } from '@app/components/bookings/BookingsTabSelector';
 import type { BookingsStackParamList } from '@app/navigation/types';
-import { AppIcon } from '@ui/AppIcon';
-import type { AvailableSlotTrainerDto } from '@generated/api';
 
 type Props = NativeStackScreenProps<BookingsStackParamList, 'BookingsHome'>;
-
-type BookingTab = 'upcoming' | 'history';
 
 type BookingSection = {
   key: string;
@@ -56,19 +50,6 @@ type CancelContext = {
 
 const NOW_REFRESH_INTERVAL_MS = 60 * 1000;
 const LIVE_REFRESH_INTERVAL_MS = 15 * 1000;
-const isPaidStatus = (value?: string | null) => (value ?? '').trim().toLowerCase() === 'paid';
-const statusIndicatorRowWidth = 112;
-const unpaidPaymentColor = '#F59E0B';
-const compactStatusLabelMap: Partial<Record<BookingStatusType, 'bookings.statusPendingShort' | 'bookings.statusCancelledShort'>> = {
-  pending_confirmation: 'bookings.statusPendingShort',
-  cancelled: 'bookings.statusCancelledShort',
-};
-
-const buildDateKey = (value: Date): string => {
-  const month = `${value.getMonth() + 1}`.padStart(2, '0');
-  const day = `${value.getDate()}`.padStart(2, '0');
-  return `${value.getFullYear()}-${month}-${day}`;
-};
 
 export function BookingsScreen({ navigation }: Props) {
   const queryClient = useQueryClient();
@@ -272,201 +253,22 @@ export function BookingsScreen({ navigation }: Props) {
       }
     },
   });
-
-  const renderCard = (
-    booking: ClientBooking,
-    showActions: boolean,
-    key: string
-  ) => {
-    const trainingTypeCode = booking.slot.slotType ?? null;
-    const isGroupTraining = trainingTypeCode === 'Group';
-    const trainingTypeLabel = trainingTypeCode
-      ? t(isGroupTraining ? 'bookings.trainingTypeGroup' : 'bookings.trainingTypeIndividual')
-      : null;
-    const trainingTypeIcon = isGroupTraining ? 'users' : 'user';
-    const times = getSlotTimes(booking.slot);
-    const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : t('common.empty');
-    const statusType = getBookingStatusType(booking.slot, nowTs);
-    const statusMeta = bookingStatusMeta[statusType];
-    const statusLabel = t(compactStatusLabelMap[statusType] ?? statusMeta.labelKey);
-    const showPaymentStatus = statusType === 'completed';
-    const isPendingConfirmation = statusType === 'pending_confirmation';
-    const paid = isPaidStatus(booking.paymentStatus);
-    const trainerProfile: AvailableSlotTrainerDto = {
-      id: booking.slot.trainerId,
-      name: booking.trainerName,
-      phoneNumber: booking.trainerPhoneNumber,
-      avatarUrl: booking.trainerAvatarUrl,
-      worksWithGender: booking.trainerWorksWithGender,
-      gender: booking.trainerGender,
-      rating: booking.trainerRating,
-      cityName: booking.trainerCityName,
-      districtName: booking.trainerDistrictName,
-      trainingTypes: booking.trainerTrainingTypes ?? null,
-    };
-    const canCancel = booking.slot.id ? canCancelBooking(booking.slot, nowTs) : false;
-    const isCancelling = Boolean(
-      booking.slot.id
-      && cancelMutation.isPending
-      && cancelMutation.variables === booking.slot.id
-    );
-    const isConfirming = Boolean(
-      booking.slot.bookingId
-      && confirmMutation.isPending
-      && confirmMutation.variables === booking.slot.bookingId
-    );
-    const isDeclining = Boolean(
-      booking.slot.bookingId
-      && declineMutation.isPending
-      && declineMutation.variables === booking.slot.bookingId
-    );
-
-    return (
-      <YStack
-        key={key}
-        gap="$3"
-        padding="$4"
-        backgroundColor="$background"
-        borderRadius="$5"
-        borderWidth={1}
-        borderColor="$border"
-      >
-        <XStack justifyContent="space-between" alignItems="center" gap="$2">
-          <Text fontSize="$4" fontWeight="700" color="$text">
-            {timeLabel}
-          </Text>
-          <YStack alignItems="flex-end" gap="$1" minWidth={0}>
-            <XStack width={statusIndicatorRowWidth} alignItems="center" gap="$2" minWidth={0}>
-              <YStack
-                width="$1"
-                height="$1"
-                borderRadius="$6"
-                backgroundColor={statusMeta.color}
-              />
-              <Text
-                fontSize="$2"
-                color={statusMeta.color}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-                flexShrink={1}
-              >
-                {statusLabel}
-              </Text>
-            </XStack>
-            {showPaymentStatus ? (
-              <XStack width={statusIndicatorRowWidth} alignItems="center" gap="$2">
-                <YStack
-                  width="$1"
-                  height="$1"
-                  borderRadius="$6"
-                  backgroundColor={paid ? '$accent' : unpaidPaymentColor}
-                />
-                <Text fontSize="$2" color={paid ? '$accent' : unpaidPaymentColor}>
-                  {paid ? t('bookings.payment.paid') : t('bookings.payment.unpaid')}
-                </Text>
-              </XStack>
-            ) : null}
-          </YStack>
-        </XStack>
-        <XStack alignItems="center" gap="$3">
-          <TrainerAvatar
-            name={booking.trainerName}
-            avatarUrl={booking.trainerAvatarUrl}
-            size="$9"
-            trainerProfile={trainerProfile}
-          />
-          <YStack gap="$1" flex={1}>
-            <Text fontSize="$4" fontWeight="700" color="$text">
-              {booking.trainerName?.trim() || t('common.empty')}
-            </Text>
-            {trainingTypeLabel ? (
-              <XStack alignItems="center" gap="$2">
-                <AppIcon name={trainingTypeIcon} size={14} color="$muted" />
-                <Text fontSize="$3" color="$muted">
-                  {trainingTypeLabel}
-                </Text>
-              </XStack>
-            ) : null}
-          </YStack>
-        </XStack>
-        {showActions ? (
-          <XStack justifyContent="flex-end" gap="$2">
-            {isPendingConfirmation && booking.slot.bookingId ? (
-              <>
-                <Button
-                  backgroundColor="$accent"
-                  color="$accentText"
-                  borderRadius="$4"
-                  minHeight="$9"
-                  paddingHorizontal="$4"
-                  onPress={() => confirmMutation.mutate(booking.slot.bookingId as string)}
-                  disabled={isConfirming || isDeclining}
-                >
-                  {isConfirming ? t('common.loading') : t('bookingConfirm.confirm')}
-                </Button>
-                <Button
-                  backgroundColor="$background"
-                  borderRadius="$4"
-                  borderWidth={1}
-                  borderColor="$danger"
-                  minHeight="$9"
-                  paddingHorizontal="$4"
-                  onPress={() => declineMutation.mutate(booking.slot.bookingId as string)}
-                  disabled={isConfirming || isDeclining}
-                >
-                  <Text color="$danger">
-                    {isDeclining ? t('common.loading') : t('bookings.cancel')}
-                  </Text>
-                </Button>
-              </>
-            ) : null}
-            {canCancel ? (
-              <Button
-                backgroundColor="$background"
-                borderRadius="$4"
-                borderWidth={1}
-                borderColor="$border"
-                minHeight="$9"
-                paddingHorizontal="$4"
-                onPress={() => booking.slot.id && cancelMutation.mutate(booking.slot.id)}
-                disabled={isCancelling}
-              >
-                <Text color="$danger">
-                  {isCancelling ? t('common.loading') : t('bookings.cancel')}
-                </Text>
-              </Button>
-            ) : null}
-            <Button
-              backgroundColor="$background"
-              borderRadius="$4"
-              borderWidth={1}
-              borderColor="$border"
-              minHeight="$9"
-              paddingHorizontal="$4"
-              onPress={() => {
-                navigation.navigate('BookingDetails', {
-                  slot: booking.slot,
-                  trainerName: booking.trainerName,
-                  trainerPhoneNumber: booking.trainerPhoneNumber,
-                  trainerGender: booking.trainerGender,
-                  trainerWorksWithGender: booking.trainerWorksWithGender,
-                  trainerRating: booking.trainerRating,
-                  trainerSpecializations: booking.trainerSpecializations,
-                  trainerTrainingTypes: booking.trainerTrainingTypes,
-                  trainerCityName: booking.trainerCityName,
-                  trainerDistrictName: booking.trainerDistrictName,
-                  trainerAvatarUrl: booking.trainerAvatarUrl,
-                  paymentStatus: booking.paymentStatus,
-                });
-              }}
-            >
-              <Text color="$text">{t('bookings.action.details')}</Text>
-            </Button>
-          </XStack>
-        ) : null}
-      </YStack>
-    );
-  };
+  const openBookingDetails = useCallback((booking: ClientBooking) => {
+    navigation.navigate('BookingDetails', {
+      slot: booking.slot,
+      trainerName: booking.trainerName,
+      trainerPhoneNumber: booking.trainerPhoneNumber,
+      trainerGender: booking.trainerGender,
+      trainerWorksWithGender: booking.trainerWorksWithGender,
+      trainerRating: booking.trainerRating,
+      trainerSpecializations: booking.trainerSpecializations,
+      trainerTrainingTypes: booking.trainerTrainingTypes,
+      trainerCityName: booking.trainerCityName,
+      trainerDistrictName: booking.trainerDistrictName,
+      trainerAvatarUrl: booking.trainerAvatarUrl,
+      paymentStatus: booking.paymentStatus,
+    });
+  }, [navigation]);
 
   const renderSection = (section: BookingSection, showActions: boolean) => (
     <YStack key={section.key} gap="$3">
@@ -476,30 +278,52 @@ export function BookingsScreen({ navigation }: Props) {
       <YStack gap="$4">
         {section.items.map((booking) => {
           const key = booking.slot.id ?? `${booking.slot.startsAtUtc ?? 'booking'}`;
+          const isCancelling = Boolean(
+            booking.slot.id
+            && cancelMutation.isPending
+            && cancelMutation.variables === booking.slot.id
+          );
+          const isConfirming = Boolean(
+            booking.slot.bookingId
+            && confirmMutation.isPending
+            && confirmMutation.variables === booking.slot.bookingId
+          );
+          const isDeclining = Boolean(
+            booking.slot.bookingId
+            && declineMutation.isPending
+            && declineMutation.variables === booking.slot.bookingId
+          );
           return showActions
-            ? renderCard(booking, true, key)
+            ? (
+              <BookingCard
+                key={key}
+                booking={booking}
+                nowTs={nowTs}
+                showActions
+                isCancelling={isCancelling}
+                isConfirming={isConfirming}
+                isDeclining={isDeclining}
+                onCancel={(slotId) => cancelMutation.mutate(slotId)}
+                onConfirm={(bookingId) => confirmMutation.mutate(bookingId)}
+                onDecline={(bookingId) => declineMutation.mutate(bookingId)}
+                onOpenDetails={openBookingDetails}
+              />
+            )
             : (
               <Button
                 key={key}
                 unstyled
-                onPress={() => {
-                navigation.navigate('BookingDetails', {
-                  slot: booking.slot,
-                  trainerName: booking.trainerName,
-                  trainerPhoneNumber: booking.trainerPhoneNumber,
-                  trainerGender: booking.trainerGender,
-                  trainerWorksWithGender: booking.trainerWorksWithGender,
-                  trainerRating: booking.trainerRating,
-                  trainerSpecializations: booking.trainerSpecializations,
-                  trainerTrainingTypes: booking.trainerTrainingTypes,
-                  trainerCityName: booking.trainerCityName,
-                  trainerDistrictName: booking.trainerDistrictName,
-                  trainerAvatarUrl: booking.trainerAvatarUrl,
-                  paymentStatus: booking.paymentStatus,
-                });
-              }}
-            >
-                {renderCard(booking, false, key)}
+                onPress={() => openBookingDetails(booking)}
+              >
+                <BookingCard
+                  booking={booking}
+                  nowTs={nowTs}
+                  showActions={false}
+                  isCancelling={false}
+                  isConfirming={false}
+                  isDeclining={false}
+                  onOpenDetails={openBookingDetails}
+                />
               </Button>
             );
         })}
@@ -583,41 +407,7 @@ export function BookingsScreen({ navigation }: Props) {
           <Text fontSize="$8" fontWeight="700" color="$text">
             {t('bookings.title')}
           </Text>
-          <XStack
-            padding="$1"
-            backgroundColor="$surfaceMuted"
-            borderRadius="$4"
-            borderWidth={1}
-            borderColor="$border"
-            gap="$1"
-          >
-            {([
-              { id: 'upcoming', label: t('bookings.upcoming') },
-              { id: 'history', label: t('bookings.past') },
-            ] as const).map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <Button
-                  key={tab.id}
-                  unstyled
-                  flex={1}
-                  paddingVertical="$2"
-                  borderRadius="$3"
-                  backgroundColor={isActive ? '$background' : 'transparent'}
-                  onPress={() => setActiveTab(tab.id)}
-                >
-                  <Text
-                    fontSize="$3"
-                    fontWeight={isActive ? '700' : '600'}
-                    color={isActive ? '$text' : '$muted'}
-                    textAlign="center"
-                  >
-                    {tab.label}
-                  </Text>
-                </Button>
-              );
-            })}
-          </XStack>
+          <BookingsTabSelector activeTab={activeTab} onChangeTab={setActiveTab} />
           {isNetworkError && presentedError ? (
             <Banner
               type="error"

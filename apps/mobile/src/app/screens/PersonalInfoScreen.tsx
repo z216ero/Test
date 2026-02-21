@@ -2,10 +2,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { YStack } from 'tamagui';
 import { launchImageLibrary } from 'react-native-image-picker';
-import type { UpdateUserRequest } from '@generated/api';
-import { patchUsersMe, putUsersMeAvatar } from '@generated/api';
-import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
-import { unwrap } from '@api/core';
+import { presentApiError } from '@api/ApiErrorPresenter';
 import { getMe } from '@api/homeApi';
 import {
   getGenderLookups,
@@ -16,18 +13,23 @@ import { t } from '@i18n';
 import { useToast } from '@ui/feedback/useToast';
 import { TabScrollView } from '@ui/layout/TabScrollView';
 import type { ProfileStackParamList } from '@app/navigation/types';
-import { useAppMutation, useAppQuery } from '@query/hooks';
+import { useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatPrice } from '@utils/price';
 import { getAnyLookupCode, getDefaultLookupCode } from '@app/utils/lookups';
 import { useAuthorizedImageSource } from '@ui/components';
-import { normalizeRussianPhoneInput, russianPhoneToE164 } from '@utils/phone';
+import { normalizeRussianPhoneInput } from '@utils/phone';
 import { PersonalInfoActions } from './personal-info/ui/PersonalInfoActions';
 import { PersonalInfoHeader } from './personal-info/ui/PersonalInfoHeader';
 import { PersonalInfoMainSection } from './personal-info/ui/PersonalInfoMainSection';
 import { PersonalInfoPhotoSection } from './personal-info/ui/PersonalInfoPhotoSection';
 import { PersonalInfoTrainerSections } from './personal-info/ui/PersonalInfoTrainerSections';
+import {
+  type PersonalInfoFieldErrors,
+  type SelectedAvatar,
+  usePersonalInfoSave,
+} from './personal-info/usePersonalInfoSave';
 
 const getInitials = (name?: string | null) => {
   const value = name?.trim();
@@ -43,29 +45,8 @@ const getInitials = (name?: string | null) => {
 
 const trainingTypesPreviewCount = 4;
 
-type SelectedAvatar = {
-  uri: string;
-  type: string;
-  name: string;
-};
-
-type PersonalInfoFieldErrors = {
-  name?: string;
-  cityName?: string;
-  phoneNumber?: string;
-  trainingTypes?: string;
-  pricePerSession?: string;
-};
-
 type Props = NativeStackScreenProps<ProfileStackParamList, 'PersonalInfo'>;
-
-const sortByOrder = (values: string[], order: Map<string, number>): string[] => (
-  [...new Set(values)].sort((left, right) => {
-    const leftIndex = order.get(left) ?? Number.MAX_SAFE_INTEGER;
-    const rightIndex = order.get(right) ?? Number.MAX_SAFE_INTEGER;
-    return leftIndex - rightIndex;
-  })
-);
+const sortByOrder = (values: string[], order: Map<string, number>): string[] => [...new Set(values)].sort((left, right) => (order.get(left) ?? Number.MAX_SAFE_INTEGER) - (order.get(right) ?? Number.MAX_SAFE_INTEGER));
 
 export function PersonalInfoScreen({ navigation, route }: Props) {
   const [name, setName] = useState('');
@@ -322,106 +303,26 @@ export function PersonalInfoScreen({ navigation, route }: Props) {
     setAvatarPreviewUri(asset.uri);
   };
 
-  const saveMutation = useAppMutation({
-    mutationFn: async () => {
-      const payload: UpdateUserRequest = {
-        name: name.trim(),
-        cityName: cityName.trim(),
-        districtName: districtName.trim() || null,
-        phoneNumber: phoneNumber.trim()
-          ? russianPhoneToE164(phoneNumber)
-          : null,
-        gender: userGender || null,
-        about: isTrainer
-          ? about.trim() || null
-          : undefined,
-        specializations: isTrainer
-          ? specializations
-          : undefined,
-        trainingTypes: isTrainer
-          ? trainingTypes
-          : undefined,
-        worksWithGender: isTrainer
-          ? worksWithGender
-          : undefined,
-        pricePerSession: isTrainer
-          ? (pricePerSession.trim().length > 0
-            ? Number(pricePerSession) * 100
-            : null)
-          : undefined,
-      };
-
-      const response = await patchUsersMe(payload);
-      unwrap(response, t('errors.saveFailed'));
-
-      if (selectedAvatar) {
-        const uploadResponse = await putUsersMeAvatar({
-          file: selectedAvatar as unknown as Blob,
-        });
-        unwrap(uploadResponse, t('errors.uploadFailed'));
-      }
-    },
-    onSuccess: async () => {
-      queryClient.invalidateQueries({ queryKey: keys.auth.me() });
-      navigation.goBack();
-    },
-    onError: (err) => {
-      const presented = presentApiError(err);
-      setSubmitError(presented.message);
-      if (shouldShowErrorToast(presented)) {
-        showToast({
-          type: 'error',
-          title: presented.title,
-          message: presented.message,
-        });
-      }
-    },
+  const { saveMutation, handleSave } = usePersonalInfoSave({
+    name,
+    cityName,
+    districtName,
+    phoneNumber,
+    userGender,
+    isTrainer,
+    about,
+    specializations,
+    trainingTypes,
+    worksWithGender,
+    pricePerSession,
+    selectedAvatar,
+    maxPriceRub,
+    setFieldErrors,
+    setSubmitError,
+    queryClient,
+    navigation,
+    showToast,
   });
-
-  const handleSave = async () => {
-    const nextFieldErrors: PersonalInfoFieldErrors = {};
-
-    if (!name.trim()) {
-      nextFieldErrors.name = t('profile.personal.nameRequired');
-    } else if (name.trim().length < 2) {
-      nextFieldErrors.name = t('profile.personal.nameMin');
-    }
-
-    if (!cityName.trim()) {
-      nextFieldErrors.cityName = t('profile.personal.cityRequired');
-    }
-
-    if (phoneNumber.trim().length > 0 && !russianPhoneToE164(phoneNumber)) {
-      nextFieldErrors.phoneNumber = t('profile.personal.phoneInvalid');
-    }
-
-    if (isTrainer && trainingTypes.length === 0) {
-      nextFieldErrors.trainingTypes = t('profile.personal.trainingTypesRequired');
-    }
-
-    if (isTrainer && pricePerSession.trim().length > 0) {
-      const value = Number(pricePerSession);
-      if (!Number.isFinite(value)) {
-        nextFieldErrors.pricePerSession = t('profile.personal.priceInvalid');
-      }
-      if ((Number.isFinite(value) && value < 0) || value > maxPriceRub) {
-        nextFieldErrors.pricePerSession = t('profile.personal.priceInvalid');
-      }
-    }
-
-    setFieldErrors(nextFieldErrors);
-    setSubmitError(null);
-
-    if (Object.keys(nextFieldErrors).length > 0) {
-      return;
-    }
-
-    try {
-      await saveMutation.mutateAsync();
-    } catch {
-      // handled in mutation callbacks
-    }
-  };
 
   const handleSelectCity = () => {
     setFieldErrors((prev) => ({ ...prev, cityName: undefined }));

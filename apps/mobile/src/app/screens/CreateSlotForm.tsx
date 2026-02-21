@@ -2,7 +2,7 @@ import type { QueryKey } from '@tanstack/react-query';
 import { Sheet } from '@tamagui/sheet';
 import { ScrollView } from '@tamagui/scroll-view';
 import { useState } from 'react';
-import { Button, Input, Switch, Text, XStack, YStack } from 'tamagui';
+import { Button, Text, XStack, YStack } from 'tamagui';
 import type {
   CreateSlotRequest,
   GetTrainersTrainerIdSlotsParams,
@@ -18,6 +18,7 @@ import { CreateSlotFooter } from './CreateSlotFooter';
 import { CreateSlotHeader } from './CreateSlotHeader';
 import { CreateSlotMultiSection } from './CreateSlotMultiSection';
 import { CreateSlotTimeSection } from './CreateSlotTimeSection';
+import { CreateSlotGroupSettingsSheet } from './CreateSlotGroupSettingsSheet';
 import {
   formatTimeLabel,
   MULTI_COUNTS,
@@ -279,87 +280,16 @@ export function CreateSlotForm({
           ) : null}
         </YStack>
       </ScrollView>
-      <Sheet
+      <CreateSlotGroupSettingsSheet
         open={groupSettingsOpen}
         onOpenChange={setGroupSettingsOpen}
-        modal
-        dismissOnSnapToBottom
-        snapPoints={[50]}
-      >
-        <Sheet.Overlay
-          animation="fast"
-          enterStyle={{ opacity: 0 }}
-          exitStyle={{ opacity: 0 }}
-          backgroundColor="rgba(15, 23, 42, 0.2)"
-        />
-        <Sheet.Frame padding="$5" gap="$4" backgroundColor="$backgroundSoft">
-          <Sheet.Handle />
-          <Text fontSize="$5" fontWeight="700" color="$text">
-            {t('createSlot.groupSettingsTitle')}
-          </Text>
-          <YStack gap="$2">
-            <Text fontSize="$3" color="$text">{t('createSlot.groupCapacityMinLabel')}</Text>
-            <Input
-              height="50"
-              keyboardType="numeric"
-              value={String(groupCapacityMin)}
-              onChangeText={(value: string) => {
-                const parsed = Number(value.replace(/\D/g, ''));
-                if (Number.isNaN(parsed)) {
-                  setGroupCapacityMin(2);
-                  return;
-                }
-                setGroupCapacityMin(parsed);
-              }}
-            />
-          </YStack>
-          <YStack gap="$2">
-            <Text fontSize="$3" color="$text">{t('createSlot.groupCapacityMaxLabel')}</Text>
-            <Input
-              height="50"
-              keyboardType="numeric"
-              value={String(groupCapacityMax)}
-              onChangeText={(value: string) => {
-                const parsed = Number(value.replace(/\D/g, ''));
-                if (Number.isNaN(parsed)) {
-                  setGroupCapacityMax(10);
-                  return;
-                }
-                setGroupCapacityMax(parsed);
-              }}
-            />
-          </YStack>
-          <XStack alignItems="center" justifyContent="space-between" gap="$3">
-            <YStack flex={1} gap="$1">
-              <Text fontSize="$3" color="$text">
-                {t('createSlot.groupAutoCancelToggle')}
-              </Text>
-              <Text fontSize="$2" color="$muted">
-                {t('createSlot.groupAutoCancelHint', { minutes: 40 })}
-              </Text>
-            </YStack>
-            <Switch
-              size="$6"
-              checked={groupAutoCancelIfMinNotReached}
-              onCheckedChange={setGroupAutoCancelIfMinNotReached}
-              backgroundColor={groupAutoCancelIfMinNotReached ? '$accent' : '$surfaceMuted'}
-            >
-              <Switch.Thumb
-                backgroundColor="$background"
-                borderWidth={1}
-                borderColor="$border"
-              />
-            </Switch>
-          </XStack>
-          <Button
-            height="50"
-            onPress={() => setGroupSettingsOpen(false)}
-            disabled={groupCapacityMin < 2 || groupCapacityMax > 100 || groupCapacityMin > groupCapacityMax}
-          >
-            {t('common.close')}
-          </Button>
-        </Sheet.Frame>
-      </Sheet>
+        groupCapacityMin={groupCapacityMin}
+        onGroupCapacityMinChange={setGroupCapacityMin}
+        groupCapacityMax={groupCapacityMax}
+        onGroupCapacityMaxChange={setGroupCapacityMax}
+        groupAutoCancelIfMinNotReached={groupAutoCancelIfMinNotReached}
+        onGroupAutoCancelIfMinNotReachedChange={setGroupAutoCancelIfMinNotReached}
+      />
       <Sheet
         open={clientPickerOpen}
         onOpenChange={setClientPickerOpen}
