@@ -37,6 +37,9 @@ const hiddenOverlayStyle = { opacity: 0 } as const;
 const normalize = (value?: string | null): string =>
   (value ?? '').trim().toLowerCase();
 
+const isAcceptedLinkStatus = (status?: string | null): boolean =>
+  normalize(status) === 'accepted';
+
 const linkStatusLabel = (status?: string): string => {
   switch ((status ?? '').toLowerCase()) {
     case 'accepted':
@@ -225,27 +228,45 @@ export function TrainerClientsScreen({ navigation }: Props) {
               >
                 <XStack alignItems="center" gap="$3" width="100%">
                   <XStack alignItems="center" gap="$2" flex={1} minWidth={0}>
-                    <Text fontSize="$4" fontWeight="700" color="$text" numberOfLines={1}>
-                      {item.displayName}
-                    </Text>
+                    <XStack alignItems="center" gap="$2" flexShrink={1} minWidth={0}>
+                      {item.kind === 'linked' && isAcceptedLinkStatus(item.link?.status) ? (
+                        <XStack
+                          width={16}
+                          height={16}
+                          borderRadius={999}
+                          backgroundColor="$accent"
+                          alignItems="center"
+                          justifyContent="center"
+                          flexShrink={0}
+                        >
+                          <AppIcon name="check" size={10} color="$accentText" />
+                        </XStack>
+                      ) : null}
+                      <Text fontSize="$4" fontWeight="700" color="$text" numberOfLines={1} flexShrink={1}>
+                        {item.displayName}
+                      </Text>
+                    </XStack>
                     {item.phone ? (
                       <Text fontSize="$3" color="$muted" numberOfLines={1}>
                         {item.phone}
                       </Text>
                     ) : null}
                     {item.kind === 'linked' ? (
-                      <XStack
+                      <Button
+                        unstyled
                         backgroundColor="$backgroundSoft"
                         borderWidth={1}
                         borderColor="$border"
                         borderRadius="$3"
                         paddingHorizontal="$2"
-                        paddingVertical="$1"
+                        minHeight="$5"
+                        alignItems="center"
+                        justifyContent="center"
                       >
-                        <Text fontSize="$2" color="$muted" numberOfLines={1}>
+                        <Text fontSize="$2" lineHeight={14} color="$muted" numberOfLines={1}>
                           {linkStatusLabel(item.link?.status)}
                         </Text>
-                      </XStack>
+                      </Button>
                     ) : null}
                   </XStack>
                   <AppIcon name="chevronRight" size={16} color="$muted" />

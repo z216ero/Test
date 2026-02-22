@@ -771,11 +771,7 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
                     "Only client-declined bookings can be released.");
             }
 
-            booking.ClientId = null;
-            booking.TrainerClientId = null;
-            booking.ClientConfirmationRequestedAtUtc = null;
-            booking.ClientConfirmationRespondedAtUtc = null;
-            booking.UpdatedAtUtc = DateTime.UtcNow;
+            db.Bookings.Remove(booking);
             slot.Status = TrainingSlotStatus.Open;
 
             await db.SaveChangesAsync(cancellationToken);

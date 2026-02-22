@@ -355,7 +355,7 @@
   'createSlot.assignmentOpen': 'Свободный слот',
   'createSlot.assignmentAssigned': 'Выбрать клиента',
   'createSlot.assignmentSearchPlaceholder': 'Поиск клиента',
-  'createSlot.assignmentEmpty': 'Нет клиентов. Добавьте клиента в разделе CRM.',
+  'createSlot.assignmentEmpty': 'Нет клиентов. Добавьте клиента в профиле.',
   'createSlot.assignmentSelected': 'Выбран клиент: {clientName}',
   'createSlot.workoutTypeLabel': 'Тип тренировки',
   'createSlot.workoutTypePlaceholder': 'Не выбран (необязательно)',
