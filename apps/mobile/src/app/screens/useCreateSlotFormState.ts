@@ -13,6 +13,7 @@ import type {
 import { ApiError } from '@api/core';
 import { ApiTimeoutError } from '@api/fetcher';
 import { TrainerSlotsOverlapError } from '@api/trainerSlotsApi';
+import { setTrainerBookingWorkoutType } from '@api/workoutTypesApi';
 import { getTrainerClientsList } from '@api/trainerClientsApi';
 import { getTrainerClientLinks } from '@api/clientLinksApi';
 import { t } from '@i18n';
@@ -45,6 +46,7 @@ export type UseCreateSlotFormStateArgs = {
   onAfterSuccess: (count: number) => void;
   initialDateIsoLocal?: string;
   initialAssignTrainerClientId?: string;
+  assignedWorkoutTypeId?: string | null;
 };
 
 type AssignableClient = {
@@ -169,6 +171,7 @@ export const useCreateSlotFormState = ({
   onAfterSuccess,
   initialDateIsoLocal,
   initialAssignTrainerClientId,
+  assignedWorkoutTypeId,
 }: UseCreateSlotFormStateArgs) => {
   const { showToast } = useToast();
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -526,7 +529,10 @@ export const useCreateSlotFormState = ({
     mutationFn: async (payloads) => {
       let created = 0;
       for (const payload of payloads) {
-        await createSlot(payload);
+        const createdSlot = await createSlot(payload);
+        if (assignedWorkoutTypeId && createdSlot.bookingId) {
+          await setTrainerBookingWorkoutType(createdSlot.bookingId, assignedWorkoutTypeId);
+        }
         created += 1;
       }
       return created;

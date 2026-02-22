@@ -110,6 +110,7 @@ export interface BookingDto {
   status?: string | null;
   /** @nullable */
   clientConfirmationStatus?: string | null;
+  workoutType?: WorkoutTypeSummaryDto;
   /** @nullable */
   clientConfirmationRequestedAtUtc?: string | null;
   /** @nullable */
@@ -198,6 +199,13 @@ export interface CreateTrainerRequest {
   cityName?: string | null;
   /** @nullable */
   districtName?: string | null;
+}
+
+export interface CreateTrainerWorkoutTypeRequest {
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  category?: string | null;
 }
 
 export interface DisablePushTokenRequest {
@@ -377,6 +385,20 @@ export interface SearchTrainerClientByPhoneResponse {
   maskedPhone?: string | null;
 }
 
+export interface SetBookingWorkoutTypeRequest {
+  /** @nullable */
+  workoutTypeId?: string | null;
+}
+
+export interface SetBookingWorkoutTypeResponse {
+  bookingId?: string;
+  /** @nullable */
+  workoutTypeId?: string | null;
+  workoutType?: WorkoutTypeSummaryDto;
+  /** @nullable */
+  updatedAtUtc?: string | null;
+}
+
 export interface SlotAttendeeDto {
   clientId?: string;
   /** @nullable */
@@ -414,6 +436,7 @@ export interface SlotDto {
   bookingStatus?: string | null;
   /** @nullable */
   clientConfirmationStatus?: string | null;
+  workoutType?: WorkoutTypeSummaryDto;
   createdAtUtc?: string;
   /** @nullable */
   clientName?: string | null;
@@ -423,7 +446,7 @@ export interface SlotDto {
   trainerPricePerSession?: number | null;
 }
 
-export interface StringFAnonymousType16 {
+export interface StringFAnonymousType18 {
   /** @nullable */
   status?: string | null;
 }
@@ -488,6 +511,16 @@ export interface TrainerSummaryReportDto {
   sessionsCancelled?: number;
   revenuePaid?: number;
   revenuePending?: number;
+}
+
+export interface TrainerWorkoutTypeDto {
+  id?: string;
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  category?: string | null;
+  isSystem?: boolean;
+  isArchived?: boolean;
 }
 
 export interface UpcomingSessionDto {
@@ -561,6 +594,16 @@ export interface UpdateUserRequest {
   level?: string | null;
   /** @nullable */
   goals?: string[] | null;
+}
+
+export interface WorkoutTypeSummaryDto {
+  id?: string;
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  category?: string | null;
+  isSystem?: boolean;
+  isArchived?: boolean;
 }
 
 export type GetLookupsRolesParams = {
@@ -646,6 +689,10 @@ districtOnly?: boolean;
 
 export type GetTrainerClientsParams = {
 status?: string;
+};
+
+export type GetTrainerWorkoutTypesParams = {
+includeArchived?: boolean;
 };
 
 export type PutUsersMeAvatarBody = {
@@ -1289,6 +1336,61 @@ export const postTrainerSlotsSlotIdAssignClient = async (slotId: string,
 
 
 
+export type postTrainerSlotsSlotIdMakeOpenResponse200 = {
+  data: SlotDto
+  status: 200
+}
+
+export type postTrainerSlotsSlotIdMakeOpenResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postTrainerSlotsSlotIdMakeOpenResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type postTrainerSlotsSlotIdMakeOpenResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type postTrainerSlotsSlotIdMakeOpenResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postTrainerSlotsSlotIdMakeOpenResponseSuccess = (postTrainerSlotsSlotIdMakeOpenResponse200) & {
+  headers: Headers;
+};
+export type postTrainerSlotsSlotIdMakeOpenResponseError = (postTrainerSlotsSlotIdMakeOpenResponse401 | postTrainerSlotsSlotIdMakeOpenResponse403 | postTrainerSlotsSlotIdMakeOpenResponse404 | postTrainerSlotsSlotIdMakeOpenResponse409) & {
+  headers: Headers;
+};
+
+export type postTrainerSlotsSlotIdMakeOpenResponse = (postTrainerSlotsSlotIdMakeOpenResponseSuccess | postTrainerSlotsSlotIdMakeOpenResponseError)
+
+export const getPostTrainerSlotsSlotIdMakeOpenUrl = (slotId: string,) => {
+
+
+  
+
+  return `/trainer/slots/${slotId}/make-open`
+}
+
+export const postTrainerSlotsSlotIdMakeOpen = async (slotId: string, options?: RequestInit): Promise<postTrainerSlotsSlotIdMakeOpenResponse> => {
+  
+  return customFetch<postTrainerSlotsSlotIdMakeOpenResponse>(getPostTrainerSlotsSlotIdMakeOpenUrl(slotId),
+  {      
+    ...options,
+    method: 'POST'
+    
+    
+  }
+);}
+
+
+
 export type postClientBookingsBookingIdConfirmResponse200 = {
   data: BookingDto
   status: 200
@@ -1647,7 +1749,7 @@ export const getClientsMeHistory = async ( options?: RequestInit): Promise<getCl
 
 
 export type getHealthResponse200 = {
-  data: StringFAnonymousType16
+  data: StringFAnonymousType18
   status: 200
 }
     
@@ -4040,6 +4142,241 @@ export const getTrainers = async ( options?: RequestInit): Promise<getTrainersRe
     method: 'GET'
     
     
+  }
+);}
+
+
+
+export type getTrainerWorkoutTypesResponse200 = {
+  data: TrainerWorkoutTypeDto[]
+  status: 200
+}
+
+export type getTrainerWorkoutTypesResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type getTrainerWorkoutTypesResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type getTrainerWorkoutTypesResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+    
+export type getTrainerWorkoutTypesResponseSuccess = (getTrainerWorkoutTypesResponse200) & {
+  headers: Headers;
+};
+export type getTrainerWorkoutTypesResponseError = (getTrainerWorkoutTypesResponse401 | getTrainerWorkoutTypesResponse403 | getTrainerWorkoutTypesResponse404) & {
+  headers: Headers;
+};
+
+export type getTrainerWorkoutTypesResponse = (getTrainerWorkoutTypesResponseSuccess | getTrainerWorkoutTypesResponseError)
+
+export const getGetTrainerWorkoutTypesUrl = (params?: GetTrainerWorkoutTypesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/trainer/workout-types?${stringifiedParams}` : `/trainer/workout-types`
+}
+
+export const getTrainerWorkoutTypes = async (params?: GetTrainerWorkoutTypesParams, options?: RequestInit): Promise<getTrainerWorkoutTypesResponse> => {
+  
+  return customFetch<getTrainerWorkoutTypesResponse>(getGetTrainerWorkoutTypesUrl(params),
+  {      
+    ...options,
+    method: 'GET'
+    
+    
+  }
+);}
+
+
+
+export type postTrainerWorkoutTypesResponse200 = {
+  data: TrainerWorkoutTypeDto
+  status: 200
+}
+
+export type postTrainerWorkoutTypesResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type postTrainerWorkoutTypesResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postTrainerWorkoutTypesResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type postTrainerWorkoutTypesResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type postTrainerWorkoutTypesResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postTrainerWorkoutTypesResponseSuccess = (postTrainerWorkoutTypesResponse200) & {
+  headers: Headers;
+};
+export type postTrainerWorkoutTypesResponseError = (postTrainerWorkoutTypesResponse400 | postTrainerWorkoutTypesResponse401 | postTrainerWorkoutTypesResponse403 | postTrainerWorkoutTypesResponse404 | postTrainerWorkoutTypesResponse409) & {
+  headers: Headers;
+};
+
+export type postTrainerWorkoutTypesResponse = (postTrainerWorkoutTypesResponseSuccess | postTrainerWorkoutTypesResponseError)
+
+export const getPostTrainerWorkoutTypesUrl = () => {
+
+
+  
+
+  return `/trainer/workout-types`
+}
+
+export const postTrainerWorkoutTypes = async (createTrainerWorkoutTypeRequest: CreateTrainerWorkoutTypeRequest, options?: RequestInit): Promise<postTrainerWorkoutTypesResponse> => {
+  
+  return customFetch<postTrainerWorkoutTypesResponse>(getPostTrainerWorkoutTypesUrl(),
+  {      
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createTrainerWorkoutTypeRequest,)
+  }
+);}
+
+
+
+export type postTrainerWorkoutTypesIdArchiveResponse200 = {
+  data: TrainerWorkoutTypeDto
+  status: 200
+}
+
+export type postTrainerWorkoutTypesIdArchiveResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type postTrainerWorkoutTypesIdArchiveResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type postTrainerWorkoutTypesIdArchiveResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type postTrainerWorkoutTypesIdArchiveResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type postTrainerWorkoutTypesIdArchiveResponseSuccess = (postTrainerWorkoutTypesIdArchiveResponse200) & {
+  headers: Headers;
+};
+export type postTrainerWorkoutTypesIdArchiveResponseError = (postTrainerWorkoutTypesIdArchiveResponse401 | postTrainerWorkoutTypesIdArchiveResponse403 | postTrainerWorkoutTypesIdArchiveResponse404 | postTrainerWorkoutTypesIdArchiveResponse409) & {
+  headers: Headers;
+};
+
+export type postTrainerWorkoutTypesIdArchiveResponse = (postTrainerWorkoutTypesIdArchiveResponseSuccess | postTrainerWorkoutTypesIdArchiveResponseError)
+
+export const getPostTrainerWorkoutTypesIdArchiveUrl = (id: string,) => {
+
+
+  
+
+  return `/trainer/workout-types/${id}/archive`
+}
+
+export const postTrainerWorkoutTypesIdArchive = async (id: string, options?: RequestInit): Promise<postTrainerWorkoutTypesIdArchiveResponse> => {
+  
+  return customFetch<postTrainerWorkoutTypesIdArchiveResponse>(getPostTrainerWorkoutTypesIdArchiveUrl(id),
+  {      
+    ...options,
+    method: 'POST'
+    
+    
+  }
+);}
+
+
+
+export type patchTrainerBookingsBookingIdWorkoutTypeResponse200 = {
+  data: SetBookingWorkoutTypeResponse
+  status: 200
+}
+
+export type patchTrainerBookingsBookingIdWorkoutTypeResponse400 = {
+  data: ProblemDetails
+  status: 400
+}
+
+export type patchTrainerBookingsBookingIdWorkoutTypeResponse401 = {
+  data: ProblemDetails
+  status: 401
+}
+
+export type patchTrainerBookingsBookingIdWorkoutTypeResponse403 = {
+  data: ProblemDetails
+  status: 403
+}
+
+export type patchTrainerBookingsBookingIdWorkoutTypeResponse404 = {
+  data: ProblemDetails
+  status: 404
+}
+
+export type patchTrainerBookingsBookingIdWorkoutTypeResponse409 = {
+  data: ProblemDetails
+  status: 409
+}
+    
+export type patchTrainerBookingsBookingIdWorkoutTypeResponseSuccess = (patchTrainerBookingsBookingIdWorkoutTypeResponse200) & {
+  headers: Headers;
+};
+export type patchTrainerBookingsBookingIdWorkoutTypeResponseError = (patchTrainerBookingsBookingIdWorkoutTypeResponse400 | patchTrainerBookingsBookingIdWorkoutTypeResponse401 | patchTrainerBookingsBookingIdWorkoutTypeResponse403 | patchTrainerBookingsBookingIdWorkoutTypeResponse404 | patchTrainerBookingsBookingIdWorkoutTypeResponse409) & {
+  headers: Headers;
+};
+
+export type patchTrainerBookingsBookingIdWorkoutTypeResponse = (patchTrainerBookingsBookingIdWorkoutTypeResponseSuccess | patchTrainerBookingsBookingIdWorkoutTypeResponseError)
+
+export const getPatchTrainerBookingsBookingIdWorkoutTypeUrl = (bookingId: string,) => {
+
+
+  
+
+  return `/trainer/bookings/${bookingId}/workout-type`
+}
+
+export const patchTrainerBookingsBookingIdWorkoutType = async (bookingId: string,
+    setBookingWorkoutTypeRequest: SetBookingWorkoutTypeRequest, options?: RequestInit): Promise<patchTrainerBookingsBookingIdWorkoutTypeResponse> => {
+  
+  return customFetch<patchTrainerBookingsBookingIdWorkoutTypeResponse>(getPatchTrainerBookingsBookingIdWorkoutTypeUrl(bookingId),
+  {      
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      setBookingWorkoutTypeRequest,)
   }
 );}
 

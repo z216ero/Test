@@ -8,7 +8,11 @@ export type ScheduleStackParamList = {
 };
 
 export type BookingsStackParamList = {
-  BookingsHome: undefined;
+  BookingsHome:
+    | {
+        initialTab?: 'upcoming' | 'pending' | 'history';
+      }
+    | undefined;
   BookingDetails: {
     slot: SlotDto;
     trainerName?: string | null;
@@ -45,6 +49,7 @@ export type ProfileStackParamList = {
   PersonalInfo: { locationSelection?: LocationSelection } | undefined;
   Notifications: undefined;
   TrainerClients: undefined;
+  TrainerWorkoutTypes: undefined;
   TrainerAddClientByPhone: undefined;
   TrainerClientForm: { clientId?: string; initialPhone?: string; returnToList?: boolean } | undefined;
   TrainerReport: undefined;

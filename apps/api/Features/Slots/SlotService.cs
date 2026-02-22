@@ -3,6 +3,7 @@ using Api.Data;
 using Api.Features.Bookings;
 using Api.Features.Common;
 using Api.Features.Push;
+using Api.Features.TrainerWorkoutTypes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -375,6 +376,7 @@ public sealed class SlotService(AppDbContext db, PushService pushService)
 
         var slots = await db.TrainingSlots
             .Include(s => s.Booking)
+            .ThenInclude(b => b!.WorkoutType)
             .Include(s => s.Attendees)
             .Where(s => s.TrainerId == trainerId
                 && s.StartsAtUtc >= normalizedFrom
@@ -513,6 +515,7 @@ public sealed class SlotService(AppDbContext db, PushService pushService)
         var query = db.TrainingSlots
             .AsNoTracking()
             .Include(s => s.Booking)
+            .ThenInclude(b => b!.WorkoutType)
             .Include(s => s.Attendees)
             .Include(s => s.TrainerProfile!)
             .ThenInclude(t => t.City)
@@ -933,10 +936,22 @@ public sealed class SlotService(AppDbContext db, PushService pushService)
             && slot.Status == TrainingSlotStatus.Cancelled
             && slot.Attendees.Count == 0;
 
+    private static bool ShouldExposeIndividualBookingMetadata(TrainingSlot slot)
+        => slot.SlotType != TrainingSlotType.Individual
+            || slot.Booking is null
+            || slot.Status != TrainingSlotStatus.Open
+            || slot.Booking.Status != BookingStatus.Cancelled
+            || slot.Booking.ClientId.HasValue
+            || slot.Booking.TrainerClientId.HasValue;
+
     private static string? ResolveBookingStatus(TrainingSlot slot)
     {
         if (slot.SlotType == TrainingSlotType.Individual)
         {
+            if (!ShouldExposeIndividualBookingMetadata(slot))
+            {
+                return null;
+            }
             return slot.Booking?.Status.ToString();
         }
 
@@ -965,6 +980,11 @@ public sealed class SlotService(AppDbContext db, PushService pushService)
             return null;
         }
 
+        if (!ShouldExposeIndividualBookingMetadata(slot))
+        {
+            return null;
+        }
+
         return slot.Booking?.ClientConfirmationStatus.ToString();
     }
 
@@ -982,12 +1002,14 @@ public sealed class SlotService(AppDbContext db, PushService pushService)
             ? occupiedCount >= slot.CapacityMax.Value
             : (bool?)null;
 
+        var exposeBookingMetadata = ShouldExposeIndividualBookingMetadata(slot);
+
         return new SlotDto(
             slot.Id,
             slot.TrainerId,
-            slot.Booking?.Id,
-            slot.Booking?.ClientId,
-            slot.Booking?.TrainerClientId,
+            exposeBookingMetadata ? slot.Booking?.Id : null,
+            exposeBookingMetadata ? slot.Booking?.ClientId : null,
+            exposeBookingMetadata ? slot.Booking?.TrainerClientId : null,
             slot.StartsAtUtc,
             slot.DurationMinutes,
             slot.SlotType.ToString(),
@@ -998,6 +1020,7 @@ public sealed class SlotService(AppDbContext db, PushService pushService)
             slot.Status.ToString(),
             ResolveBookingStatus(slot),
             ResolveClientConfirmationStatus(slot),
+            exposeBookingMetadata ? TrainerWorkoutTypeService.ToSummaryDto(slot.Booking?.WorkoutType) : null,
             slot.CreatedAtUtc,
             clientName,
             clientAvatarUrl,

@@ -1,3 +1,5 @@
+using Api.Features.WorkoutTypes;
+
 namespace Api.Features.Slots;
 
 public sealed record CreateSlotRequest(
@@ -26,6 +28,7 @@ public sealed record SlotDto(
     string Status,
     string? BookingStatus,
     string? ClientConfirmationStatus,
+    WorkoutTypeSummaryDto? WorkoutType,
     DateTime CreatedAtUtc,
     string? ClientName,
     string? ClientAvatarUrl,

@@ -28,6 +28,8 @@ import {
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 import type { BookingsStackParamList } from '@app/navigation/types';
 import type { AvailableSlotTrainerDto } from '@generated/api';
+import { getSlotWorkoutType } from '@api/workoutTypesApi';
+import { WorkoutTypeChip } from '@app/components/workout/WorkoutTypeChip';
 
 type Props = NativeStackScreenProps<BookingsStackParamList, 'BookingDetails'>;
 
@@ -116,6 +118,7 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
     : null;
 
   const canCancel = Boolean(slot.id) && canCancelBooking(slot, nowTs);
+  const workoutType = getSlotWorkoutType(slot);
 
   const handleBack = () => {
     const parent = navigation.getParent();
@@ -272,6 +275,10 @@ export function BookingDetailsScreen({ navigation, route }: Props) {
                     </Text>
                   </XStack>
                 ) : null}
+                <WorkoutTypeChip
+                  label={workoutType?.name}
+                  archived={Boolean(workoutType?.isArchived)}
+                />
               </YStack>
             </XStack>
           </YStack>

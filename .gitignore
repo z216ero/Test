@@ -90,6 +90,7 @@ $RECYCLE.BIN/
 .tmp_*/
 .verify/
 .tmpbuild/
+.tmp
 # Certificates
 **/*.pfx
 **/*.crt

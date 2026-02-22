@@ -1,6 +1,8 @@
 using Api.Data;
 using Api.Features.Common;
 using Api.Features.Slots;
+using Api.Features.TrainerWorkoutTypes;
+using Api.Features.WorkoutTypes;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Features.Clients;
@@ -26,6 +28,7 @@ public sealed class ClientService(AppDbContext db)
         var individualBookings = await db.Bookings
             .AsNoTracking()
             .Include(b => b.Slot!)
+            .Include(b => b.WorkoutType)
             .Include(b => b.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.City)
@@ -46,6 +49,7 @@ public sealed class ClientService(AppDbContext db)
             .AsNoTracking()
             .Include(a => a.Slot!)
             .ThenInclude(s => s.Booking)
+            .ThenInclude(b => b!.WorkoutType)
             .Include(a => a.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.City)
@@ -85,7 +89,7 @@ public sealed class ClientService(AppDbContext db)
         sessions.AddRange(individualBookings
             .Where(booking => booking.Slot is not null)
             .Select(booking => ToSessionDto(
-                booking.Slot!,
+                booking,
                 booking.Status,
                 booking.ClientConfirmationStatus,
                 trainerAvatarIds,
@@ -126,6 +130,7 @@ public sealed class ClientService(AppDbContext db)
         var individualBookings = await db.Bookings
             .AsNoTracking()
             .Include(b => b.Slot!)
+            .Include(b => b.WorkoutType)
             .Include(b => b.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.City)
@@ -153,6 +158,7 @@ public sealed class ClientService(AppDbContext db)
             .AsNoTracking()
             .Include(a => a.Slot!)
             .ThenInclude(s => s.Booking)
+            .ThenInclude(b => b!.WorkoutType)
             .Include(a => a.Slot!)
             .ThenInclude(s => s.TrainerProfile!)
             .ThenInclude(t => t.City)
@@ -200,7 +206,7 @@ public sealed class ClientService(AppDbContext db)
         sessions.AddRange(individualBookings
             .Where(booking => booking.Slot is not null)
             .Select(booking => ToSessionDto(
-                booking.Slot!,
+                booking,
                 booking.Status,
                 booking.ClientConfirmationStatus,
                 trainerAvatarIds,
@@ -274,6 +280,22 @@ public sealed class ClientService(AppDbContext db)
     }
 
     private static UpcomingSessionDto ToSessionDto(
+        Booking booking,
+        BookingStatus bookingStatus,
+        BookingClientConfirmationStatus clientConfirmationStatus,
+        HashSet<Guid> trainerAvatarIds,
+        IReadOnlyDictionary<Guid, int> occupiedCounts,
+        IReadOnlyDictionary<Guid, double?> trainerRatings)
+        => ToSessionDto(
+            booking.Slot!,
+            bookingStatus.ToString(),
+            clientConfirmationStatus.ToString(),
+            trainerAvatarIds,
+            occupiedCounts,
+            trainerRatings,
+            TrainerWorkoutTypeService.ToSummaryDto(booking.WorkoutType));
+
+    private static UpcomingSessionDto ToSessionDto(
         TrainingSlot slot,
         BookingStatus bookingStatus,
         BookingClientConfirmationStatus clientConfirmationStatus,
@@ -302,7 +324,8 @@ public sealed class ClientService(AppDbContext db)
         string? clientConfirmationStatus,
         HashSet<Guid> trainerAvatarIds,
         IReadOnlyDictionary<Guid, int> occupiedCounts,
-        IReadOnlyDictionary<Guid, double?> trainerRatings)
+        IReadOnlyDictionary<Guid, double?> trainerRatings,
+        WorkoutTypeSummaryDto? workoutType = null)
     {
         var trainerProfile = slot.TrainerProfile;
         var trainerName = trainerProfile?.User?.Name;
@@ -319,7 +342,7 @@ public sealed class ClientService(AppDbContext db)
         var trainerWorksWithGender = trainerProfile?.WorksWithGender.ToString();
 
         return new UpcomingSessionDto(
-            ToSlotDto(slot, bookingStatus, clientConfirmationStatus, occupiedCounts),
+            ToSlotDto(slot, bookingStatus, clientConfirmationStatus, occupiedCounts, workoutType),
             trainerName,
             trainerCityName,
             trainerDistrictName,
@@ -419,7 +442,8 @@ public sealed class ClientService(AppDbContext db)
         TrainingSlot slot,
         string bookingStatus,
         string? clientConfirmationStatus,
-        IReadOnlyDictionary<Guid, int> occupiedCounts)
+        IReadOnlyDictionary<Guid, int> occupiedCounts,
+        WorkoutTypeSummaryDto? workoutType = null)
     {
         var occupiedCount = slot.SlotType == TrainingSlotType.Group
             ? (int?)(occupiedCounts.TryGetValue(slot.Id, out var count) ? count : 0)
@@ -445,6 +469,7 @@ public sealed class ClientService(AppDbContext db)
             slot.Status.ToString(),
             bookingStatus,
             clientConfirmationStatus,
+            workoutType ?? TrainerWorkoutTypeService.ToSummaryDto(slot.Booking?.WorkoutType),
             slot.CreatedAtUtc,
             null,
             null,

@@ -12,6 +12,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<ClientProfile> ClientProfiles => Set<ClientProfile>();
     public DbSet<TrainerClient> TrainerClients => Set<TrainerClient>();
     public DbSet<TrainerClientLink> TrainerClientLinks => Set<TrainerClientLink>();
+    public DbSet<TrainerWorkoutType> TrainerWorkoutTypes => Set<TrainerWorkoutType>();
     public DbSet<TrainingSlot> TrainingSlots => Set<TrainingSlot>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<Payment> Payments => Set<Payment>();
@@ -177,6 +178,38 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<TrainerWorkoutType>(entity =>
+        {
+            entity.ToTable("trainer_workout_types");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name)
+                .HasMaxLength(40)
+                .IsRequired();
+            entity.Property(x => x.NormalizeKey)
+                .HasMaxLength(40)
+                .IsRequired();
+            entity.Property(x => x.Category)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(WorkoutTypeCategory.Other)
+                .IsRequired();
+            entity.Property(x => x.IsSystem)
+                .HasDefaultValue(false)
+                .IsRequired();
+            entity.Property(x => x.IsArchived)
+                .HasDefaultValue(false)
+                .IsRequired();
+            entity.Property(x => x.CreatedAtUtc)
+                .HasDefaultValueSql("now() at time zone 'utc'");
+            entity.HasIndex(x => new { x.TrainerId, x.NormalizeKey })
+                .IsUnique();
+            entity.HasIndex(x => new { x.TrainerId, x.IsArchived });
+            entity.HasOne(x => x.TrainerProfile)
+                .WithMany()
+                .HasForeignKey(x => x.TrainerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<ClientProfile>(entity =>
         {
             entity.ToTable("client_profiles");
@@ -258,6 +291,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(x => x.Id);
             entity.Property(x => x.ClientId);
             entity.Property(x => x.TrainerClientId);
+            entity.Property(x => x.WorkoutTypeId);
             entity.Property(x => x.Status)
                 .HasConversion<string>()
                 .HasMaxLength(20)
@@ -277,6 +311,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsUnique();
             entity.HasIndex(x => x.ClientId);
             entity.HasIndex(x => x.TrainerClientId);
+            entity.HasIndex(x => x.WorkoutTypeId);
             entity.HasIndex(x => new { x.ClientId, x.ClientConfirmationStatus });
             entity.ToTable(tb => tb.HasCheckConstraint(
                 "CK_bookings_client_or_trainer_client",
@@ -288,6 +323,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasOne(x => x.TrainerClient)
                 .WithMany()
                 .HasForeignKey(x => x.TrainerClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.WorkoutType)
+                .WithMany()
+                .HasForeignKey(x => x.WorkoutTypeId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

@@ -1,10 +1,12 @@
 import { Button, Text, XStack, YStack } from 'tamagui';
 import type { AvailableSlotTrainerDto, SlotDto } from '@generated/api';
 import type { ClientBooking } from '@api/bookingsApi';
+import { getSlotWorkoutType } from '@api/workoutTypesApi';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
 import { getBookingStatusType } from '@app/components/bookings/bookingUtils';
+import { WorkoutTypeChip } from '@app/components/workout/WorkoutTypeChip';
 import { formatTimeRangeRu } from '@utils/datetime';
 import { formatPrice } from '@utils/price';
 
@@ -164,6 +166,7 @@ export function TrainerSlotGroupCard({
           const pendingBookingId = isPendingConfirmation
             ? (clientBooking?.slot.bookingId ?? slot.bookingId ?? null)
             : null;
+          const workoutType = getSlotWorkoutType(slot);
           const isPendingActionBusy = Boolean(pendingBookingId) && pendingActionBookingId === pendingBookingId;
           const occupiedCount = slot.occupiedCount ?? 0;
           const capacityMax = slot.capacityMax ?? null;
@@ -264,6 +267,15 @@ export function TrainerSlotGroupCard({
               <Text fontSize="$2" color={statusColor} marginTop="$1">
                 {statusLabel}
               </Text>
+              {workoutType ? (
+                <XStack marginTop="$2">
+                  <WorkoutTypeChip
+                    label={workoutType.name}
+                    archived={Boolean(workoutType.isArchived)}
+                    compact
+                  />
+                </XStack>
+              ) : null}
               {isPendingConfirmation && pendingBookingId ? (
                 <XStack gap="$2" marginTop="$3">
                   <Button

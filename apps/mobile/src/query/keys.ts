@@ -34,6 +34,10 @@ export const keys = {
         ? (['trainer', 'clients', 'list', params] as const)
         : (['trainer', 'clients', 'list'] as const),
   },
+  trainerWorkoutTypes: {
+    list: (includeArchived = false) =>
+      ['trainer', 'workout-types', { includeArchived }] as const,
+  },
   myClients: () => ['trainer', 'clients', 'my-clients'] as const,
   clientRequests: () => ['client', 'links', 'requests'] as const,
   pendingLinkRequestsCount: () => ['client', 'links', 'pending-count'] as const,

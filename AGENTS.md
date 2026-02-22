@@ -68,6 +68,7 @@ Infrastructure:
 - Always use UTC in DB and API; never store local times in DB.
 - Avoid breaking API contract without updating mobile.
 - For paired action buttons in bottom sheets (Yes/No style), prefer `unstyled` button wrappers with explicit `minHeight` and spacing to avoid overlap/clipping on smaller screens.
+- In Tamagui, prefer `Button unstyled` + explicit `minHeight/height`, `alignItems`, `justifyContent`, and inner `Text lineHeight` for custom row buttons/chips/sheet actions; default `Button` styles often cause vertical text clipping.
 
 ## Business rules
 - All business logic and constraints are defined in docs/domain.md

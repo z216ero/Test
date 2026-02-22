@@ -4,6 +4,8 @@ import { t } from '@i18n';
 import { formatTimeRangeRu } from '@utils/datetime';
 import { AppIcon } from '@ui/AppIcon';
 import type { AvailableSlotTrainerDto } from '@generated/api';
+import { getSlotWorkoutType } from '@api/workoutTypesApi';
+import { WorkoutTypeChip } from '@app/components/workout/WorkoutTypeChip';
 import {
   bookingStatusMeta,
   type BookingStatusType,
@@ -73,6 +75,7 @@ export function BookingCard({
     trainingTypes: booking.trainerTrainingTypes ?? null,
   };
   const canCancel = booking.slot.id ? canCancelBooking(booking.slot, nowTs) : false;
+  const workoutType = getSlotWorkoutType(booking.slot);
 
   return (
     <YStack
@@ -131,16 +134,21 @@ export function BookingCard({
           <Text fontSize="$4" fontWeight="700" color="$text">
             {booking.trainerName?.trim() || t('common.empty')}
           </Text>
-          {trainingTypeLabel ? (
-            <XStack alignItems="center" gap="$2">
-              <AppIcon name={trainingTypeIcon} size={14} color="$muted" />
-              <Text fontSize="$3" color="$muted">
-                {trainingTypeLabel}
-              </Text>
+                {trainingTypeLabel ? (
+                  <XStack alignItems="center" gap="$2">
+                    <AppIcon name={trainingTypeIcon} size={14} color="$muted" />
+                    <Text fontSize="$3" color="$muted">
+                      {trainingTypeLabel}
+                    </Text>
+                  </XStack>
+                ) : null}
+                <WorkoutTypeChip
+                  label={workoutType?.name}
+                  archived={Boolean(workoutType?.isArchived)}
+                  compact
+                />
+              </YStack>
             </XStack>
-          ) : null}
-        </YStack>
-      </XStack>
       {showActions ? (
         <XStack justifyContent="flex-end" gap="$2">
           {isPendingConfirmation && booking.slot.bookingId ? (

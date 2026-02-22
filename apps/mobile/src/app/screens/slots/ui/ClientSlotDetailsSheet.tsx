@@ -23,6 +23,8 @@ import { formatDateWithWeekdayRu, formatTimeRangeRu } from '@utils/datetime';
 import { formatPrice } from '@utils/price';
 import { useQueryClient } from '@tanstack/react-query';
 import { TrainerAvatar } from '@app/components/bookings/TrainerAvatar';
+import { getSlotWorkoutType } from '@api/workoutTypesApi';
+import { WorkoutTypeChip } from '@app/components/workout/WorkoutTypeChip';
 
 type ClientSlotDetailsSheetProps = {
   open: boolean;
@@ -137,6 +139,7 @@ export function ClientSlotDetailsSheet({
     && capacityMax !== null
     && occupiedCount >= capacityMax
   );
+  const workoutType = activeSlot ? getSlotWorkoutType(activeSlot) : null;
 
   const bookingMutation = useAppMutation({
     mutationFn: (slotId: string) => createBooking(slotId),
@@ -347,6 +350,10 @@ export function ClientSlotDetailsSheet({
                   {t('slots.details.priceLabel', { price: priceLabel })}
                 </Text>
               ) : null}
+              <WorkoutTypeChip
+                label={workoutType?.name}
+                archived={Boolean(workoutType?.isArchived)}
+              />
             </YStack>
 
             {conflict && !isBookedThisSlot ? (

@@ -83,6 +83,12 @@ export function ProfileScreen({ navigation }: Props) {
             onPress: () => navigation.navigate('TrainerClients'),
           },
           {
+            id: 'trainer-workout-types',
+            label: 'Типы тренировок',
+            icon: 'settings' as const,
+            onPress: () => navigation.navigate('TrainerWorkoutTypes'),
+          },
+          {
             id: 'reports',
             label: t('profile.settings.reports'),
             icon: 'history' as const,

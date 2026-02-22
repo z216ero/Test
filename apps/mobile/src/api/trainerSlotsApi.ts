@@ -23,6 +23,7 @@ import {
 import { t } from '@i18n';
 import { ApiError, unwrap } from './core';
 import { ApiTimeoutError } from './fetcher';
+import { customFetch } from './custom-fetch';
 
 export class TrainerSlotsOverlapError extends ApiError {}
 export class TrainerSlotsNotFoundError extends ApiError {}
@@ -266,6 +267,24 @@ export const assignRegisteredClientToSlot = async (
       options
     );
     return unwrap<BookingDto>(response, t('errors.generic'));
+  } catch (error) {
+    throw mapAttendanceError(error);
+  }
+};
+
+export const makeTrainerSlotOpen = async (
+  slotId: string,
+  options?: RequestInit
+): Promise<SlotDto> => {
+  try {
+    const response = await customFetch<{ status: number; data: unknown }>(
+      `/trainer/slots/${slotId}/make-open`,
+      {
+        ...options,
+        method: 'POST',
+      }
+    );
+    return unwrap<SlotDto>(response, t('errors.generic'));
   } catch (error) {
     throw mapAttendanceError(error);
   }

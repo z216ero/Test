@@ -17,6 +17,12 @@ import {
   type PaymentMethod as BookingPaymentMethod,
 } from '@api/paymentsApi';
 import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
+import {
+  getSlotWorkoutType,
+  getTrainerWorkoutTypes,
+  setTrainerBookingWorkoutType,
+  type WorkoutTypeSummary,
+} from '@api/workoutTypesApi';
 import type { PaymentDto } from '@generated/api';
 import { t } from '@i18n';
 import { useAppMutation, useAppQuery } from '@query/hooks';
@@ -26,12 +32,14 @@ import { formatDateRu, formatTimeRangeRu } from '@utils/datetime';
 import type { ScheduleStackParamList } from '@app/navigation/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppIcon } from '@ui/AppIcon';
+import { WorkoutTypeChip } from '@app/components/workout/WorkoutTypeChip';
 import {
   canCancelBookedSlot,
   canCancelSlot,
 } from '@app/components/schedule/slotHelpers';
 import { TrainerSlotGroupSection } from './slot-details/ui/TrainerSlotGroupSection';
 import { TrainerSlotPaymentSection } from './slot-details/ui/TrainerSlotPaymentSection';
+import { TrainerWorkoutTypePickerSheet } from './slot-details/ui/TrainerWorkoutTypePickerSheet';
 import {
   getSlotTimes,
   getStatusLabel,
@@ -47,6 +55,10 @@ const BOOKING_PAYMENT_METHODS: BookingPaymentMethod[] = ['Cash', 'Transfer', 'SB
 export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   const { slot } = route.params;
   const [actionError, setActionError] = useState<string | null>(null);
+  const [workoutTypePickerOpen, setWorkoutTypePickerOpen] = useState(false);
+  const [selectedWorkoutType, setSelectedWorkoutType] = useState<WorkoutTypeSummary | null>(
+    () => getSlotWorkoutType(slot)
+  );
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<BookingPaymentMethod>('Cash');
   const queryClient = useQueryClient();
@@ -62,6 +74,11 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
   const startTs = times?.start.getTime() ?? null;
   const canCompleteNow = startTs !== null && nowTs >= startTs;
   const canNoShowNow = startTs !== null && nowTs >= startTs + 15 * 60 * 1000;
+  const canEditWorkoutType =
+    !group
+    && Boolean(slot.bookingId)
+    && startTs !== null
+    && nowTs <= startTs + 15 * 60 * 1000;
   const occupiedCount = slot.occupiedCount ?? 0;
   const capacityMax = slot.capacityMax ?? null;
 
@@ -79,9 +96,18 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
     queryFn: ({ signal }) => getBookingPayment(slot.bookingId!, { signal }),
   });
 
+  const workoutTypesQuery = useAppQuery({
+    queryKey: keys.trainerWorkoutTypes.list(false),
+    enabled: !group && Boolean(slot.bookingId),
+    queryFn: ({ signal }) => getTrainerWorkoutTypes(false, { signal }),
+  });
+
   const invalidateTrainerData = () => {
     queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
     queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+    queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Client') });
+    queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
+    queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
     queryClient.invalidateQueries({ queryKey: keys.reports.summary() });
     queryClient.invalidateQueries({ queryKey: keys.payments.all() });
     if (slot.bookingId) {
@@ -169,6 +195,21 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
       if (slot.bookingId) {
         queryClient.setQueryData<PaymentDto>(keys.payments.booking(slot.bookingId), payment);
       }
+      invalidateTrainerData();
+    },
+    onError: handleMutationError,
+  });
+
+  const updateWorkoutTypeMutation = useAppMutation({
+    mutationFn: (workoutTypeId: string | null) => {
+      if (!slot.bookingId) {
+        throw new Error('Booking id is required');
+      }
+      return setTrainerBookingWorkoutType(slot.bookingId, workoutTypeId);
+    },
+    onSuccess: (payload) => {
+      setSelectedWorkoutType(payload.workoutType ?? null);
+      setWorkoutTypePickerOpen(false);
       invalidateTrainerData();
     },
     onError: handleMutationError,
@@ -350,6 +391,45 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
           </YStack>
         ) : null}
 
+        {!group && slot.bookingId ? (
+          <YStack
+            gap="$2"
+            padding="$4"
+            backgroundColor="$background"
+            borderRadius="$4"
+            borderWidth={1}
+            borderColor="$border"
+          >
+            <XStack alignItems="center" justifyContent="space-between" gap="$3">
+              <YStack flex={1} minWidth={0}>
+                <Text fontSize="$3" color="$muted">Тип тренировки</Text>
+                <Text fontSize="$4" color="$text" numberOfLines={1}>
+                  {selectedWorkoutType?.name ?? 'Не выбран'}
+                </Text>
+              </YStack>
+              <Button
+                unstyled
+                onPress={() => setWorkoutTypePickerOpen(true)}
+                disabled={!canEditWorkoutType || updateWorkoutTypeMutation.isPending}
+                padding="$2"
+              >
+                <Text color={!canEditWorkoutType ? '$muted' : '$accent'}>
+                  {canEditWorkoutType ? 'Изменить' : 'Недоступно'}
+                </Text>
+              </Button>
+            </XStack>
+            <WorkoutTypeChip
+              label={selectedWorkoutType?.name}
+              archived={Boolean(selectedWorkoutType?.isArchived)}
+            />
+            {!canEditWorkoutType ? (
+              <Text fontSize="$2" color="$muted">
+                Можно изменить до начала и 15 минут после
+              </Text>
+            ) : null}
+          </YStack>
+        ) : null}
+
         <TrainerSlotPaymentSection
           canTogglePayment={canTogglePayment}
           paymentStatus={paymentStatus}
@@ -393,6 +473,20 @@ export function TrainerSlotDetailsScreen({ route, navigation }: Props) {
           </Button>
         </XStack>
       </YStack>
+      <TrainerWorkoutTypePickerSheet
+        open={workoutTypePickerOpen}
+        onOpenChange={setWorkoutTypePickerOpen}
+        items={workoutTypesQuery.data ?? []}
+        current={selectedWorkoutType}
+        isLoading={workoutTypesQuery.isLoading}
+        submitting={updateWorkoutTypeMutation.isPending}
+        onSelect={(workoutTypeId) => {
+          if (updateWorkoutTypeMutation.isPending) {
+            return;
+          }
+          updateWorkoutTypeMutation.mutate(workoutTypeId);
+        }}
+      />
     </YStack>
   );
 }

@@ -1,3 +1,5 @@
+using Api.Features.WorkoutTypes;
+
 namespace Api.Features.Bookings;
 
 public sealed record BookSlotRequest(Guid? ClientId);
@@ -9,6 +11,7 @@ public sealed record BookingDto(
     Guid? TrainerClientId,
     string Status,
     string ClientConfirmationStatus,
+    WorkoutTypeSummaryDto? WorkoutType,
     DateTime? ClientConfirmationRequestedAtUtc,
     DateTime? ClientConfirmationRespondedAtUtc,
     DateTime CreatedAtUtc,

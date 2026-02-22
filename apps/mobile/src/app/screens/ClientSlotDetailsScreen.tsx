@@ -26,6 +26,8 @@ import { AppIcon } from '@ui/AppIcon';
 import type { SlotDto } from '@generated/api';
 import type { SlotsStackParamList } from '@app/navigation/types';
 import { TabScrollView } from '@ui/layout/TabScrollView';
+import { getSlotWorkoutType } from '@api/workoutTypesApi';
+import { WorkoutTypeChip } from '@app/components/workout/WorkoutTypeChip';
 
 const normalizeStatus = (value?: string | null) => value?.toLowerCase().trim();
 
@@ -116,6 +118,7 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
   const occupiedCount = slot.occupiedCount ?? 0;
   const capacityMax = slot.capacityMax ?? null;
   const isFull = slot.isFull ?? (group && capacityMax !== null && occupiedCount >= capacityMax);
+  const workoutType = getSlotWorkoutType(slot);
 
   const bookingMutation = useAppMutation({
     mutationFn: (slotId: string) => createBooking(slotId),
@@ -296,6 +299,10 @@ export function ClientSlotDetailsScreen({ navigation, route }: Props) {
                 {t('slots.details.priceLabel', { price: priceLabel })}
               </Text>
             ) : null}
+            <WorkoutTypeChip
+              label={workoutType?.name}
+              archived={Boolean(workoutType?.isArchived)}
+            />
           </YStack>
 
           {conflict && !isBookedThisSlot ? (

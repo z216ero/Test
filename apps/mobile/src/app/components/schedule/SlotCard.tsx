@@ -1,5 +1,6 @@
 import { Button } from 'tamagui';
 import type { SlotDto } from '@generated/api';
+import { getSlotWorkoutType } from '@api/workoutTypesApi';
 import { t } from '@i18n';
 import { formatTimeRangeRu } from '@utils/datetime';
 import { useAppTheme } from '../../theme/AppThemeContext';
@@ -43,6 +44,7 @@ export function SlotCard({
   const isGroup = (slot.slotType ?? '').toLowerCase() === 'group';
   const clientName = !isGroup && statusType !== 'available' ? getClientName(slot) : null;
   const avatarUrl = !isGroup && statusType !== 'available' ? getClientAvatarUrl(slot) : null;
+  const workoutType = !isGroup ? getSlotWorkoutType(slot) : null;
 
   const isMuted = variant === 'muted';
   const isNeedsAttention = statusType === 'needs_attention';
@@ -110,6 +112,8 @@ export function SlotCard({
           isMuted={isMuted}
           clientName={clientName}
           avatarUrl={avatarUrl}
+          workoutTypeName={workoutType?.name}
+          workoutTypeArchived={Boolean(workoutType?.isArchived)}
           highlight={resolvedHighlight}
         />
       )}

@@ -2,10 +2,23 @@ import { useEffect, useMemo, useState } from 'react';
 import { Sheet } from '@tamagui/sheet';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import type { SlotDto } from '@generated/api';
+import { useQueryClient } from '@tanstack/react-query';
 import { t } from '@i18n';
 import { formatTimeRangeRu } from '@utils/datetime';
 import { AppIcon } from '@ui/AppIcon';
 import { Avatar, useAuthorizedImageSource } from '@ui/components';
+import { WorkoutTypeChip } from '@app/components/workout/WorkoutTypeChip';
+import { TrainerWorkoutTypePickerSheet } from '@app/screens/slot-details/ui/TrainerWorkoutTypePickerSheet';
+import { useAppMutation, useAppQuery } from '@query/hooks';
+import { keys } from '@query/keys';
+import { useToast } from '@ui/feedback/useToast';
+import { presentApiError } from '@api/ApiErrorPresenter';
+import {
+  getSlotWorkoutType,
+  getTrainerWorkoutTypes,
+  setTrainerBookingWorkoutType,
+  type WorkoutTypeSummary,
+} from '@api/workoutTypesApi';
 import {
   CANCEL_FORBIDDEN_WITHIN_MS,
   canCancelBookedSlot,
@@ -73,6 +86,8 @@ export function SlotActionsSheet({
   isAssigningAnotherClient,
   statusOverride,
 }: SlotActionsSheetProps) {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const statusType = slot ? (statusOverride ?? getUiSlotStatus(slot, nowTs)) : null;
   const statusMeta = statusType ? uiSlotStatusMeta[statusType] : null;
   const statusLabel = statusMeta ? t(statusMeta.labelKey) : null;
@@ -82,6 +97,8 @@ export function SlotActionsSheet({
   const clientName = slot ? getClientName(slot) : null;
   const avatarUrl = slot ? getClientAvatarUrl(slot) : null;
   const avatarSource = useAuthorizedImageSource(avatarUrl);
+  const [workoutTypePickerOpen, setWorkoutTypePickerOpen] = useState(false);
+  const [selectedWorkoutType, setSelectedWorkoutType] = useState<WorkoutTypeSummary | null>(null);
 
   const canMarkAttendance = Boolean(
     slot?.id
@@ -92,6 +109,12 @@ export function SlotActionsSheet({
   const canShowComplete = Boolean(slot && canMarkAttendance && canMarkCompleted(slot, nowTs));
   const canCancelAvailable = Boolean(slot && canCancelSlot(slot, nowTs));
   const startTs = slot ? getSlotStartTimestamp(slot) : null;
+  const canEditWorkoutType =
+    !!slot
+    && (slot.slotType ?? '').toLowerCase() !== 'group'
+    && !!slot.bookingId
+    && startTs !== null
+    && nowTs <= startTs + 15 * 60 * 1000;
   const canCancelBooked = Boolean(
     slot && statusType !== 'needs_attention' && canCancelBookedSlot(slot, nowTs)
   );
@@ -133,6 +156,11 @@ export function SlotActionsSheet({
     }
   }, [isNoShowSelected, markPaid]);
 
+  useEffect(() => {
+    setSelectedWorkoutType(slot ? getSlotWorkoutType(slot) : null);
+    setWorkoutTypePickerOpen(false);
+  }, [slot]);
+
   const canUseCloseForm =
     !!slot?.bookingId
     && canMarkAttendance
@@ -156,6 +184,33 @@ export function SlotActionsSheet({
     }
     return canShowNoShow;
   }, [canUseCloseForm, isActionPending, selectedAttendance, canShowComplete, canShowNoShow]);
+
+  const workoutTypesQuery = useAppQuery({
+    queryKey: keys.trainerWorkoutTypes.list(false),
+    enabled: open && !!slot?.bookingId && (slot?.slotType ?? '').toLowerCase() !== 'group',
+    queryFn: ({ signal }) => getTrainerWorkoutTypes(false, { signal }),
+  });
+
+  const updateWorkoutTypeMutation = useAppMutation({
+    mutationFn: (workoutTypeId: string | null) => {
+      if (!slot?.bookingId) {
+        throw new Error('Booking id is required');
+      }
+      return setTrainerBookingWorkoutType(slot.bookingId, workoutTypeId);
+    },
+    onSuccess: (payload) => {
+      setSelectedWorkoutType(payload.workoutType ?? null);
+      setWorkoutTypePickerOpen(false);
+      queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
+      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+      queryClient.invalidateQueries({ queryKey: keys.bookings.upcoming() });
+      queryClient.invalidateQueries({ queryKey: keys.bookings.history() });
+    },
+    onError: (error) => {
+      const presented = presentApiError(error);
+      showToast({ type: 'error', title: presented.title, message: presented.message });
+    },
+  });
 
   return (
     <Sheet
@@ -302,6 +357,47 @@ export function SlotActionsSheet({
               showBookedCancelLockedByTime={showBookedCancelLockedByTime}
             />
 
+            {!!slot.bookingId && (slot.slotType ?? '').toLowerCase() !== 'group' ? (
+              <YStack
+                gap="$2"
+                padding="$3"
+                borderRadius="$4"
+                borderWidth={1}
+                borderColor="$border"
+                backgroundColor="$background"
+              >
+                <XStack justifyContent="space-between" alignItems="center" gap="$3">
+                  <YStack flex={1} minWidth={0}>
+                    <Text fontSize="$3" color="$muted">
+                      Тип тренировки
+                    </Text>
+                    <Text fontSize="$3" color="$text" numberOfLines={1}>
+                      {selectedWorkoutType?.name ?? 'Не выбран'}
+                    </Text>
+                  </YStack>
+                  <Button
+                    unstyled
+                    onPress={() => setWorkoutTypePickerOpen(true)}
+                    disabled={!canEditWorkoutType || updateWorkoutTypeMutation.isPending}
+                  >
+                    <Text color={canEditWorkoutType ? '$accent' : '$muted'}>
+                      {canEditWorkoutType ? 'Изменить' : 'Недоступно'}
+                    </Text>
+                  </Button>
+                </XStack>
+                <WorkoutTypeChip
+                  label={selectedWorkoutType?.name}
+                  archived={Boolean(selectedWorkoutType?.isArchived)}
+                  compact
+                />
+                {!canEditWorkoutType ? (
+                  <Text fontSize="$2" color="$muted">
+                    Можно изменить до начала и 15 минут после
+                  </Text>
+                ) : null}
+              </YStack>
+            ) : null}
+
             {statusType === 'cancelled' ? (
               <XStack
                 padding="$4"
@@ -337,6 +433,20 @@ export function SlotActionsSheet({
           </YStack>
         ) : null}
       </Sheet.Frame>
+      <TrainerWorkoutTypePickerSheet
+        open={workoutTypePickerOpen}
+        onOpenChange={setWorkoutTypePickerOpen}
+        items={workoutTypesQuery.data ?? []}
+        current={selectedWorkoutType}
+        isLoading={workoutTypesQuery.isLoading}
+        submitting={updateWorkoutTypeMutation.isPending}
+        onSelect={(workoutTypeId) => {
+          if (!slot?.bookingId || updateWorkoutTypeMutation.isPending) {
+            return;
+          }
+          updateWorkoutTypeMutation.mutate(workoutTypeId);
+        }}
+      />
     </Sheet>
   );
 }

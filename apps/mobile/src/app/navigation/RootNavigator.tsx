@@ -23,6 +23,7 @@ import { SlotsScreen } from '@app/screens/SlotsScreen';
 import { TrainerSlotDetailsScreen } from '@app/screens/TrainerSlotDetailsScreen';
 import { TrainerAttendanceQueueScreen } from '@app/screens/TrainerAttendanceQueueScreen';
 import { TrainerClientsScreen } from '@app/screens/TrainerClientsScreen';
+import { TrainerWorkoutTypesScreen } from '@app/screens/TrainerWorkoutTypesScreen';
 import { TrainerClientFormScreen } from '@app/screens/TrainerClientFormScreen';
 import { TrainerReportScreen } from '@app/screens/TrainerReportScreen';
 import { TrainerAddClientByPhoneScreen } from '@app/screens/TrainerAddClientByPhoneScreen';
@@ -70,6 +71,7 @@ const ProfileStackNavigator = () => (
     <ProfileStack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
     <ProfileStack.Screen name="Notifications" component={NotificationsScreen} />
     <ProfileStack.Screen name="TrainerClients" component={TrainerClientsScreen} />
+    <ProfileStack.Screen name="TrainerWorkoutTypes" component={TrainerWorkoutTypesScreen} />
     <ProfileStack.Screen name="TrainerAddClientByPhone" component={TrainerAddClientByPhoneScreen} />
     <ProfileStack.Screen name="TrainerClientForm" component={TrainerClientFormScreen} />
     <ProfileStack.Screen name="TrainerReport" component={TrainerReportScreen} />

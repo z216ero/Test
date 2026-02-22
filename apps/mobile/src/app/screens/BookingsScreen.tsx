@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl } from 'react-native';
 import { Button, Text, YStack } from 'tamagui';
 import {
@@ -26,6 +26,7 @@ import { formatDateRu } from '@utils/datetime';
 import { buildDateKey } from '@utils/localDate';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  getBookingStatusType,
   getSlotTimes,
   isHistoryBooking,
   isUpcomingBooking,
@@ -51,11 +52,11 @@ type CancelContext = {
 const NOW_REFRESH_INTERVAL_MS = 60 * 1000;
 const LIVE_REFRESH_INTERVAL_MS = 15 * 1000;
 
-export function BookingsScreen({ navigation }: Props) {
+export function BookingsScreen({ navigation, route }: Props) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<BookingTab>('upcoming');
+  const [activeTab, setActiveTab] = useState<BookingTab>(route.params?.initialTab ?? 'upcoming');
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
@@ -72,6 +73,12 @@ export function BookingsScreen({ navigation }: Props) {
     refetchInterval: LIVE_REFRESH_INTERVAL_MS,
     refetchIntervalInBackground: true,
   });
+
+  useEffect(() => {
+    if (route.params?.initialTab) {
+      setActiveTab(route.params.initialTab);
+    }
+  }, [route.params?.initialTab]);
 
   useFocusEffect(
     useCallback(() => {
@@ -130,6 +137,20 @@ export function BookingsScreen({ navigation }: Props) {
     [upcomingItems, historyIds]
   );
 
+  const pendingItems = useMemo(
+    () =>
+      upcomingFiltered.filter(
+        (item) => getBookingStatusType(item.slot, nowTs) === 'pending_confirmation'
+      ),
+    [upcomingFiltered, nowTs]
+  );
+
+  const upcomingConfirmedItems = useMemo(
+    () =>
+      upcomingFiltered.filter((item) => getBookingStatusType(item.slot, nowTs) === 'booked'),
+    [upcomingFiltered, nowTs]
+  );
+
   const buildSections = useCallback((items: ClientBooking[], order: 'asc' | 'desc') => {
     const sorted = items.slice().sort((a, b) => {
       const aTime = a.slot.startsAtUtc ? new Date(a.slot.startsAtUtc).getTime() : 0;
@@ -155,8 +176,13 @@ export function BookingsScreen({ navigation }: Props) {
   }, []);
 
   const upcomingSections = useMemo(
-    () => buildSections(upcomingFiltered, 'asc'),
-    [buildSections, upcomingFiltered]
+    () => buildSections(upcomingConfirmedItems, 'asc'),
+    [buildSections, upcomingConfirmedItems]
+  );
+
+  const pendingSections = useMemo(
+    () => buildSections(pendingItems, 'asc'),
+    [buildSections, pendingItems]
   );
 
   const historySections = useMemo(
@@ -331,11 +357,24 @@ export function BookingsScreen({ navigation }: Props) {
     </YStack>
   );
 
-  const activeItems = activeTab === 'upcoming' ? upcomingFiltered : historyItems;
-  const activeSections = activeTab === 'upcoming' ? upcomingSections : historySections;
-  const activeError = activeTab === 'upcoming' ? upcomingQuery.error : historyQuery.error;
-  const activeLoading = activeTab === 'upcoming' ? upcomingQuery.isLoading : historyQuery.isLoading;
-  const activeFetching = activeTab === 'upcoming' ? upcomingQuery.isFetching : historyQuery.isFetching;
+  const activeItems =
+    activeTab === 'upcoming'
+      ? upcomingConfirmedItems
+      : activeTab === 'pending'
+        ? pendingItems
+        : historyItems;
+  const activeSections =
+    activeTab === 'upcoming'
+      ? upcomingSections
+      : activeTab === 'pending'
+        ? pendingSections
+        : historySections;
+  const activeError =
+    activeTab === 'history' ? historyQuery.error : upcomingQuery.error;
+  const activeLoading =
+    activeTab === 'history' ? historyQuery.isLoading : upcomingQuery.isLoading;
+  const activeFetching =
+    activeTab === 'history' ? historyQuery.isFetching : upcomingQuery.isFetching;
 
   const presentedError = activeError ? presentApiError(activeError) : null;
   const isNetworkError = presentedError
@@ -366,7 +405,9 @@ export function BookingsScreen({ navigation }: Props) {
           <Text fontSize="$4" fontWeight="600" color="$text" textAlign="center">
             {activeTab === 'upcoming'
               ? t('bookings.emptyUpcomingTitle')
-              : t('bookings.emptyHistoryTitle')}
+              : activeTab === 'pending'
+                ? t('bookings.emptyPendingTitle')
+                : t('bookings.emptyHistoryTitle')}
           </Text>
           {activeTab === 'upcoming' ? (
             <Button
@@ -387,7 +428,7 @@ export function BookingsScreen({ navigation }: Props) {
     return (
       <YStack gap="$6">
         {activeSections.map((section) =>
-          renderSection(section, activeTab === 'upcoming')
+          renderSection(section, activeTab !== 'history')
         )}
       </YStack>
     );
@@ -407,7 +448,11 @@ export function BookingsScreen({ navigation }: Props) {
           <Text fontSize="$8" fontWeight="700" color="$text">
             {t('bookings.title')}
           </Text>
-          <BookingsTabSelector activeTab={activeTab} onChangeTab={setActiveTab} />
+          <BookingsTabSelector
+            activeTab={activeTab}
+            pendingCount={pendingItems.length}
+            onChangeTab={setActiveTab}
+          />
           {isNetworkError && presentedError ? (
             <Banner
               type="error"

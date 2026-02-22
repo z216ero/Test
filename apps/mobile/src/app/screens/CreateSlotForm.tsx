@@ -9,10 +9,17 @@ import type {
   SlotDto,
 } from '@generated/api';
 import { getMe } from '@api/homeApi';
+import {
+  getTrainerWorkoutTypes,
+  type TrainerWorkoutType,
+  type WorkoutTypeSummary,
+} from '@api/workoutTypesApi';
 import { useAppQuery } from '@query/hooks';
 import { keys } from '@query/keys';
 import { t } from '@i18n';
 import { FormInput } from '@ui/components';
+import { WorkoutTypeChip } from '@app/components/workout/WorkoutTypeChip';
+import { TrainerWorkoutTypePickerSheet } from './slot-details/ui/TrainerWorkoutTypePickerSheet';
 import { CreateSlotDateSection } from './CreateSlotDateSection';
 import { CreateSlotFooter } from './CreateSlotFooter';
 import { CreateSlotHeader } from './CreateSlotHeader';
@@ -50,6 +57,8 @@ export function CreateSlotForm({
   initialAssignTrainerClientId,
 }: CreateSlotFormProps) {
   const [clientPickerOpen, setClientPickerOpen] = useState(false);
+  const [workoutTypePickerOpen, setWorkoutTypePickerOpen] = useState(false);
+  const [selectedAssignedWorkoutType, setSelectedAssignedWorkoutType] = useState<WorkoutTypeSummary | null>(null);
 
   const {
     selectedDate,
@@ -105,6 +114,13 @@ export function CreateSlotForm({
     onAfterSuccess,
     initialDateIsoLocal,
     initialAssignTrainerClientId,
+    assignedWorkoutTypeId: selectedAssignedWorkoutType?.id ?? null,
+  });
+
+  const workoutTypesQuery = useAppQuery({
+    queryKey: keys.trainerWorkoutTypes.list(false),
+    enabled: assignmentMode === 'assigned',
+    queryFn: ({ signal }) => getTrainerWorkoutTypes(false, { signal }),
   });
 
   const meQuery = useAppQuery({
@@ -119,7 +135,7 @@ export function CreateSlotForm({
   return (
     <YStack flex={1} backgroundColor="$backgroundSoft">
       <ScrollView>
-        <YStack padding="$6" gap="$5" paddingBottom="$8">
+        <YStack padding="$6" gap="$5" paddingBottom="$16">
           <CreateSlotHeader title={title} onBack={onBack} />
           <CreateSlotDateSection
             visibleDates={visibleDates}
@@ -152,7 +168,6 @@ export function CreateSlotForm({
             borderRadius="$5"
             borderWidth={1}
             borderColor="$border"
-            minHeight={160}
           >
             <Text fontSize="$4" fontWeight="700" color="$text">
               {t('createSlot.assignmentTitle')}
@@ -202,23 +217,70 @@ export function CreateSlotForm({
               </Button>
             </XStack>
             {assignmentMode === 'assigned' ? (
-              <YStack gap="$2">
-                <Button
-                  paddingLeft="$5"
-                  backgroundColor="$background"
-                  borderWidth={1}
-                  borderColor="$border"
-                  borderRadius="$4"
-                  minHeight="$8"
-                  justifyContent="flex-start"
-                  onPress={() => setClientPickerOpen(true)}
-                >
-                  <Text color={selectedTrainerClient ? '$text' : '$muted'} fontWeight="600">
-                    {selectedTrainerClient?.displayName?.trim()
-                      ? selectedTrainerClient.displayName
-                      : t('createSlot.assignmentSearchPlaceholder')}
+              <YStack gap="$3">
+                <YStack gap="$1.5">
+                  <Text fontSize="$3" color="$muted">
+                    {t('createSlot.assignmentAssigned')}
                   </Text>
-                </Button>
+                  <Button
+                    unstyled
+                    paddingHorizontal="$4"
+                    backgroundColor="$background"
+                    borderWidth={1}
+                    borderColor="$border"
+                    borderRadius="$4"
+                    height="$9"
+                    alignItems="stretch"
+                    justifyContent="center"
+                    onPress={() => setClientPickerOpen(true)}
+                  >
+                    <XStack alignItems="center" justifyContent="space-between" width="100%" gap="$2" flex={1}>
+                      <Text
+                        color={selectedTrainerClient ? '$text' : '$muted'}
+                        fontWeight="600"
+                        numberOfLines={1}
+                        flex={1}
+                      >
+                        {selectedTrainerClient?.displayName?.trim()
+                          ? selectedTrainerClient.displayName
+                          : t('createSlot.assignmentSearchPlaceholder')}
+                      </Text>
+                    </XStack>
+                  </Button>
+                </YStack>
+                <YStack gap="$1.5">
+                  <Text fontSize="$3" color="$muted">
+                    {t('createSlot.workoutTypeLabel')}
+                  </Text>
+                  <Button
+                    unstyled
+                    paddingHorizontal="$4"
+                    backgroundColor="$background"
+                    borderWidth={1}
+                    borderColor="$border"
+                    borderRadius="$4"
+                    minHeight="$10"
+                    alignItems="stretch"
+                    justifyContent="center"
+                    onPress={() => setWorkoutTypePickerOpen(true)}
+                  >
+                    <XStack alignItems="center" justifyContent="space-between" width="100%" gap="$2" flex={1}>
+                      <XStack flex={1} minWidth={0} alignItems="center">
+                        {selectedAssignedWorkoutType ? (
+                          <WorkoutTypeChip
+                            label={selectedAssignedWorkoutType.name}
+                            archived={Boolean(selectedAssignedWorkoutType.isArchived)}
+                            compact
+                          />
+                        ) : (
+                          <Text color="$muted" fontWeight="600" numberOfLines={1}>
+                            {t('createSlot.workoutTypePlaceholder')}
+                          </Text>
+                        )}
+                      </XStack>
+                    </XStack>
+                  </Button>
+                </YStack>
               </YStack>
             ) : null}
           </YStack>
@@ -359,6 +421,23 @@ export function CreateSlotForm({
           </Button>
         </Sheet.Frame>
       </Sheet>
+      <TrainerWorkoutTypePickerSheet
+        open={workoutTypePickerOpen}
+        onOpenChange={setWorkoutTypePickerOpen}
+        items={workoutTypesQuery.data ?? ([] as TrainerWorkoutType[])}
+        current={selectedAssignedWorkoutType}
+        isLoading={workoutTypesQuery.isLoading}
+        onSelect={(workoutTypeId) => {
+          if (!workoutTypeId) {
+            setSelectedAssignedWorkoutType(null);
+            setWorkoutTypePickerOpen(false);
+            return;
+          }
+          const selected = (workoutTypesQuery.data ?? []).find((item) => item.id === workoutTypeId) ?? null;
+          setSelectedAssignedWorkoutType(selected);
+          setWorkoutTypePickerOpen(false);
+        }}
+      />
       <CreateSlotFooter
         canSubmit={canSubmit}
         isPending={isCreating}

@@ -2,6 +2,7 @@ import { Text, XStack, YStack } from 'tamagui';
 import { t } from '@i18n';
 import { AppIcon } from '@ui/AppIcon';
 import { Avatar, useAuthorizedImageSource } from '@ui/components';
+import { WorkoutTypeChip } from '@app/components/workout/WorkoutTypeChip';
 
 type Highlight = {
   color: 'success' | 'destructive';
@@ -18,6 +19,8 @@ type SlotCardIndividualProps = {
   isMuted: boolean;
   clientName: string | null;
   avatarUrl: string | null;
+  workoutTypeName?: string | null;
+  workoutTypeArchived?: boolean;
   highlight: Highlight | null;
 };
 
@@ -31,6 +34,8 @@ export function SlotCardIndividual({
   isMuted,
   clientName,
   avatarUrl,
+  workoutTypeName,
+  workoutTypeArchived = false,
   highlight,
 }: SlotCardIndividualProps) {
   const avatarSource = useAuthorizedImageSource(avatarUrl);
@@ -84,6 +89,11 @@ export function SlotCardIndividual({
             <Text fontSize="$4" fontWeight="700" color={isMuted ? '$muted' : '$text'}>
               {clientName}
             </Text>
+            <WorkoutTypeChip
+              label={workoutTypeName}
+              archived={workoutTypeArchived}
+              compact
+            />
           </YStack>
         </XStack>
       ) : null}

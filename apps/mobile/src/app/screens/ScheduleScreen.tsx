@@ -241,16 +241,22 @@ export function ScheduleScreen({ navigation, route }: Props) {
     }
     return { color: highlight.color, chipText: highlight.chipText };
   }, [slotHighlights]);
+
   const {
     cancelMutation,
     closeBookingMutation,
     assignAnotherClientMutation,
+    makeSlotOpenMutation,
   } = useScheduleSlotMutations({
     activeSlot,
     setActiveSlot,
     refetch,
     closeSheet,
     closeReassignSheet,
+    onDeclinedSlotReleased: (slotId) => {
+      setReleasedDeclinedSlotsLocal((current) => ({ ...current, [slotId]: true }));
+      markDeclinedSlotReleased(slotId).catch(() => {});
+    },
     showToast,
   });
 
@@ -390,14 +396,12 @@ export function ScheduleScreen({ navigation, route }: Props) {
           setReassignSheetOpen(true);
         }}
         onMakeSlotOpen={(slot) => {
-          if (!slot.id) {
+          if (!slot.id || makeSlotOpenMutation.isPending) {
             return;
           }
-          setReleasedDeclinedSlotsLocal((current) => ({ ...current, [slot.id as string]: true }));
-          markDeclinedSlotReleased(slot.id).catch(() => {});
-          closeSheet();
+          makeSlotOpenMutation.mutate(slot.id);
         }}
-        isAssigningAnotherClient={assignAnotherClientMutation.isPending}
+        isAssigningAnotherClient={assignAnotherClientMutation.isPending || makeSlotOpenMutation.isPending}
       />
       <ScheduleReassignSheet
         open={reassignSheetOpen}

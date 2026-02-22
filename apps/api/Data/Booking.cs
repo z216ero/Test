@@ -8,6 +8,8 @@ public sealed class Booking
     public Guid? ClientId { get; set; }
     public Guid? TrainerClientId { get; set; }
     public TrainerClient? TrainerClient { get; set; }
+    public Guid? WorkoutTypeId { get; set; }
+    public TrainerWorkoutType? WorkoutType { get; set; }
     public BookingStatus Status { get; set; }
     public BookingClientConfirmationStatus ClientConfirmationStatus { get; set; } = BookingClientConfirmationStatus.Confirmed;
     public DateTime? ClientConfirmationRequestedAtUtc { get; set; }

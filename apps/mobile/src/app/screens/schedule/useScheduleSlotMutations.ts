@@ -5,6 +5,7 @@ import {
   assignRegisteredClientToSlot,
   cancelTrainerSlot,
   closeTrainerBooking,
+  makeTrainerSlotOpen,
   type PaymentMethod,
 } from '@api/trainerSlotsApi';
 import { presentApiError, shouldShowErrorToast } from '@api/ApiErrorPresenter';
@@ -30,6 +31,7 @@ type UseScheduleSlotMutationsArgs = {
   refetch: () => Promise<unknown> | unknown;
   closeSheet: () => void;
   closeReassignSheet: () => void;
+  onDeclinedSlotReleased?: (slotId: string) => void;
   showToast: (payload: {
     type: 'success' | 'error';
     title: string;
@@ -43,6 +45,7 @@ export function useScheduleSlotMutations({
   refetch,
   closeSheet,
   closeReassignSheet,
+  onDeclinedSlotReleased,
   showToast,
 }: UseScheduleSlotMutationsArgs) {
   const queryClient = useQueryClient();
@@ -202,9 +205,64 @@ export function useScheduleSlotMutations({
     },
   });
 
+  const makeSlotOpenMutation = useAppMutation<SlotDto, unknown, string, SlotsContext>({
+    mutationFn: (slotId: string) => makeTrainerSlotOpen(slotId),
+    onMutate: async (slotId) => {
+      await queryClient.cancelQueries({ queryKey: keys.trainerSlots.mine() });
+      const snapshot = queryClient.getQueriesData<SlotDto[]>({ queryKey: keys.trainerSlots.mine() });
+      const activeSlotSnapshot = activeSlot;
+
+      const makeOpen = (slot: SlotDto): SlotDto => ({
+        ...slot,
+        status: 'Open',
+        bookingStatus: null,
+        clientConfirmationStatus: null,
+        bookingId: null,
+        clientId: null,
+        trainerClientId: null,
+        clientName: null,
+        clientAvatarUrl: null,
+        isFull: false,
+      });
+
+      updateSlotsCache(slotId, makeOpen);
+      setActiveSlot((current) =>
+        current && current.id === slotId ? makeOpen(current) : current
+      );
+
+      return { snapshot, activeSlot: activeSlotSnapshot };
+    },
+    onSuccess: (slot) => {
+      if (slot.id) {
+        onDeclinedSlotReleased?.(slot.id);
+      }
+      queryClient.invalidateQueries({ queryKey: keys.trainerSlots.mine() });
+      queryClient.invalidateQueries({ queryKey: keys.home.upcoming('Trainer') });
+      refetch();
+      closeSheet();
+    },
+    onError: (err, _slotId, context) => {
+      if (context?.snapshot) {
+        rollbackSlotsCache(context.snapshot);
+      }
+      if (context?.activeSlot) {
+        setActiveSlot(context.activeSlot);
+      }
+      const presented = presentApiError(err);
+      if (shouldShowErrorToast(presented)) {
+        showToast({
+          type: 'error',
+          title: presented.title,
+          message: presented.message,
+        });
+      }
+    },
+  });
+
   return {
     cancelMutation,
     closeBookingMutation,
     assignAnotherClientMutation,
+    makeSlotOpenMutation,
   };
 }

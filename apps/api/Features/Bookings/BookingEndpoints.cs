@@ -104,6 +104,45 @@ public static class BookingEndpoints
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict);
 
+        trainerAssignments.MapPost("/make-open", async (
+            Guid slotId,
+            HttpContext httpContext,
+            BookingService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!AuthClaims.TryGetUserId(httpContext.User, out var userId))
+            {
+                return Problems.Unauthorized("Unauthorized", "Authentication is required.");
+            }
+
+            var role = AuthClaims.GetRole(httpContext.User);
+            if (!string.Equals(role, UserRoles.Trainer, StringComparison.OrdinalIgnoreCase))
+            {
+                return TypedResults.Problem(
+                    title: "Forbidden",
+                    detail: "Only trainers can make slot open.",
+                    statusCode: StatusCodes.Status403Forbidden,
+                    type: "https://errors.trainerapp/forbidden");
+            }
+
+            var result = await service.ReleaseDeclinedClientFromSlotAsync(
+                slotId,
+                userId,
+                cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Problems.FromServiceError(result.Error!);
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .RequireAuthorization()
+        .Produces<SlotDto>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
+
         group.MapPost("/cancel", async (
             Guid slotId,
             HttpContext httpContext,

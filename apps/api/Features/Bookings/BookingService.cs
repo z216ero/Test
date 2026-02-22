@@ -3,6 +3,7 @@ using Api.Data;
 using Api.Features.Common;
 using Api.Features.Push;
 using Api.Features.Slots;
+using Api.Features.TrainerWorkoutTypes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -683,6 +684,108 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
         return ServiceResult<BookingDto>.Success(ToDto(booking));
     }
 
+    public async Task<ServiceResult<SlotDto>> ReleaseDeclinedClientFromSlotAsync(
+        Guid slotId,
+        Guid trainerUserId,
+        CancellationToken cancellationToken)
+    {
+        var trainerProfileId = await db.TrainerProfiles
+            .AsNoTracking()
+            .Where(t => t.UserId == trainerUserId)
+            .Select(t => (Guid?)t.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (!trainerProfileId.HasValue)
+        {
+            return ServiceResult<SlotDto>.Fail(
+                StatusCodes.Status404NotFound,
+                "Trainer profile not found",
+                "Trainer profile is not available for this user.");
+        }
+
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database
+                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+            var slot = await db.TrainingSlots
+                .Include(s => s.Booking)
+                .Include(s => s.TrainerProfile)
+                .FirstOrDefaultAsync(s => s.Id == slotId, cancellationToken);
+            if (slot is null)
+            {
+                return ServiceResult<SlotDto>.Fail(
+                    StatusCodes.Status404NotFound,
+                    "Slot not found",
+                    "Slot does not exist.");
+            }
+
+            if (slot.TrainerId != trainerProfileId.Value)
+            {
+                return ServiceResult<SlotDto>.Fail(
+                    StatusCodes.Status403Forbidden,
+                    "Forbidden",
+                    "Slot does not belong to this trainer.",
+                    new Dictionary<string, object?> { ["errorCode"] = "forbidden" });
+            }
+
+            if (slot.SlotType != TrainingSlotType.Individual)
+            {
+                return ServiceResult<SlotDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Invalid slot type",
+                    "Only individual slots can be made open.");
+            }
+
+            if (slot.StartsAtUtc <= DateTime.UtcNow)
+            {
+                return ServiceResult<SlotDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Slot already started",
+                    "Started slot cannot be changed.");
+            }
+
+            if (slot.Status == TrainingSlotStatus.Cancelled)
+            {
+                return ServiceResult<SlotDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Slot not available",
+                    "Cancelled slot cannot be changed.");
+            }
+
+            if (slot.Booking is null)
+            {
+                return ServiceResult<SlotDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Invalid slot state",
+                    "Slot has no booking to release.");
+            }
+
+            var booking = slot.Booking;
+            if (booking.Status != BookingStatus.Cancelled
+                || booking.ClientConfirmationStatus != BookingClientConfirmationStatus.Declined)
+            {
+                return ServiceResult<SlotDto>.Fail(
+                    StatusCodes.Status409Conflict,
+                    "Invalid slot state",
+                    "Only client-declined bookings can be released.");
+            }
+
+            booking.ClientId = null;
+            booking.TrainerClientId = null;
+            booking.ClientConfirmationRequestedAtUtc = null;
+            booking.ClientConfirmationRespondedAtUtc = null;
+            booking.UpdatedAtUtc = DateTime.UtcNow;
+            slot.Status = TrainingSlotStatus.Open;
+
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            var dto = await BuildSlotDtoAsync(slotId, cancellationToken);
+            return ServiceResult<SlotDto>.Success(dto);
+        });
+    }
+
     public async Task<ServiceResult<PendingBookingConfirmationsCountDto>> GetPendingBookingConfirmationsCountAsync(
         Guid clientUserId,
         CancellationToken cancellationToken)
@@ -1325,6 +1428,7 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
         var slot = await db.TrainingSlots
             .AsNoTracking()
             .Include(s => s.Booking)
+            .ThenInclude(b => b!.WorkoutType)
             .Include(s => s.Attendees)
             .Include(s => s.TrainerProfile)
             .FirstAsync(s => s.Id == slotId, cancellationToken);
@@ -1372,6 +1476,7 @@ public sealed class BookingService(AppDbContext db, PushService pushService)
             booking.TrainerClientId,
             booking.Status.ToString(),
             booking.ClientConfirmationStatus.ToString(),
+            TrainerWorkoutTypeService.ToSummaryDto(booking.WorkoutType),
             booking.ClientConfirmationRequestedAtUtc,
             booking.ClientConfirmationRespondedAtUtc,
             booking.CreatedAtUtc,

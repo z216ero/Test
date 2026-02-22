@@ -3,6 +3,8 @@ import type { SlotDto } from '@generated/api';
 import { t } from '@i18n';
 import { canMarkCompleted } from '@app/components/schedule/slotHelpers';
 import { Avatar } from '@ui/components';
+import { getSlotWorkoutType } from '@api/workoutTypesApi';
+import { WorkoutTypeChip } from '@app/components/workout/WorkoutTypeChip';
 
 type AvatarSource = {
   uri: string;
@@ -117,6 +119,7 @@ export function TrainerNowNextCard({
   const header = currentSlot
     ? t('home.trainer.nowTitle')
     : t('home.trainer.nextTitle');
+  const workoutType = getSlotWorkoutType(highlightSlot);
 
   return (
     <YStack
@@ -152,34 +155,48 @@ export function TrainerNowNextCard({
           <Text fontSize="$3" color="$muted">
             {highlightDetailLabel ?? t('common.empty')}
           </Text>
+          <WorkoutTypeChip
+            label={workoutType?.name}
+            archived={Boolean(workoutType?.isArchived)}
+            compact
+          />
         </YStack>
       </XStack>
       {currentSlot && showAttendanceActions ? (
         <XStack>
           {canMarkCompleted(currentSlot, nowTs) ? (
             <Button
+              unstyled
               flex={1}
               minHeight="$9"
               backgroundColor="$accent"
-              color="$accentText"
               borderRadius="$5"
+              alignItems="center"
+              justifyContent="center"
               onPress={() => onOpenActions(currentSlot)}
             >
-              {t('slotDetails.markCompleted')}
+              <Text color="$accentText" fontWeight="600" lineHeight={18}>
+                {t('slotDetails.markCompleted')}
+              </Text>
             </Button>
           ) : null}
         </XStack>
       ) : null}
       {!currentSlot ? (
         <Button
+          unstyled
           backgroundColor="$surfaceMuted"
           borderRadius="$5"
           borderWidth={1}
           borderColor="$border"
           minHeight="$9"
+          alignItems="center"
+          justifyContent="center"
           onPress={onGoToSchedule}
         >
-          {t('home.trainer.goToSchedule')}
+          <Text color="$text" fontWeight="600" lineHeight={18}>
+            {t('home.trainer.goToSchedule')}
+          </Text>
         </Button>
       ) : null}
     </YStack>

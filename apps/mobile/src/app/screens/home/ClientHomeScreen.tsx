@@ -46,7 +46,11 @@ const sortByStart = (left: ClientBooking, right: ClientBooking) => {
   return leftTs - rightTs;
 };
 
-const pickUpcomingBookings = (items: ClientBooking[], nowTs: number): ClientBooking[] => {
+const pickUpcomingBookingsByStatus = (
+  items: ClientBooking[],
+  nowTs: number,
+  statusType: BookingStatusType
+): ClientBooking[] => {
   if (items.length === 0) {
     return [];
   }
@@ -58,11 +62,17 @@ const pickUpcomingBookings = (items: ClientBooking[], nowTs: number): ClientBook
         return false;
       }
       const status = getBookingStatusType(booking.slot) as BookingStatusType;
-      return status === 'booked' || status === 'pending_confirmation';
+      return status === statusType;
     })
     .slice()
-    .sort(sortByStart)
-    .slice(0, MAX_UPCOMING);
+    .sort(sortByStart);
+};
+
+const withLimit = (items: ClientBooking[], limit?: number): ClientBooking[] => {
+  if (typeof limit !== 'number' || limit <= 0) {
+    return items;
+  }
+  return items.slice(0, limit);
 };
 
 const UpcomingListSkeleton = () => (
@@ -118,11 +128,19 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
   });
   const { refetch: refetchUpcoming } = upcomingQuery;
 
-  const nowTs = useMemo(() => Date.now(), []);
   const upcomingBookings = useMemo(
-    () => pickUpcomingBookings(upcomingQuery.data ?? [], nowTs),
-    [upcomingQuery.data, nowTs]
+    () =>
+      withLimit(
+        pickUpcomingBookingsByStatus(upcomingQuery.data ?? [], Date.now(), 'booked'),
+        MAX_UPCOMING
+      ),
+    [upcomingQuery.data]
   );
+  const pendingBookings = useMemo(
+    () => pickUpcomingBookingsByStatus(upcomingQuery.data ?? [], Date.now(), 'pending_confirmation'),
+    [upcomingQuery.data]
+  );
+  const pendingCount = pendingBookings.length;
 
   useEffect(() => {
     queryClient.setQueryData(keys.home.upcoming('Client'), upcomingBookings[0] ?? null);
@@ -164,6 +182,13 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
 
   const handleBookings = () => {
     navigation.navigate('Bookings', { screen: 'BookingsHome' });
+  };
+
+  const handlePendingBookings = () => {
+    navigation.navigate('Bookings', {
+      screen: 'BookingsHome',
+      params: { initialTab: 'pending' },
+    });
   };
 
   const handleDetails = (booking: ClientBooking) => {
@@ -256,7 +281,6 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
                   const times = getSlotTimes(booking.slot);
                   const timeLabel = times ? formatTimeRangeRu(times.start, times.end) : t('common.empty');
                   const dateLabel = times ? formatWeekdayDateRu(times.start) : t('common.empty');
-                  const isBooked = getBookingStatusType(booking.slot) === 'booked';
                   const trainerName = booking.trainerName?.trim() || t('common.empty');
                   const trainerProfile: AvailableSlotTrainerDto = {
                     id: booking.slot.trainerId,
@@ -309,14 +333,12 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
                             <Text fontSize="$3" color="$muted">
                               {timeLabel}
                             </Text>
-                            {isBooked ? (
-                              <YStack
-                                width="$1"
-                                height="$1"
-                                borderRadius="$6"
-                                backgroundColor="$accent"
-                              />
-                            ) : null}
+                            <YStack
+                              width="$1"
+                              height="$1"
+                              borderRadius="$6"
+                              backgroundColor="$accent"
+                            />
                           </XStack>
                         </XStack>
                         <XStack justifyContent="flex-end">
@@ -340,7 +362,45 @@ export function ClientHomeScreen({ navigation, me, meState }: ClientHomeScreenPr
             </YStack>
           ) : null}
 
-          {!showSkeleton && !hasUpcoming ? (
+          {!showSkeleton && pendingCount > 0 ? (
+            <YStack
+              gap="$3"
+              padding="$5"
+              backgroundColor="$background"
+              borderRadius="$5"
+              borderWidth={1}
+              borderColor="$border"
+            >
+              <Text fontSize="$5" fontWeight="700" color="$text">
+                {t('home.client.pendingTitle')}
+              </Text>
+              <Text fontSize="$3" color="$muted">
+                {t('home.client.pendingCount', { count: pendingCount })}
+              </Text>
+              <Button
+                unstyled
+                onPress={handlePendingBookings}
+              >
+                <XStack
+                  minHeight="$9"
+                  paddingHorizontal="$4"
+                  borderRadius="$4"
+                  borderWidth={1}
+                  borderColor="$border"
+                  backgroundColor="$background"
+                  alignItems="center"
+                  justifyContent="center"
+                  alignSelf="flex-start"
+                >
+                  <Text color="$text" fontWeight="600">
+                    {t('home.client.pendingAction')}
+                  </Text>
+                </XStack>
+              </Button>
+            </YStack>
+          ) : null}
+
+          {!showSkeleton && !hasUpcoming && pendingCount === 0 ? (
             <YStack
               padding="$5"
               backgroundColor="$background"
